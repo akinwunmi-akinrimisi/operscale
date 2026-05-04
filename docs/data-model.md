@@ -603,13 +603,30 @@ The one place this gets thorny is **paid orders**: Nigerian commercial law requi
 Migrations are applied in lexical order by Supabase. We use a 4-digit numeric prefix:
 
 ```
-0001_init_schema.sql            -- All 12 tables, indexes, FKs, RLS
-0002_storage_buckets.sql        -- customer-photos, customer-logos with policies
-0003_realtime_publication.sql   -- Add tables to supabase_realtime
-0004_edge_function_helpers.sql  -- Any RPC functions used by Edge Functions
+0001_init_schema.sql              -- All 12 tables, indexes, FKs, RLS
+0002_storage_buckets.sql          -- customer-photos, customer-logos with policies
+0003_realtime_publication.sql     -- Add tables to supabase_realtime
+0004_edge_function_helpers.sql    -- Any RPC functions used by Edge Functions
+0005_framework_seed_and_history.sql -- V2 framework_seed JSONB on analysis_runs + customer_framework_history table
+0006_ai_analysis_jobs.sql         -- V2 Phase 1 durable queue (worker pickup + status lifecycle)
 ```
 
-Future schema changes follow the same pattern (`0005_*`, `0006_*`...). Migrations are append-only — never edit a migration after it's applied to any environment, even staging.
+Future schema changes follow the same pattern (`0007_*`...). Migrations are append-only — never edit a migration after it's applied to any environment, even staging.
+
+### `ai_analysis_jobs` (added by `0006_*`)
+
+Durable queue for V2 brief analysis. Inserted by the analyze HTTP route at form-submit or re-analyze trigger time; consumed by the worker container which polls every 5 seconds and claims rows with `FOR UPDATE SKIP LOCKED`.
+
+Lifecycle: `queued` → `running` → `completed | failed`. Stuck rows (`status='running'` for >5 min) are reclaimed by the worker startup sweep (per the design doc invariant #2).
+
+Key columns:
+- `idempotency_key` (UNIQUE) — `{brief_id}::{trigger_type}::{prior_run_index|0}` — prevents duplicate enqueue.
+- `attempt_count` — incremented on each claim; ≥3 → permanent failure with `error_detail.reason='orphaned_by_restart'`.
+- `prior_run_id` + `founder_note` — required for `re_analyze_*` trigger types (enforced by a constraint trigger).
+- `resulting_run_id` — populated on success; FK to `analysis_runs`.
+
+RLS: anon denied; founder reads via JWT claim; `service_role` bypasses (used by both agent and worker containers).
+Replica identity full (per CLAUDE.md gotcha #4).
 
 ## 11. Backups
 
