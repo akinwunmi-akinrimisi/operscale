@@ -291,7 +291,7 @@ export interface BriefAnalyzerInput {
   order_index: number;
   tier: Tier;
 
-  niche: NicheSlug;
+  niche_slug: NicheSlug;   // matches the {{niche_slug}} marker in ai-brief-analysis.md §3.2
   niche_label: string;
 
   // Step 1
@@ -356,6 +356,8 @@ export interface PromptImageBlock {
 }
 export type PromptUserContentBlock = PromptTextBlock | PromptImageBlock;
 
+// role is always 'user'; Phase 2 prompts have no pre-seeded assistant turns
+// (see ai-brief-analysis.md §4 — three user messages, single Claude response).
 export interface PromptUserMessage {
   role: 'user';
   content: PromptUserContentBlock[];
@@ -365,3 +367,12 @@ export interface BuiltPrompt {
   system: string;
   messages: PromptUserMessage[];
 }
+
+// Output-validator failure variants per ai-brief-analysis.md §6. Lives in v2.ts
+// because the Phase 3 worker (orchestrator) consumes these to populate
+// activity_log.payload.reason on ai_analysis_failed events.
+export type ValidationFailure =
+  | { reason: 'malformed_json'; detail: string }
+  | { reason: 'schema_mismatch'; detail: string; zodIssues: import('zod').ZodIssue[] }
+  | { reason: 'slot_count_mismatch'; detail: string; expected: number; actual: number }
+  | { reason: 'unauthorized_slot'; detail: string; offenders: string[] };

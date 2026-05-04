@@ -59,12 +59,12 @@ export function buildPromptMessages(args: {
 }): BuiltPrompt;
 
 // output-validator.ts
-import type { AiOutput, FrameworkSeedResult, Tier } from './types/v2';
-export type ValidationFailure =
-  | { reason: 'malformed_json'; detail: string }
-  | { reason: 'schema_mismatch'; detail: string; zodIssues: import('zod').ZodIssue[] }
-  | { reason: 'slot_count_mismatch'; detail: string; expected: number; actual: number }
-  | { reason: 'unauthorized_slot'; detail: string; offenders: string[] };
+import type {
+  AiOutput,
+  FrameworkSeedResult,
+  Tier,
+  ValidationFailure,    // canonical shape lives in types/v2.ts (Phase 2 Task 2)
+} from './types/v2';
 export function validateAiOutput(
   raw: unknown,
   seed: FrameworkSeedResult,
@@ -233,6 +233,7 @@ import type {
   PriorRunContext,
   AnalysisEdit,
   BuiltPrompt,
+  ValidationFailure,
 } from './v2';
 
 describe('Phase 2 types', () => {
@@ -253,7 +254,7 @@ describe('Phase 2 types', () => {
       submission_week_iso: '2026-W18',
       order_index: 1,
       tier: 'standard',
-      niche: 'fashion',
+      niche_slug: 'fashion',
       niche_label: 'Fashion e-commerce',
       brand_name: 'Acme Ankara',
       owner_name: 'Akinwunmi',
@@ -304,7 +305,7 @@ describe('Phase 2 types', () => {
       before: 'timeless',
       after: 'crafted',
     };
-    expectTypeOf(e.field_path).toBeString();
+    expectTypeOf(e.field_path).toEqualTypeOf<string>();
   });
 
   it('BuiltPrompt holds system + Anthropic-shaped messages', () => {
@@ -314,11 +315,30 @@ describe('Phase 2 types', () => {
         { role: 'user', content: [{ type: 'text', text: 'hi' }] },
       ],
     };
-    expectTypeOf(out.system).toBeString();
-    expectTypeOf(out.messages).toBeArray();
+    expectTypeOf(out.system).toEqualTypeOf<string>();
+    expectTypeOf(out.messages).toEqualTypeOf<import('./v2').PromptUserMessage[]>();
+  });
+
+  it('ValidationFailure has all four reason variants', () => {
+    // The const annotations below are the type test — TS rejects an unknown
+    // reason literal or a missing reason-specific field at compile time.
+    const a: ValidationFailure = { reason: 'malformed_json', detail: 'unexpected token' };
+    const b: ValidationFailure = { reason: 'schema_mismatch', detail: 'shape', zodIssues: [] };
+    const c: ValidationFailure = { reason: 'slot_count_mismatch', detail: '21 vs 10', expected: 10, actual: 21 };
+    const d: ValidationFailure = { reason: 'unauthorized_slot', detail: 'AIDA used', offenders: ['framework:AIDA'] };
+    expect([a, b, c, d].map((f) => f.reason)).toEqual([
+      'malformed_json',
+      'schema_mismatch',
+      'slot_count_mismatch',
+      'unauthorized_slot',
+    ]);
   });
 });
 ```
+
+NOTE: Vitest 1.6.1 types `.toBeString()` / `.toBeArray()` as non-callable for
+some actual types; we use `.toEqualTypeOf<...>()` which is strictly stronger
+(compile-time vs runtime).
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -355,7 +375,7 @@ export interface BriefAnalyzerInput {
   order_index: number;
   tier: Tier;
 
-  niche: NicheSlug;
+  niche_slug: NicheSlug;   // matches the {{niche_slug}} marker in ai-brief-analysis.md §3.2
   niche_label: string;
 
   // Step 1
@@ -421,6 +441,8 @@ export interface PromptImageBlock {
 }
 export type PromptUserContentBlock = PromptTextBlock | PromptImageBlock;
 
+// role is always 'user'; Phase 2 prompts have no pre-seeded assistant turns
+// (see ai-brief-analysis.md §4 — three user messages, single Claude response).
 export interface PromptUserMessage {
   role: 'user';
   content: PromptUserContentBlock[];
@@ -430,6 +452,15 @@ export interface BuiltPrompt {
   system: string;
   messages: PromptUserMessage[];
 }
+
+// Output-validator failure variants per ai-brief-analysis.md §6. Lives in v2.ts
+// because the Phase 3 worker (orchestrator) consumes these to populate
+// activity_log.payload.reason on ai_analysis_failed events.
+export type ValidationFailure =
+  | { reason: 'malformed_json'; detail: string }
+  | { reason: 'schema_mismatch'; detail: string; zodIssues: import('zod').ZodIssue[] }
+  | { reason: 'slot_count_mismatch'; detail: string; expected: number; actual: number }
+  | { reason: 'unauthorized_slot'; detail: string; offenders: string[] };
 ```
 
 - [ ] **Step 4: Verify the type tests pass**
@@ -439,7 +470,7 @@ pnpm --filter @operscale-calendar/agent typecheck
 pnpm --filter @operscale-calendar/agent test src/lib/types/v2.test.ts
 ```
 
-Expected: typecheck clean; v2.test.ts passes (existing 9 + new 5 = 14).
+Expected: typecheck clean; v2.test.ts passes (existing 9 + new 6 = 15).
 
 - [ ] **Step 5: Commit**
 
@@ -637,7 +668,7 @@ const SAMPLE_BRIEF: BriefAnalyzerInput = {
   submission_week_iso: '2026-W18',
   order_index: 1,
   tier: 'standard',
-  niche: 'fashion',
+  niche_slug: 'fashion',
   niche_label: 'Fashion e-commerce',
   brand_name: 'Acme Ankara',
   owner_name: 'Akinwunmi',
@@ -774,7 +805,7 @@ The customer submitted this form on ${input.submitted_at_iso} (WAT).
 - Email: ${input.email}
 
 ### Step 2 — Niche and offer
-- Niche: ${input.niche} (${input.niche_label})
+- Niche: ${input.niche_slug} (${input.niche_label})
 - One-line description: ${input.one_line_description}
 - What they sell: ${input.offer_description}
 - Price point band: ${input.price_point_band}
@@ -809,7 +840,7 @@ The customer submitted this form on ${input.submitted_at_iso} (WAT).
 
 ## Niche brief
 
-The following is the agency's niche brief for ${input.niche}. Use it as authoritative context on
+The following is the agency's niche brief for ${input.niche_slug}. Use it as authoritative context on
 audience, voice, restricted claims, and topic library — but never substitute it for the customer's
 own stated voice or facts.
 
@@ -1618,9 +1649,9 @@ export function buildPromptMessages(args: {
 }): BuiltPrompt {
   const { brief, seed, catalog, photos, logo, prior } = args;
 
-  const nicheBrief = catalog.niches[brief.niche];
+  const nicheBrief = catalog.niches[brief.niche_slug];
   if (typeof nicheBrief !== 'string' || nicheBrief.length === 0) {
-    throw new Error(`buildPromptMessages: niche brief for "${brief.niche}" missing from catalog`);
+    throw new Error(`buildPromptMessages: niche brief for "${brief.niche_slug}" missing from catalog`);
   }
 
   const layer2Text = renderLayer2Text(brief, nicheBrief);
@@ -2141,13 +2172,13 @@ Expected: FAIL — `validateAiOutput` not exported.
 Append to `apps/agent/src/lib/output-validator.ts`:
 
 ```ts
-import { TIER_COUNTS, type AiOutput, type FrameworkSeedResult, type Tier } from './types/v2';
-
-export type ValidationFailure =
-  | { reason: 'malformed_json'; detail: string }
-  | { reason: 'schema_mismatch'; detail: string; zodIssues: import('zod').ZodIssue[] }
-  | { reason: 'slot_count_mismatch'; detail: string; expected: number; actual: number }
-  | { reason: 'unauthorized_slot'; detail: string; offenders: string[] };
+import {
+  TIER_COUNTS,
+  type AiOutput,
+  type FrameworkSeedResult,
+  type Tier,
+  type ValidationFailure,
+} from './types/v2';
 
 export type ValidationResult =
   | { ok: true; value: AiOutput }
@@ -3070,7 +3101,7 @@ export const initialFashionTier2: BriefAnalyzerInput = {
   order_index: 1,
   tier: 'standard',
 
-  niche: 'fashion',
+  niche_slug: 'fashion',
   niche_label: 'Fashion e-commerce',
 
   brand_name: 'Tola Studios',
@@ -3189,7 +3220,7 @@ describe('L2 integration — initial / fashion / tier-standard', () => {
     const seed = await selectFrameworksForBrief({
       inputs: {
         customer_id: initialFashionTier2.customer_id,
-        niche: initialFashionTier2.niche,
+        niche: initialFashionTier2.niche_slug,
         order_index: initialFashionTier2.order_index,
         submission_week_iso: initialFashionTier2.submission_week_iso,
       },
@@ -3237,7 +3268,7 @@ describe('L2 integration — initial / fashion / tier-standard', () => {
     const postHocViolations = auditFabrication(validation.value, initialFashionTier2.customer_backstory_verbatim);
     pipelineResult = postProcess({
       aiOutput: validation.value,
-      niche: initialFashionTier2.niche,
+      niche: initialFashionTier2.niche_slug,
       tier: initialFashionTier2.tier,
       hasPhotos: initialFashionTier2.photo_count > 0,
       reanalyzed: false,

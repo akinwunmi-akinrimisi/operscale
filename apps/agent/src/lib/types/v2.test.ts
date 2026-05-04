@@ -69,6 +69,7 @@ import type {
   PriorRunContext,
   AnalysisEdit,
   BuiltPrompt,
+  ValidationFailure,
 } from './v2';
 
 describe('Phase 2 types', () => {
@@ -89,7 +90,7 @@ describe('Phase 2 types', () => {
       submission_week_iso: '2026-W18',
       order_index: 1,
       tier: 'standard',
-      niche: 'fashion',
+      niche_slug: 'fashion',
       niche_label: 'Fashion e-commerce',
       brand_name: 'Acme Ankara',
       owner_name: 'Akinwunmi',
@@ -152,5 +153,20 @@ describe('Phase 2 types', () => {
     };
     expectTypeOf(out.system).toEqualTypeOf<string>();
     expectTypeOf(out.messages).toEqualTypeOf<import('./v2').PromptUserMessage[]>();
+  });
+
+  it('ValidationFailure has all four reason variants', () => {
+    // The const annotations below are the type test — TS rejects an unknown
+    // reason literal or a missing reason-specific field at compile time.
+    const a: ValidationFailure = { reason: 'malformed_json', detail: 'unexpected token' };
+    const b: ValidationFailure = { reason: 'schema_mismatch', detail: 'shape', zodIssues: [] };
+    const c: ValidationFailure = { reason: 'slot_count_mismatch', detail: '21 vs 10', expected: 10, actual: 21 };
+    const d: ValidationFailure = { reason: 'unauthorized_slot', detail: 'AIDA used', offenders: ['framework:AIDA'] };
+    expect([a, b, c, d].map((f) => f.reason)).toEqual([
+      'malformed_json',
+      'schema_mismatch',
+      'slot_count_mismatch',
+      'unauthorized_slot',
+    ]);
   });
 });
