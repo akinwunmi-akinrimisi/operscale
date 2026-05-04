@@ -34,17 +34,17 @@ The order in which UGC, T2V, and carousels appear matters as much as the ratio. 
 ### 3.1 Starter (7 days, 7 videos + 3 carousels)
 
 ```
-Day 1: UGC 30s     (intro / hook — meet the founder)
+Day 1: UGC 30s     (hook — high-affinity framework, e.g. DR Formula or Myth-Buster)
 Day 2: Carousel    (key value prop, 5 image cards)
-Day 3: T2V 30s     (cinematic mood piece)
-Day 4: UGC 30s     (educational / how-to)
-Day 5: Carousel    (testimonial or social proof)
-Day 6: UGC 30s     (behind-the-scenes)
-Day 7: UGC 30s     (CTA / push to action)
+Day 3: T2V 30s     (cinematic mood piece — Outcome Showcase or Quality Moment)
+Day 4: UGC 30s     (educational — Educational Breakdown or Quick-Win archetype)
+Day 5: Carousel    (Industry Pattern or Decoded Jargon — category-level proof, no named individuals)
+Day 6: UGC 30s     (Behind-the-Work — process tour, no fabricated origin)
+Day 7: UGC 30s     (CTA-strong close — Value Equation or DR Formula)
 Day 8: Carousel    (week recap — bonus)
 ```
 
-The arc: open with personality (Day 1 UGC), stake the value prop (Day 2 carousel), introduce visual ambition (Day 3 T2V), educate to build expertise (Day 4 UGC), prove the product works (Day 5 carousel), open the kitchen (Day 6 UGC), close with action (Day 7 UGC), recap to reinforce (Day 8 carousel).
+The arc: open with a high-affinity framework (Day 1 UGC), stake the value prop (Day 2 carousel), introduce visual ambition (Day 3 T2V), educate to build expertise (Day 4 UGC), prove the product works at category level (Day 5 carousel), open the kitchen (Day 6 UGC), close with action (Day 7 UGC), recap to reinforce (Day 8 carousel). Each slot's framework × archetype pair is selected by the deterministic seeding system in `docs/specs/non-duplication-system.md` from the customer's tier-specific selection.
 
 ### 3.2 Standard (14 days, 14 videos + 7 carousels)
 
@@ -56,16 +56,27 @@ The key Standard-specific move is the introduction of 60s videos at Day 8 and Da
 
 ### 3.3 Calendar (30 days, 30 videos + 14 carousels)
 
-Four weekly arcs. Each week is a self-contained mini-Starter with its own thematic spine.
+Four weekly arcs. Each week is a self-contained mini-Starter with its own thematic spine. V2 organises rhythm by framework family rather than founder narrative — see `docs/specs/script-frameworks.md` and `docs/specs/angle-archetypes.md` for the bank.
 
-- **Week 1 — Introduce.** Founder origin, value prop, signature offering.
-- **Week 2 — Educate.** Tutorials, how-tos, demystification content.
-- **Week 3 — Validate.** Testimonials, customer journeys, behind-the-scenes.
-- **Week 4 — Activate.** Offers, urgency, calls-to-action.
+- **Week 1 — Foundation.** Heavy educational, moderate direct response. Educational Breakdown, Quick-Win, and Numbered List frameworks; Pricing Breakdown, Decoded Jargon, and Insider Checklist archetypes. Establishes expertise.
+- **Week 2 — Depth.** Process tours, quality tells, decoded jargon. Behind-the-Work, Process Demystification, and Industry Insider frameworks; Quality Moment and Common Mistake archetypes. Builds trust through specificity.
+- **Week 3 — Persuasion.** Myth-busters, comparisons, cost reveals. PAS, DR Formula, Myth-Buster, Comparison, Cost Reveal frameworks; Hidden Trap, Cost of Inaction, Decision Framework archetypes. Drives consideration.
+- **Week 4 — Aspiration and close.** Outcome showcases (category level, never named individuals), use-case spotlights, CTA-strong direct response. Value Equation, Hook Stack, and Anti-Trend frameworks; Outcome Showcase, Use-Case Spotlight, Industry Pattern archetypes.
 
 Each week opens with a UGC 60s hero (Days 1, 8, 15, 22), fills with mixed UGC/T2V across the week (UGC 60% of the time, T2V 40%), and closes with a carousel recap.
 
 The 30-day calendar gives us room to commit to the four-week arc properly. Customers see a calendar that has a beginning, middle, and end — not just thirty videos sequentially shipped.
+
+Within each week the internal rhythm runs educational → persuasive → aspirational → CTA, so even a customer who skips a few days gets the full arc shape from any seven-day window.
+
+### 3.4 Why we don't use founder-narrative arcs
+
+Earlier iterations of this playbook organised arcs around founder origin stories ("Week 1: meet the founder, Week 2: customer transformation"). V2 replaces that pattern for two reasons:
+
+1. **The customer never sat for a content interview.** Outside the few sentences they typed in form step 6, we don't have biographical material. Founder-narrative arcs force the AI to either fabricate (ADR 0010 — no fabrication) or leave the slot empty.
+2. **Framework-driven arcs are more expressive.** A 30-day calendar built around "introduce → educate → validate → activate" produces four kinds of video. A 30-day calendar built around the framework × archetype bank produces dozens of distinct angles, all grounded in the customer's actual offer.
+
+The ratio (60% UGC, 40% T2V) and the carousel cadence are unchanged. The arc *content* is what V2 reorganises, not the *format mix*.
 
 ## 4. Lane selection within T2V
 
@@ -187,7 +198,7 @@ Each niche has a small set of overrides that the AI brief analysis applies on to
 ### 8.1 Beauty
 
 - **More UGC than baseline.** Beauty is a face-and-product category; the founder on camera matters even more here. Phase 1 keeps the 60/40 mix but Phase 2+ may shift to 70/30.
-- **Carousels skew toward ingredients/before-after.** The carousel templates for beauty bias to "5 ingredients we'll never use" and customer transformation grids.
+- **Carousels skew toward ingredients/before-after.** The carousel templates for beauty bias to "5 ingredients we'll never use" and routine-step grids. Before-and-after grids are allowed only at the category level (generic stock-style imagery) and never with named individual customers — see ADR 0010 and `docs/specs/content-types-allowed.md` for the full no-fabrication rule.
 - **T2V skews toward sensory close-ups.** Slow-motion serum drops, golden-hour applications, shelf reveals. Less narrative, more texture.
 
 ### 8.2 Real estate

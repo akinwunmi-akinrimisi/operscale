@@ -1,161 +1,204 @@
-# Niche brief: Fintech
+# Niche brief: Fintech (V2)
 
 **Status:** Authoritative for Phase 1.
 **Used by:** AI brief analysis prompt. Phase 2 production agent. Calendar preview component.
+**Last updated:** 2026-05-04.
 
-This document is the operational knowledge the AI consults when a fintech customer submits a brief. **Restricted-niche care applies throughout.**
+This document is the operational knowledge the AI consults when a fintech customer submits a brief. It pairs with the framework × archetype selection from `docs/specs/non-duplication-system.md` and the no-fabrication rule from `docs/specs/content-types-allowed.md`. Fintech is the most regulatory-sensitive niche on Operscale; this brief reflects that.
 
 ## 1. Who's in this niche
 
-- Personal finance educators and content creators.
-- Savings/budgeting app founders.
-- SME financial-services providers (invoicing, bookkeeping, payroll).
-- Investment advisors (registered).
-- Tax professionals and accounting firms.
-- Wealth management coaches.
+- B2C fintech app founders (savings, lending, investments — within their licensing scope).
+- Personal finance educators and money coaches.
+- Tax compliance services (FIRS, NRS — for individuals or SMEs).
+- Bookkeeping and accounting service providers.
+- Insurance broker apps and platforms.
+- Crypto education providers (within regulatory scope).
+- Payroll and HR-finance platforms for SMEs.
+- B2B fintech serving SMEs (invoicing, expense management).
 
-Edge cases that **do not fit** Phase 1:
-- **Unregistered consumer credit / lending** — hard pass. We don't make ads for unregistered lending operations.
-- **Crypto trading "signals" or "groups"** — hard pass.
-- **Forex trading rooms** — hard pass.
-- **Multi-level structures dressed as financial education** — hard pass.
+Edge cases — these are restricted by default and require founder pre-approval:
+- Crypto trading services / signal services — restricted.
+- Forex education with implied trading promises — restricted.
+- High-yield investment platforms — restricted.
+- Loan apps — fits the niche, but content with implied approval guarantees is restricted.
 
-The founder review screen flags these and the founder discards the brief.
+When the customer's business sits on or near a restricted line, the AI flags the brief for founder review *before* analysis runs. The CRM has a "fintech compliance pre-check" workflow.
 
 ## 2. Tone and voice patterns
 
-Fintech in Nigeria converts on **calm authority**. The category is loud and full of overpromising; trustworthy fintech voices stand out by being measured. Successful Nigerian fintech content sounds like a competent friend who knows the system, not like a hype merchant.
+Fintech in Nigeria converts on plain-language clarity + specific numbers. The audience is financially anxious (with reason — failed banks, currency depreciation, fraud) and rewards content that *explains things they were embarrassed to ask*.
 
 Common tonal markers:
 
-- Specific numbers, conservative claims: "saved ₦42,000 in 90 days", not "save millions".
-- System knowledge: tax dates, CBN circulars, BVN requirements, Pension Reform Act mentions.
-- Process-oriented: "step 1, step 2, step 3".
-- Lagos and Nigeria-specific cost references: NEPA bills, transport, food inflation, school fees.
-- Grounded in real Nigerian financial reality (multiple income streams, diaspora support, family obligations).
+- Clear-language explanations of jargon (BVN, NIN, NRS, PFA, FRC, CBN).
+- Specific numbers cited explicitly (% rates, ₦ amounts, days).
+- Direct address: "you're losing money this way".
+- Recognition of audience experience: "you've probably had a bank charge you can't explain".
+- Light Naija inflection when reference posts use it; otherwise neutral professional.
 
 Avoid:
-- Absolute wealth claims: "build wealth", "financial freedom" without specifics.
-- Aggressive scarcity ("only 50 spots left in this masterclass!").
-- US-style "passive income" framing — Nigerian audiences see through this.
-- Crypto / investment hype.
-- Anything that sounds like a get-rich-quick scheme.
+- Hype language ("financial freedom", "passive income", "wealth building").
+- Specific return promises in any form.
+- "Get rich quick" framing entirely.
+- Casual claims that imply licensed advice (you're not their lawyer or financial advisor unless the customer is one).
+- First-person biographical anecdotes that we haven't been given.
 
-## 3. Topic library
+## 3. Topic library — by archetype
 
-### 3.1 UGC topics that perform
+### Decoded Jargon
+- "What 'BVN' actually does — and what it doesn't."
+- "Decoding your bank statement — every line item."
+- "NIN, BVN, NRS — what each one is for."
+- "PFA vs PFC — the plain-language version."
 
-- "I tracked my bank charges for 90 days — here's what I found"
-- "Why most Nigerian SMEs fail at bookkeeping"
-- "The 3 buckets that actually work for Nigerian salaries"
-- "My honest review of [savings app / bank product]"
-- "What I'd tell my younger self about money in Lagos"
-- "Tax-season checklist for SME owners"
-- "How to actually negotiate your salary in 2026"
-- "Why your emergency fund needs to be in [specific instrument]"
-- "Behind the math: how I personally invest"
-- "Things accountants hate hearing"
-- "5 fees in your bank statements you didn't know existed"
-- "How to set up your first PFA pension contribution"
-- "What changed in CBN's [recent circular] — and what you need to do"
-- "Customer journey: how [name] cleared ₦Xm in 18 months"
+### Educational Breakdown / Process Demystification
+- "How a Nigerian tax filing actually works — step by step."
+- "What happens to your money when you 'save' in a microfinance app."
+- "From signup to first transaction: how [type of platform] works."
 
-### 3.2 T2V cinematic topics
+### Insider Checklist / Pre-Decision Audit
+- "[N] questions to ask before opening any new financial account."
+- "Before you sign up for any savings app, check these [N] things."
+- "The [N]-point audit for any small-business expense process."
 
-Visual register: clean, considered, professional but warm. Fintech T2V succeeds when it earns trust through visual restraint, not visual ambition.
+### Common Mistake / Cost of Inaction
+- "[N] money mistakes Nigerian SMEs keep making."
+- "Why most Nigerian freelancers under-pay tax — and what it actually costs them."
+- "What missing your monthly remittance actually costs you over a year."
 
-- Time-lapse of a desk with documents, calculator, laptop in golden hour.
-- Hands counting cash, then cash being banked.
-- Wide shot of a Lagos office through a glass door.
-- Slow zoom on a savings number going up on a dashboard.
-- Aerial of Lagos at dawn — the city waking up to work.
-- Founder walking to work / boardroom-side.
-- Document close-ups: tax filing, invoice, payment confirmation.
+### Symptom Diagnosis
+- "Signs you're paying more in bank charges than you should."
+- "How to know if your business needs a separate tax ID."
+- "If your bookkeeping looks like this, you have a problem."
 
-### 3.3 Carousel templates
+### Hidden Trap / Category Myth
+- "The [type of product] trap nobody warns you about."
+- "Stop believing [common money myth]."
+- "Why [popular financial advice] doesn't work for Nigerian incomes."
 
-- "5 fees you didn't know about"
-- "Tax-season SME checklist"
-- "How to set up your emergency fund (Naira version)"
-- "BVN vs NIN — what each does and when you need them"
-- "[App or product] features — what's actually useful"
-- "End-of-year financial review template"
+### Regulatory Snapshot
+- "What changed in [recent CBN circular] — and what you need to do."
+- "FIRS [recent rule]: the version that affects you."
+- "NRS in 2026 — the practical guide."
 
-## 4. Brand voice variables
+### Comparison / Decision Framework
+- "[Platform A] vs [Platform B]: when each makes sense."
+- "Should you save in naira or hold in dollars? — the trade-offs."
+- "Mutual funds vs treasury bills: the real differences."
+
+### Service Anatomy / What You Get
+- "What our [platform] actually includes."
+- "The [N] features in [signature plan]."
+- "Inside the [paid tier] — every line of value."
+
+### Industry Pattern / Market Reality
+- "Average savings rates across major Nigerian apps right now."
+- "What Nigerian SMEs are actually spending on bookkeeping in 2026."
+- "Where the [niche] is heading in the next 6 months."
+
+### Cost Reveal
+- "What it actually costs to run a fintech app — the parts users don't see."
+- "Why our [tier] costs ₦[X] — broken down."
+- "The hidden costs in 'free' financial products."
+
+### Outcome Showcase / Use-Case Spotlight (T2V cinematic — careful)
+- App UI close-ups (with consent — never show real customer balances).
+- Dashboard reveals showing typical (anonymised) data.
+- Numbers animating into clarity (analytics-style).
+- A laptop on a desk in a Lagos apartment — daytime work scene.
+
+## 4. Brand voice variables (defaults; overridden by extraction)
 
 ```
 common_do_say:
-  - specific Naira figures
-  - specific institutions (CBN, FIRS, NDIC, PFAs by name)
-  - process steps ("first, second, third")
-  - "I", "in my experience", "my clients"
-  - cautionary framing ("before you do this", "the part to double-check")
+  - specific terms used naturally (BVN, NIN, NRS, CBN, FIRS, PFA)
+  - exact percentages, naira amounts, durations
+  - "in my experience" / "what we keep seeing" — observational expertise
+  - direct addressing of audience financial anxiety
+  - plain-language explanations of jargon
 
 common_do_not_say:
-  - "build wealth" without specifics
-  - "passive income" / "financial freedom"
-  - absolute claims about returns
-  - generic "the system is broken" framing
-  - any crypto hype language
+  - "financial freedom", "passive income", "build wealth"
+  - any specific return promise ("earn X% guaranteed")
+  - "the only [solution] you'll ever need"
+  - implied licensed advice unless customer is licensed
+  - first-person biographical claims not in customer material
 ```
 
 ## 5. Restricted claims to flag
 
-This is the most flag-heavy niche. The AI brief analysis must catch:
+- Specific return promises — hard-block.
+- "Guaranteed" anything financial — hard-block.
+- Specific stock/crypto picks — hard-block.
+- Implied tax advice when customer isn't a registered tax practitioner — flag.
+- Specific debt-clearing timelines without methodology — flag.
+- Claims about CBN / FIRS / SEC / EFCC affiliation that aren't substantiated — hard-block.
+- Specific success-rate percentages without methodology — flag.
 
-- **Return / yield claims** — "make 20% on your money", "guaranteed returns" — flag and propose softer "what to expect from [instrument]" framings.
-- **Unregistered credit offers** — if customer mentions "give loans", "consumer credit", check for CBN registration. If unregistered, flag for founder review (likely discard).
-- **Crypto trading claims** — flag any mention of trading signals, group memberships, or guaranteed crypto returns.
-- **Tax / legal advice without licensing** — if customer is positioning as a tax authority without ICAN / ANAN registration, soften from "tax advice" to "tax-season tips" framing.
-- **Pension claims** — pension industry is regulated; flag any "guaranteed" pension claims.
-- **Foreign-exchange products** — heavily regulated; flag any FX-related angle for compliance review.
+## 6. Niche-specific framework × archetype affinity adjustments
 
-The flag should always specify what to soften and what's hard-blocked. Example: "Customer mentioned 'helps clients save 30% on tax' — soften to 'helps clients identify deductions they may have missed' OR escalate for ICAN-registration confirmation."
+- **Educational frameworks dominate.** This is the most education-heavy niche on Operscale.
+- **Decoded Jargon archetype runs strongest here.** Nigerian fintech jargon density is high.
+- **Regulatory Snapshot is high-affinity** because regulation changes often.
+- **Comparison framework is critical** — fintech buyers compare options.
+- **PAS and DR Formula run cooler** than other niches because aggressive selling reads as scammy in this category.
+- **Behind-the-Work runs lowest** of all niches — fintech work is screen-bound and not visually compelling.
 
-## 6. Niche-specific calendar rhythm bias
+## 7. Sample reference material fallback — observational, not first-person
 
-Fintech calendars deviate from baseline 60/40:
+> Example A (educational, plain language):
+> "Most people don't realise their NIN and BVN do different things. Your NIN is your identity. Your BVN is your banking footprint. They're issued by different bodies, used for different things, and recovering one is a completely different process from recovering the other."
 
-- **More T2V than baseline.** Calm, considered visual register from T2V is what fintech needs. T2V uses 70%+ quality lane allocation.
-- **UGC skews to expertise and education.** "Why most SMEs fail at..." beats "look at our app".
-- **Carousels are guides and explainers.** The 14-page Calendar carousel allotment is dense with practical content.
-- **Less aspirational / mood-piece content.** Fintech doesn't need cinematic-as-fantasy; it needs cinematic-as-credibility.
+> Example B (specific, expert):
+> "₦47,300. That's the average monthly bank charge a Nigerian SME with three accounts pays — most of it avoidable. The breakdown: ₦18,000 in transaction levies, ₦12,000 in card maintenance, ₦9,000 in stamp duty, and ₦8,300 in service fees. Here's how to cut three of those four lines."
 
-## 7. Sample reference material fallback
+> Example C (regulatory, observational):
+> "The CBN updated the cashless policy thresholds again last quarter. If you're an SME running daily collections, three things changed for you — and one of them affects how much your processor is allowed to charge you per transaction."
 
-> Example A (calm / authoritative):
-> "I've been doing tax planning for SMEs for 7 years. The single most common mistake I see is not separating personal and business expenses. Here's how to fix it in one weekend."
-
-> Example B (educational / specific):
-> "If you're earning ₦600k a month in Lagos and saving nothing, you're not bad with money — you're paying inflation tax. Here's the bucket system that actually works at this income level."
-
-> Example C (founder / vulnerable):
-> "I built this app because I almost lost ₦4m in 2022 to a fraud I didn't understand. Now we're protecting 12,000 Nigerian SMEs from the same thing. Here's what I learned the hard way."
+None of these claim "I once lost ₦Xm in a failed bank" or "my client cleared their debt in 18 months". Observational educational framing only.
 
 ## 8. Photo aesthetic notes
 
-Fintech founders are often less camera-comfortable than beauty or fashion founders. The photo upload, when it happens, often shows:
-- Office settings.
-- Business-casual to formal wardrobe.
-- Indoor lighting (often suboptimal — fluorescent).
-
-Note the lighting register and recommend the avatar treatment compensate. The visual style block should bias toward professional warmth — desk lamps, natural window light, neutral backgrounds — rather than fluorescent overhead realism.
+- Founder photos in casual professional settings work well — avatar reads "competent peer".
+- Avoid suit-and-tie corporate photos — that register has lost trust in Nigerian fintech.
+- Office or laptop-on-desk settings work for visual_style fallback.
+- Note any photos that show actual customer/user data — flag for blur/redaction in T2V references.
 
 ## 9. Common upsell signals
 
-- Customer mentioned both consumer-facing and SME-facing service lines.
-- Customer mentioned upcoming product launch or feature rollout.
-- Customer mentioned tax season urgency (Q1, Q4 windows).
-- Customer is targeting more than one customer segment (e.g. SMEs AND salaried professionals).
+- Customer is in active growth phase (mentioned MAU growth, new feature launches).
+- Customer has multiple products / tiers / segments.
+- Customer mentioned regulatory deadline or compliance push.
+- Customer mentioned "fundraise" or "launch" — both increase content urgency.
 
-Upsell framing: "with 14 videos we can have 6-7 dedicated to SME content and 6-7 to salaried-professional content — they're different audiences and need different angles. Hard to serve both in 7 videos."
+Upsell framing: "30 videos lets you cover regulatory updates, product education, jargon decoding, and pricing transparency — all without repeating angles. Fintech needs volume for trust-building."
 
-## 10. Restricted-niche fallback
+## 10. No-fabrication notes specific to fintech
 
-If a fintech customer is borderline (unregistered lending, crypto signals, FX trading), the founder review path is:
+Fintech is the highest-stakes niche for fabrication risk because false financial claims can cause real harm. The AI must resist:
 
-- **Founder discards** in CRM with reason recorded.
-- **No further automated emails.**
-- **Founder may follow up manually** if there's a compliant version of the customer's offering we'd be willing to make content for.
+- **Outcome stories about specific people.** "Tomi cleared ₦8m in 18 months" — off the table without documented consent and substantiation.
+- **Implied personal financial track record.** "I made my first million doing this" — off the table.
+- **Specific case studies dressed as personal experience.** "When I helped a client through their tax investigation" — off the table unless customer typed it.
+- **Implied insider regulatory knowledge** — "what the CBN is about to announce" — off the table without source.
 
-We don't have a fintech-restricted sub-flow. The decision is binary: in-scope or out-of-scope.
+What we do instead:
+
+- **Public regulatory explanation** with cited authority.
+- **Pricing and fee transparency** with current public data.
+- **Process tours** of how financial products actually work.
+- **Decision frameworks** customers can apply themselves.
+- **Jargon decoding** with accurate definitions.
+- **Defensible opinion** on category-level patterns (e.g. "most savings apps have similar problems" is defensible; "I've used 12 of them" needs source).
+
+The fintech compliance pre-check in the CRM exists to catch any restricted-line risk before analysis runs.
+
+## 11. Cross-references
+
+- `docs/specs/script-frameworks.md`
+- `docs/specs/angle-archetypes.md`
+- `docs/specs/research-methodology.md`
+- `docs/specs/content-types-allowed.md`
+- `niche-briefs/restricted.md`
+- `docs/specs/ndpc-compliance.md` — for content that touches user data examples.

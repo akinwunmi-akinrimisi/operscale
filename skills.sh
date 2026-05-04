@@ -207,6 +207,11 @@ install_skills() {
   run "npx -y skills add coreyhaines31/marketingskills --skill form-cro -g -y"
   run "npx -y skills add coreyhaines31/marketingskills --skill analytics-tracking -g -y"
 
+  # Scriptwriting methodology (awesomeskill.ai) — DR formula and hook-stacking patterns,
+  # filtered through ADR 0012 (frameworks by name of framework, not by name of marketer).
+  log "  -> Scriptwriting methodology (awesomeskill.ai)"
+  run "npx -y skills add awesomeskill-ai/scriptwriting-methodology --skill claude-vibes-scriptwriting-methodology -g -y"
+
   # Observability — Sentry CLI for error tracking
   log "  -> Observability (sentry/dev)"
   run "npx -y skills add sentry/dev --skill sentry-cli -g -y"

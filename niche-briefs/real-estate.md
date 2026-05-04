@@ -1,154 +1,195 @@
-# Niche brief: Real estate
+# Niche brief: Real estate (V2)
 
 **Status:** Authoritative for Phase 1.
 **Used by:** AI brief analysis prompt. Phase 2 production agent. Calendar preview component.
+**Last updated:** 2026-05-04.
 
-This document is the operational knowledge the AI consults when a real-estate customer submits a brief.
+This document is the operational knowledge the AI consults when a real-estate customer submits a brief. It pairs with the framework × archetype selection from `docs/specs/non-duplication-system.md` and the no-fabrication rule from `docs/specs/content-types-allowed.md`.
 
 ## 1. Who's in this niche
 
-- Real-estate agents and brokers selling residential properties.
-- Real-estate developers marketing their own projects.
-- Property managers running short-let / serviced apartment portfolios.
-- Real-estate investment advisors and educators.
-- Mortgage brokers (with care — they overlap with fintech).
+- Solo real-estate agents and brokers.
+- Property-marketing freelancers and content-led agents.
+- Boutique agencies (under 10 staff) marketing across Lekki, Ikoyi, Victoria Island, Ajah, Ibeju-Lekki, Magodo, Surulere, Yaba, Abuja's Maitama/Asokoro/Wuse, Port Harcourt's GRA.
+- Property-investment educators selling courses, consulting, or due-diligence services.
+- Off-plan and primary-market sales reps.
+- Short-let operators (Airbnb, Booking.com, Hotels.ng listings).
 
 Edge cases:
-- Pure construction firms — fits, but tone bias shifts toward execution and craft, less toward the buying decision.
-- Land bankers selling raw plots — fits, but compliance risk is higher (Lagos has frequent land-title disputes; we tread carefully).
-- Buy-to-let coaching businesses — fits more like education than real estate.
+- Architecture firms — fits but slants toward Behind-the-Work and Process Tour rather than transaction archetypes.
+- Property valuers / surveyors — fits as service business, not as transaction marketers.
+- Mortgage brokers — sits at the fintech/real-estate boundary; route by primary revenue source.
 
 ## 2. Tone and voice patterns
 
-Real-estate buyers in Nigeria are looking for **trust signals** above all else. The category is full of cowboy operators; the customers know it. Successful real-estate content is the opposite of hype — measured, specific, willing to disclose downsides.
+Real estate in Nigeria converts on authority + transparency. The buyers are sceptical (with reason — the market has documented fraud and pricing opacity), so content that *demonstrates expertise* and *names the things people don't talk about* outperforms aspirational drone shots.
 
-Common tonal markers in successful Nigerian real-estate content:
+Common tonal markers:
 
-- Direct expertise framing: "after 4 years of doing this", "I've inspected over 200 properties", "I've seen this go wrong twice".
-- Specific numbers: "₦65m for the duplex, ₦1.2m for service charge per year, ₦300k for legal".
-- Willingness to disclose: "the catch is...", "this isn't for everyone", "I wouldn't recommend this if you're a first-time buyer".
-- Lagos-area specificity: not "Lagos" but "Ikate, Lekki Phase 1", "Banana Island", "Magodo Phase 2".
-- Cautionary tone: "before you sign anything...", "the document to ask for is...".
+- Specific neighbourhood references (Ikoyi vs Lekki Phase 1 vs Lekki Phase 2 vs Ajah is a *real* distinction, not aesthetic).
+- Document literacy: C of O, Governor's consent, deed of assignment, survey plan, building approval.
+- Pricing transparency: agency fees (5-10%), legal fees (5%), service charge ranges, parking levies.
+- Scepticism toward "good deals" — the genre rewards founders who help buyers spot scams.
+- Light professional swagger: "this is what you should be asking" beats "we're the best agency".
 
 Avoid:
-- "Luxury" overuse. Every Nigerian real-estate ad says luxury; saying it makes you sound like every other ad.
-- "Investment opportunity" framing without specifics. Vague signals scam.
-- Generic aerial drone shots without context — flag if customer requests this exclusively.
-- Aggressive scarcity claims ("only 3 left!") unless verifiable.
+- Aspirational drone-shot openers without substance.
+- "Luxury living" generic copy.
+- Implied promises of returns ("this property will appreciate by X%").
+- Specific competitor naming as targets.
+- First-person biographical anecdotes that we haven't been given.
 
-## 3. Topic library
+## 3. Topic library — by archetype
 
-### 3.1 UGC topics that perform
+### Pricing Breakdown
+- "₦[X] for a 3-bedroom in [neighbourhood]. Here's the breakdown — agency fee, legal, service charge, parking."
+- "Why a Lekki Phase 1 flat costs more than a Lekki Phase 2 flat — line by line."
+- "Service charge ranges across Lagos in 2026."
 
-- "House hunting in Lekki under ₦Xm — here's what I found"
-- "Things agents won't tell first-time buyers"
-- "How to inspect a property like a pro in 10 minutes"
-- "My honest review: Lagos vs Abuja for landlords"
-- "Inside a ₦Xm duplex you wouldn't expect"
-- "Why 'newly built' doesn't mean what you think"
-- "Real client journey: rented to owned in 18 months"
-- "The 7 documents that protect you"
-- "Service charge — how it's actually calculated"
-- "C of O vs Governor's Consent vs Survey — explained"
-- "Why I turned down a ₦150m listing last month"
-- "What I check on every property before showing it to a client"
-- "Common mistakes I see Lagos buyers making"
-- "How to read a sales agreement (the 5 lines that matter)"
+### Service Anatomy
+- "What an agent actually does between offer and handover."
+- "The 7 stages of a typical property purchase in Lagos."
+- "Behind a property listing: what we do before it goes live."
 
-### 3.2 T2V cinematic topics
+### Insider Checklist
+- "[N]-point checklist for any pre-purchase property visit."
+- "What to check on a Governor's consent before you sign anything."
+- "The [N] documents you should see before paying any money."
 
-Visual register: aspirational but grounded. Real-estate cinematic that performs is cinematic-as-evidence, not cinematic-as-fantasy.
+### Common Mistake / Pre-Decision Audit
+- "[N] mistakes first-time Lagos buyers make."
+- "Don't pay any deposit until you've checked these [N] things."
+- "Why most off-plan buyers regret their first purchase."
 
-- Drone glide over a coastal Lagos estate.
-- Sunset on a luxury terrace in Banana Island or Eko Atlantic.
-- Empty sitting room transforming with morning light.
-- Architectural reveal — walk through the front door, into the living space.
-- Time-lapse of a development from foundation to completion.
-- Tracking shot through a hallway into a master bedroom.
-- Wide establishing shot of a neighbourhood — main road, then the property.
+### Process Tour / Process Demystification
+- "How a Governor's consent application actually works."
+- "From offer to handover: a typical Lagos property timeline."
+- "What 'family land' actually involves — the full process."
 
-### 3.3 Carousel templates
+### Quality Tells
+- "How to spot a well-built Nigerian apartment vs a rushed one."
+- "[N] tells of a quality property finish."
+- "What separates a real Lagos developer from a fly-by-night."
 
-- "7 questions to ask before any inspection"
-- "How service charge is actually calculated"
-- "Lekki vs Ikoyi vs Yaba — a buyer's breakdown"
-- "Documents that protect you" (C of O, Governor's consent, etc.)
-- "[Listing name] — virtual brochure" — 5-page property showcase
-- "First-time buyer's checklist"
+### Decoded Jargon
+- "What 'C of O' actually means and why it matters."
+- "Deed of assignment vs Governor's consent — the plain version."
+- "Decoding 'family land' — the part agents won't explain."
 
-## 4. Brand voice variables
+### Industry Pattern / Market Reality
+- "Lagos rental market right now — by the numbers."
+- "Why service charges in Lekki keep rising."
+- "What changed in the Lagos State land use charge — the practical version."
+
+### Regulatory Snapshot
+- "What the new Lagos building regulation requires."
+- "Land use charge: the version that affects you."
+- "Recent Lagos State Land Bureau updates."
+
+### Cost of Inaction / Hidden Trap
+- "The Lagos property trap nobody warns you about."
+- "Why some 'good deals' are documents waiting to be challenged."
+- "The cost of buying without proper due diligence — every fee."
+
+### Decision Framework
+- "Buy vs rent in Lagos: the math, with current rates."
+- "Lekki vs Ikoyi for a first apartment — the trade-offs."
+- "Off-plan vs ready-built: when each makes sense."
+
+### Outcome Showcase / Use-Case Spotlight (T2V cinematic)
+- Slow-pan property reveals — interior shots, never claiming "Sarah's new apartment".
+- Hands flipping through clean property documents.
+- Wide shot of a Lagos street, narrowing to a specific building.
+- Property handover montage (keys, signed documents, neutral framing).
+
+## 4. Brand voice variables (defaults; overridden by extraction)
 
 ```
 common_do_say:
-  - specific neighbourhoods, not "Lagos"
-  - specific numbers (price, ROI, service charge)
-  - "I", "my client", "the property"
-  - cautionary language ("before you sign", "the document to ask for")
-  - measured outcomes ("appreciated 22% in 3 years")
+  - specific neighbourhood names ("Lekki Phase 2", "Ajah")
+  - document terminology used naturally ("C of O", "Governor's consent", "deed")
+  - exact prices, percentages, durations
+  - "in my experience" / "what we keep seeing" — observational expertise
+  - direct addressing of buyer fears ("I know you've heard horror stories")
 
 common_do_not_say:
-  - "luxury" used twice in the same script
-  - "exclusive", "premium", "world-class" without specifics
-  - "investment opportunity" without detail
-  - hype-style scarcity ("only X left!")
-  - "best deal in Lagos" (no, it isn't, and the viewer knows)
+  - "luxury living", "your dream home", aspirational generic
+  - "guaranteed appreciation", any return promise
+  - specific competitor names as targets
+  - "the only agency you'll ever need" (overclaim)
+  - first-person biographical claims not in customer material
 ```
 
 ## 5. Restricted claims to flag
 
-- **Title claims** — if the customer says "C of O is in process", "title is clean", "Governor's consent secured" — flag. We don't restate these in the brief without verification.
-- **Yield projections** — "this property will yield 25% per year" must be flagged. Real-estate yield depends on market, location, and execution; we won't put numbers in the customer's mouth that they can't substantiate.
-- **Government project endorsements** — if customer claims a project is "approved by the State Government" or "Federal Government partnership", flag.
-- **Off-plan urgency** — flag if the customer wants high-pressure scarcity around an off-plan project.
+- Specific return-on-investment promises ("this will appreciate by 20%").
+- Any "guaranteed" framing on appreciation, rental yield, or sale.
+- Implied legal advice ("you don't need a lawyer for this").
+- Implied EFCC / regulatory clearance the customer didn't claim.
+- Anti-competitor framing (specific named developers/agents).
+- Claims about ongoing court cases / disputed land titles.
 
-The brief flag should be specific: "Customer mentioned 'guaranteed 25% yield' — soften to 'historically appreciated' with specific year-over-year numbers, or escalate for substantiation review."
+## 6. Niche-specific framework × archetype affinity adjustments
 
-## 6. Niche-specific calendar rhythm bias
+- **Educational frameworks dominate.** Educational Breakdown, Process Demystification, Numbered List, Checklist Reveal — the genre is fundamentally educational.
+- **Cost Reveal runs strong.** Pricing transparency is the differentiator.
+- **Behind-the-Work runs lower than other niches.** Real estate work is often less visually compelling than craft work.
+- **Specificity Stack is critical.** Numbers (prices, fees, square footage) are the genre's currency.
+- **Comparison framework is high-affinity** for neighbourhood and tier comparisons.
 
-Real-estate calendars deviate from the baseline 60/40 mix:
+## 7. Sample reference material fallback — observational, not first-person
 
-- **More T2V than baseline.** Real-estate buyers want to see the property. T2V here uses 60%+ quality lane allocation (vs 45% baseline).
-- **UGC skews to expertise and trust, not product reveals.** "What I'd check before any inspection" beats "look at this property".
-- **Carousels are the most-saved content.** Real-estate buyers print and bring carousels to inspections. The 14-page Calendar carousel allotment is a real differentiator here.
+> Example A (authoritative observational):
+> "Most first-time Lagos buyers focus on price. They miss the four other costs that come with a purchase: agency fee (10%), legal fee (5%), survey plan, and Governor's consent. Together those add 18-22% to the sticker price."
 
-## 7. Sample reference material fallback
+> Example B (specificity-led):
+> "₦65 million for a 3-bedroom in Lekki Phase 1. The unit is 156 sqm, 5th floor, with parking for two. Service charge is ₦1.4m a year. Here's the breakdown."
 
-> Example A (expert / measured):
-> "I've inspected 220 properties in Lekki over the past 4 years. Out of those, I've recommended 31. The other 189 had issues that the listing agents didn't flag. Here's the checklist I use."
+> Example C (educational, expert):
+> "Governor's consent is what makes a property transfer legal in Lagos. Without it, what you have is a payment receipt — not ownership. Here's how the process actually works."
 
-> Example B (cautionary / educational):
-> "If your sales agreement doesn't include a clause about the C of O, pause. I've seen Nigerian buyers lose ₦40m+ on this exact issue. The document language to look for is..."
-
-> Example C (warm / first-person):
-> "When I was buying my first place in Magodo, I missed three things that cost me an extra ₦3m in year one. I won't let my clients miss them. Here's what they are."
+None of these claim a specific personal history. The expertise comes through naturally via specificity.
 
 ## 8. Photo aesthetic notes
 
-Real-estate customers occasionally upload photos of themselves (for UGC). They less often upload photos of properties (those come from the customer's own listing photography or the AI generates establishing shots).
-
-For founder photos:
-- **Wardrobe** is usually business-casual to formal. Note the register.
-- **Setting** is usually office or property-side. The visual style block should bias toward "professional but approachable" — not corporate.
-- **Lighting** — many founder photos are office lighting. Flag if the photos look harsh; recommend the avatar treatment soften it.
+- Wide shots of properties usually need re-lighting before avatar generation; flag for production.
+- Outdoor portraits in front of properties read as "agent" — strong for trust signals.
+- Studio shots feel corporate and less native — flag if customer's only photos are studio.
+- Clean indoor shots in finished properties pair well with T2V property reveals.
+- Avoid drone-only photos for avatar generation — vision pass can't extract good wardrobe/face data.
 
 ## 9. Common upsell signals
 
-Real-estate customers who pick Starter often have multiple listings or services and 7 videos can't cover them. Upsell triggers:
+- Customer manages 5+ active listings.
+- Customer mentioned "agency growth" or "team expansion".
+- Customer operates in multiple neighbourhoods (more content needed for each).
+- Customer mentioned ongoing court cases or document issues — flag for restricted-content discussion before proceeding.
 
-- Customer mentioned 3+ active listings.
-- Customer mentioned both rental management AND sales (two distinct service lines).
-- Customer mentioned an off-plan project (which needs a longer story arc).
-- Customer mentioned operating in 2+ neighbourhoods (each needs its own cluster of content).
+Upsell framing: "30 videos lets you cover one specific niche concern per day for a month — different documents, different neighbourhoods, different price tiers — without repeating angles."
 
-Upsell framing: "with 14 videos we can dedicate 3-4 videos per neighbourhood / listing, plus carve out the educational content (inspection checklists, document guides) that actually converts buyers."
+## 10. No-fabrication notes specific to real estate
 
-## 10. Compliance-adjacent guidance
+Real estate is high-stakes and fabrication risk has both reputational and regulatory exposure. The AI must resist:
 
-Real-estate is the niche most likely to drift into territory that creates legal exposure for the customer. The AI brief analysis should:
+- **Outcome stories.** "How my client made ₦50m on this property" — off the table without documented testimonial consent.
+- **Specific case studies.** "When I helped a buyer through a tricky C of O case" — off the table unless customer typed it into step 6.
+- **Implied rare-event experience.** "I once stopped a fraudulent deed transfer at the last minute" — off the table.
+- **Specific market predictions** dressed as personal forecasting.
 
-- Avoid putting specific yield numbers in any sample script.
-- Avoid restating ownership or title status as fact.
-- Default to "I" and "in my experience" framings rather than absolute claims.
-- Include "for educational purposes — please consult your lawyer" disclaimers in any script that involves contract or document discussion.
+What we do instead:
 
-If a customer specifically asks for content that's a hard pass (claims they can't substantiate, predatory urgency, anti-competitor framing), the founder discards the brief and follows up manually with what we can do instead.
+- **Document explanations** grounded in public regulatory knowledge.
+- **Pricing transparency** with current market data.
+- **Process tours** of how transactions work.
+- **Pre-decision checklists** customers can use themselves.
+- **Hidden traps** framed as category-level patterns, not personal saves.
+- **Regulatory snapshots** based on current public information.
+- **Defensible opinion** on neighbourhoods, building quality, contract terms.
+
+## 11. Cross-references
+
+- `docs/specs/script-frameworks.md`
+- `docs/specs/angle-archetypes.md`
+- `docs/specs/research-methodology.md`
+- `docs/specs/content-types-allowed.md`
+- `niche-briefs/restricted.md`

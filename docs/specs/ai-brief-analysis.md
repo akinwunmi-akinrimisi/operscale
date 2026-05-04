@@ -1,395 +1,445 @@
-# Spec: AI brief analysis service
+# AI brief analysis service
 
-The most novel piece of Phase 1. Reads the customer's intake form (and photos if uploaded) and produces structured output that drives both the customer-facing brief email and the founder's CRM review. This document is the single source of truth for the prompt, the schema, the failure handling, and the cost expectations.
+**Status:** Authoritative for Phase 1 (V2 content migration).
+**Owner:** Akinwunmi.
+**Last updated:** 2026-05-04.
 
-If you (Claude) are implementing or modifying the analysis service, this document is the contract. If `apps/agent/src/lib/claude.ts` disagrees with this doc, the code is wrong — fix the code.
+This document specifies the AI brief analysis service — the asynchronous worker that turns a submitted form payload into a founder-ready analysis. It is the central content-generation surface of the platform and the place where the no-fabrication rule (`docs/specs/content-types-allowed.md`), the framework × archetype banks (`docs/specs/script-frameworks.md`, `docs/specs/angle-archetypes.md`), the deterministic seeding system (`docs/specs/non-duplication-system.md`), and the four-lens research methodology (`docs/specs/research-methodology.md`) all converge.
 
-## What this service is and is not
+If you change anything in those five files, this spec is the integration surface and must be updated in the same commit.
 
-The AI brief analysis service:
+## 1. What this service does
 
-- Reads a brief from the database (`briefs` row + linked `brief_photos` + niche markdown).
-- Calls Claude Opus 4.7 (with vision when photos exist) to produce a structured JSON output.
-- Validates the output against a strict schema.
-- Writes the result to `analysis_runs` with `is_current = true`.
-- Updates the order to `pending_founder_review`.
+When a customer submits the intake form, the form-submission endpoint enqueues an `ai_analysis_job`. The agent service (port 3002) picks the job up within seconds and runs the analysis, which produces a structured JSON output the founder reviews in the CRM.
 
-The AI brief analysis service does NOT:
+Concretely the service:
 
-- Send any customer-facing email. (That happens after founder approval — see `email-templates.md`.)
-- Mutate the original `briefs` row. The form is immutable once submitted.
-- Generate scripts, captions, or any production-ready content. (That's Phase 2.)
-- Decide whether to upsell — it recommends; the founder decides.
+1. Loads the brief, photos, niche brief, framework bank, and archetype bank.
+2. Computes a deterministic per-customer seed (per `docs/specs/non-duplication-system.md`) and selects N frameworks and N archetypes for the tier.
+3. Constructs a four-layer prompt (system framing, customer corpus, selection inputs, generation instructions).
+4. Calls Claude Opus 4.7 with vision blocks for any uploaded photos.
+5. Validates the structured JSON output against the schema, runs a fabrication-risk audit, and writes the run to `analysis_runs`.
+6. Emits an `ai_analysis_completed` event so the CRM realtime subscription updates.
 
-## Inputs
+The service does not produce final scripts — it produces a *brief analysis* the founder reviews. Phase 2 production agents take the founder-approved analysis and turn it into shootable scripts, image prompts, and renders.
 
-### Form payload
+## 2. Inputs to the service
 
-The full `briefs.form_payload` JSON. This includes:
+For every analysis run, the service has access to:
 
-- Tier intent (Starter / Standard / Calendar)
-- Business info (name, niche, website, description, customer name, WhatsApp, email)
-- Direction & goals (angles, calendar goal, topics, things to avoid, posting platforms)
-- Brand voice (tone, 3 reference posts, brand colors, logo URL)
-- Photo metadata (presence indicator, count, paths, quality flags, consent timestamp)
-- Visual character lock (on-camera choice, setting/vibe)
-- Niche-specific follow-up answers
-- Source attribution
-- Save token (for audit only — not part of the prompt)
+| Input | Source | Required |
+|---|---|---|
+| Form payload (7 steps) | `briefs.form_payload` JSONB | Yes |
+| Reference posts (text + URLs) | Form step 6 | Optional |
+| Reference photos | Supabase Storage `customer-photos` bucket | Optional |
+| Brand logo | Supabase Storage `customer-logos` bucket | Optional |
+| Niche brief markdown | `niche-briefs/<niche>.md` on disk | Yes |
+| Framework bank | `docs/specs/script-frameworks.md` (excerpts loaded by slot) | Yes |
+| Archetype bank | `docs/specs/angle-archetypes.md` (excerpts loaded by slot) | Yes |
+| Framework seed | Computed pre-prompt per `docs/specs/non-duplication-system.md` | Yes |
+| Customer history (for repeat customers) | `customer_framework_history` table | Yes for repeat |
+| Re-analysis context (if applicable) | `analysis_runs.founder_note`, prior run output | Conditional |
 
-### Niche brief markdown
+Photos enter the prompt as vision blocks. URLs in reference-posts are fetched server-side and the page text is included verbatim (subject to a 50KB-per-URL truncation cap, per `docs/security.md`).
 
-Loaded from `niche-briefs/<niche>.md` based on `business.niche`. Each niche file contains:
+## 3. The four-layer prompt structure
 
-- Audience profile
-- Top 5-10 content angles known to perform in that niche
-- Common objections we hear from that audience
-- Tone do's and don'ts
-- Restricted-content flags (e.g., medical advice claims, MLM disclosures)
+V2 organises the prompt as four named layers, in order. The layers are concatenated into the `system` and `user` messages sent to Claude.
 
-If the niche file doesn't exist, we fall back to `niche-briefs/_default.md` and flag the analysis with `flags.unknown_niche`.
-
-### Tier scope
-
-Looked up from a static config:
-
-```typescript
-const TIER_SCOPE = {
-  starter:  { videos: 7,  carousels: 3,  ugc_count: 4,  t2v_count: 3,  length_mix: '7×30s' },
-  standard: { videos: 14, carousels: 7,  ugc_count: 8,  t2v_count: 6,  length_mix: '10×30s + 4×60s' },
-  calendar: { videos: 30, carousels: 14, ugc_count: 18, t2v_count: 12, length_mix: '20×30s + 10×60s' },
-};
+```
+LAYER 1 — System framing      (Claude `system` parameter)
+LAYER 2 — Customer corpus      (first `user` message content)
+LAYER 3 — Selection inputs     (second `user` message content)
+LAYER 4 — Generation instructions (third `user` message content)
 ```
 
-### Photos (when uploaded)
+Each layer is documented below with its full rendered template. The `{{double_brace}}` markers indicate values the application substitutes before the call.
 
-Photos are downloaded from Supabase Storage (private bucket, service-role read) and base64-encoded. Each photo becomes a content block in the Claude API call:
+### 3.1 Layer 1 — System framing
 
-```typescript
-{
-  type: 'image',
-  source: {
-    type: 'base64',
-    media_type: 'image/jpeg',  // or image/png
-    data: base64String,
-  }
-}
+This is the Claude `system` parameter. It establishes role, constraints, and the schema the model must obey.
+
+```
+You are a senior content strategist at a Lagos-based SMB content agency. You have eight years
+of experience producing short-form social-video calendars for African and global SMBs across
+beauty, real-estate, fashion, fintech, health, food, and education. You are technically literate
+in copywriting frameworks, you read brand voice as a researcher rather than a fan, and you write
+briefs that another senior producer could shoot from without you.
+
+Your job in this conversation is to produce a structured brief analysis for ONE customer's
+content calendar. The output is reviewed by the agency founder before anything is sent to the
+customer; you are the analyst, not the final approver.
+
+Three rules govern everything you produce. Internalise them; they override every other instinct.
+
+RULE 1 — NO FABRICATION.
+You produce content ABOUT the customer's business — never invented content FROM the customer's
+biography. Specifically:
+  - You do NOT invent founder origin stories. If the customer typed "I started this business in
+    2019 because I couldn't find good products" in form step 6, you may use that. If the customer
+    did not write a backstory, you do not produce one.
+  - You do NOT invent customer testimonials, transformations, or named-customer narratives.
+    Outcomes are spoken at the category level ("clients commonly see X"), never with invented
+    individual names.
+  - You do NOT invent family or cultural background ("my grandmother taught me", "my mum's
+    recipe") unless the customer explicitly stated it.
+  - First-person opinion IS allowed ("In my experience X..."). Generic authority numbers ARE
+    allowed ("After hundreds of inspections..."). The line is between opinion the customer
+    plausibly holds and biographical claims that would be lies if challenged.
+  - Full taxonomy: see docs/specs/content-types-allowed.md.
+
+RULE 2 — FRAMEWORKS BY NAME OF FRAMEWORK, NOT BY NAME OF MARKETER.
+You reference structural patterns by their canonical names (DR Formula, PAS, AIDA, Value
+Equation, Hook Stack, Open Loop, Pattern Interrupt, Myth-Buster, etc.). You do NOT write "in the
+style of [marketer's name]". The frameworks are tools; the names of the people who taught them
+are not part of the customer's deliverable.
+
+RULE 3 — DETERMINISTIC SELECTION.
+The frameworks and archetypes you may use have already been selected by a deterministic seed
+(passed to you in Layer 3). You do NOT pick from outside that selection. If a framework or
+archetype is not in the selection list, it is not available for this customer for this order.
+
+You produce output in valid JSON matching the schema in Layer 4. No prose outside the JSON. No
+preamble. No "here is the analysis" line. Just the JSON object.
 ```
 
-Photos are only passed if their quality check passed (or if the customer explicitly overrode quality flags). A flagged-and-overridden photo is still sent, but the prompt includes "the customer overrode quality flags on photo N" so Claude can comment.
+### 3.2 Layer 2 — Customer corpus
 
-## Output schema
+This is the first `user` message. It contains everything the model needs to know about the customer. Photos enter as vision blocks before the text.
 
-Claude returns one JSON object matching this exact schema. We validate. Any deviation triggers a retry.
+```
+[Vision blocks: 1 to N customer reference photos, each as a base64 image_url block]
+[Vision block: customer brand logo if present]
 
-```typescript
+# CUSTOMER CORPUS
+
+## Form payload
+
+The customer submitted this form on {{submitted_at_iso}} (WAT).
+
+### Step 1 — Who they are
+- Brand name: {{brand_name}}
+- Owner name: {{owner_name}}
+- WhatsApp: {{phone_e164}}
+- Email: {{email}}
+
+### Step 2 — Niche and offer
+- Niche: {{niche_slug}} ({{niche_label}})
+- One-line description: {{one_line_description}}
+- What they sell: {{offer_description}}
+- Price point band: {{price_point_band}}
+
+### Step 3 — Audience
+- Primary audience: {{primary_audience_description}}
+- Audience age range: {{audience_age_range}}
+- Audience location: {{audience_location}}
+- What audience already believes: {{audience_belief}}
+- What audience needs to believe to buy: {{audience_belief_target}}
+
+### Step 4 — Brand assets
+- Logo uploaded: {{logo_uploaded_yes_no}}
+- Brand colours (if stated): {{brand_colours}}
+- Existing IG handle: {{instagram_handle}}
+
+### Step 5 — Photos
+- Photos uploaded: {{photo_count}} (see vision blocks above)
+- Photo consent: {{photo_consent_yes_no}}
+
+### Step 6 — Voice and references
+- Stated brand voice: {{stated_voice}}
+- Reference posts (verbatim text and URL-fetched bodies):
+  {{reference_posts_block}}
+- What customer wrote about their backstory (verbatim, may be empty):
+  {{customer_backstory_verbatim}}
+
+### Step 7 — Calendar choice
+- Tier: {{tier}}
+- Number of videos: {{video_count}}
+- Number of carousels: {{carousel_count}}
+
+## Niche brief
+
+The following is the agency's niche brief for {{niche_slug}}. Use it as authoritative context on
+audience, voice, restricted claims, and topic library — but never substitute it for the customer's
+own stated voice or facts.
+
+{{niche_brief_full_text}}
+```
+
+### 3.3 Layer 3 — Selection inputs
+
+This is the second `user` message. It carries the deterministic selection and the relevant excerpts of the framework and archetype banks.
+
+```
+# SELECTION INPUTS
+
+## Framework seed
+
+The deterministic seed for this analysis was computed as:
+
+  seed_inputs:
+    customer_id: {{customer_id}}
+    niche: {{niche_slug}}
+    order_index: {{order_index}}
+    submission_week_iso: {{submission_week_iso}}
+  seed_hash: {{seed_hash_hex}}
+
+## Selected frameworks (for this {{tier}} order)
+
+You will use these {{n_frameworks}} frameworks, no others:
+
+{{framework_excerpts_block}}
+
+## Selected archetypes (for this {{tier}} order)
+
+You will use these {{n_archetypes}} archetypes, no others:
+
+{{archetype_excerpts_block}}
+
+## Selected pairs
+
+The deterministic pairing assigns each video slot a (framework, archetype) pair as follows:
+
+{{pair_assignments_table}}
+
+## Customer history (repeat customers only)
+
+The following (framework, archetype) pairs have been delivered to this customer in prior orders
+and are excluded from re-use unless the bank is exhausted:
+
+{{customer_history_excluded_pairs_block}}
+
+## Bank exhaustion flag
+
+{{bank_exhaustion_block}}
+  // Either: "Not exhausted. Selection drew from the unused bank for this customer."
+  // Or:     "EXHAUSTED — this customer has run through the unused bank. The selection above
+  //         used least-recently-used pairs as fallback. Flag this for the founder in your
+  //         output's `flags_for_review` field with reason 'bank_exhausted_lru_fallback'."
+
+## Re-analysis context
+
+{{reanalysis_context_block}}
+  // Only present when trigger_type = 're_analyze_with_note'. Contains the founder's note and
+  // a summary of the prior run's output (whichever fields the founder marked as needing change).
+```
+
+### 3.4 Layer 4 — Generation instructions
+
+This is the third `user` message. It is the operational instruction set for the analysis: the four lenses to run, the output shape, and the audit step.
+
+```
+# GENERATION INSTRUCTIONS
+
+Run the following process in order. Do not skip steps. Each lens informs the next.
+
+## Lens 1 — Voice extraction
+
+Read the customer's reference posts (Layer 2 step 6) and stated voice. Identify:
+  - Two to four phrases the customer uses repeatedly that are theirs (not generic).
+  - The customer's typical sentence rhythm (short and punchy / mid-length / dense).
+  - Words the customer would NOT use (terms that would feel out of register).
+  - Energy register (calm, urgent, playful, authoritative, irreverent, warm).
+
+If reference posts are absent or thin, fall back to the niche brief defaults but flag the
+thinness in `flags_for_review` with reason 'thin_voice_corpus'.
+
+## Lens 2 — Specificity inventory
+
+Read the customer's offer description, audience description, and any URL-fetched bodies. Extract:
+  - Concrete numbers (price points, time-to-result, quantities).
+  - Concrete proper nouns (brand names, neighbourhood names, product line names).
+  - Concrete process steps the customer described (do not invent — only extract).
+
+These specifics will be re-used across scripts so the calendar reads as informed, not generic.
+If the corpus is empty of specifics, flag 'thin_specificity_corpus'.
+
+## Lens 3 — Expertise mapping
+
+Read the offer description and identify what the customer KNOWS that their audience does not.
+Phrase each expertise nugget as: "Customers in this niche often don't realise that {{X}}."
+These nuggets seed Educational / Myth-Buster / Decoded-Jargon scripts.
+
+## Lens 4 — Visual aesthetic
+
+If photos are present (vision blocks in Layer 2), describe:
+  - Lighting register (warm/cool/neutral; soft/harsh).
+  - Setting type (studio, home, retail, outdoor).
+  - Wardrobe and prop register.
+  - Photo quality and confidence (do NOT critique — describe).
+
+If no photos, infer from the niche brief's photo-aesthetic notes and the customer's stated voice;
+flag 'no_photos_uploaded' so the founder knows to set Phase 2 production toward stock-presenter.
+
+## Compose the analysis
+
+Produce a single JSON object with this exact shape:
+
 {
-  "brief_summary": string,                    // 2-3 sentences, written as if speaking to the customer
-  "recommended_angles": [
-    {
-      "angle": string,                        // 1-line angle name
-      "hook": string,                         // First 1.5 seconds of a Reels/TikTok — must work as voiceover
-      "why_it_fits": string                   // 1-2 sentences referencing their actual business
-    },
-    // exactly 3 items
-  ],
-  "sample_script_seed": {
-    "video_1_topic": string,
-    "video_1_hook": string,                   // First 1.5 seconds
-    "video_1_outline": string[]               // 3-5 bullet points
-  },
   "brand_voice": {
-    "tone_summary": string,                   // 1 sentence
-    "vocabulary_pattern": string,             // 1-2 sentences
-    "sentence_rhythm": string,                // 1-2 sentences
-    "emotional_register": string,             // 1 sentence
-    "do_say": string[],                       // 3-5 phrases
-    "do_not_say": string[]                    // 3-5 phrases
+    "voice_phrases": ["string", ...],
+    "sentence_rhythm": "short_punchy | mid_length | dense",
+    "avoid_words": ["string", ...],
+    "energy_register": "calm | urgent | playful | authoritative | irreverent | warm",
+    "voice_corpus_quality": "thick | thin | absent"
   },
-  "photo_aesthetic": {                        // Only present if photos were uploaded
-    "face_quality_summary": string,
-    "styling_observations": string,
-    "setting_hints": string,
-    "recommended_avatar_treatment": string,
-    "flags": string[]                         // e.g. ["sunglasses_present", "low_resolution"]
-  } | null,
-  "visual_style": {
-    "recommended_palette": string[],          // hex codes, 3-5 colors
-    "recommended_palette_rationale": string,
-    "recommended_typography": string,
-    "recommended_camera_treatment": string,
-    "recommended_caption_style": string
+  "specificity_inventory": {
+    "numbers": ["string", ...],
+    "proper_nouns": ["string", ...],
+    "process_steps": ["string", ...],
+    "specificity_corpus_quality": "thick | thin | absent"
   },
-  "upsell_recommendation": {
-    "should_upsell": boolean,
-    "recommended_tier": "starter" | "standard" | "calendar" | null,
-    "reasoning": string,
-    "upsell_price_delta": number              // NGN, 0 if should_upsell is false
+  "expertise_map": [
+    {"nugget": "string", "framework_affinity": ["framework_slot", ...]}
+  ],
+  "visual_aesthetic": {
+    "lighting": "string",
+    "setting": "string",
+    "wardrobe_props": "string",
+    "photo_quality_summary": "string",
+    "photos_present": true | false
   },
-  "flags": [
+  "calendar_plan": [
     {
-      "type": "restricted_niche" | "unknown_niche" | "low_form_quality" | "photo_concerns" | "language_mismatch",
-      "detail": string
+      "slot_index": 1,
+      "day": 1,
+      "format": "ugc_30s | ugc_60s | t2v_quality | t2v_budget | carousel",
+      "framework_slot": "string (must be in selected_frameworks)",
+      "archetype_slot": "string (must be in selected_archetypes)",
+      "topic": "string (the angle this slot covers, derived from the lenses above)",
+      "hook": "string (one-line opener that obeys the framework's hook style)",
+      "core_beats": ["string", ...],
+      "cta": "string",
+      "fabrication_risk_check": "passed | escalate"
     }
   ],
-  "estimated_brief_quality_score": number     // 0.0 to 1.0, Claude's self-assessment
+  "fabrication_audit": {
+    "lines_checked": "integer",
+    "violations_found": [
+      {"slot_index": "integer", "line": "string", "violation": "string"}
+    ],
+    "audit_passed": true | false
+  },
+  "flags_for_review": [
+    {"reason": "string (e.g. 'bank_exhausted_lru_fallback', 'thin_voice_corpus')", "detail": "string"}
+  ]
 }
+
+## Run the fabrication audit
+
+After composing `calendar_plan`, walk every `hook`, every entry in `core_beats`, and every `cta`.
+For each line, ask:
+  - Does this line claim a biographical fact about the customer? If yes, is that fact in
+    `customer_backstory_verbatim` from Layer 2? If not, the line FAILS.
+  - Does this line attribute a story to a named individual customer? If yes, the line FAILS.
+  - Does this line use a phrase like "in the style of [marketer]"? If yes, the line FAILS.
+
+Set `fabrication_risk_check` per slot. If any slot fails, populate `fabrication_audit.violations_found`
+and set `audit_passed = false`. Re-write the offending slots BEFORE finalising the JSON. Do not
+emit a JSON with `audit_passed = false` unless you have rewritten and the violations persist —
+in which case the founder review will catch it.
+
+## Output
+
+Emit ONLY the JSON object. No prose. No code fence. No preamble.
 ```
 
-If `photos.uploaded == false` in the form payload, `photo_aesthetic` is `null`.
-
-## The prompt
-
-Constructed in `apps/agent/src/lib/claude.ts`. Three parts: system, user, content blocks.
-
-### System prompt (fixed, ~800 tokens)
-
-```
-You are Operscale's brief analyst. You read SMB content briefs from Nigerian small
-business customers and produce structured JSON output that drives a personalised
-email and an internal CRM card.
-
-CONTEXT:
-- Operscale sells short-form content calendars (7, 14, or 30 videos + bundled carousels).
-- Customers are Nigerian SMBs in beauty, real estate, fashion, fintech, health, food,
-  or education niches.
-- The output you produce is reviewed by a founder before it reaches the customer.
-- The customer pays after they receive your output — so quality matters.
-
-RULES:
-- Be specific. Generic suggestions lose customers.
-- Reference the customer's actual words back to them in `brief_summary`.
-- For Nigerian SMBs, use local context where relevant (Lagos, Nigerian English,
-  cultural references that land).
-- Only recommend an upsell when the brief actually justifies it. Don't push.
-- Flag restricted niches: medical advice claims, fintech without NDPC mention,
-  gambling, alcohol, MLM. The founder will decide whether to proceed.
-- The 3 sample angles must be DIFFERENT — not 3 variations of the same idea.
-- The video_1_hook must work as the first 1.5 seconds of a Reels/TikTok video,
-  spoken aloud or shown on screen as a hook.
-- Do NOT invent facts about the customer's business. If the form doesn't say it,
-  don't claim it.
-
-BRAND VOICE ANALYSIS:
-- Read the 3 reference posts the customer shared.
-- Read their `tone` selection and one-liner business description.
-- Capture: vocabulary patterns, sentence rhythm, emotional register, DO-SAY and
-  DO-NOT-SAY lists.
-- This output drives the script generation in Phase 2.
-
-PHOTO AESTHETIC ANALYSIS (only when photos provided):
-- Look at each photo. Comment on face quality, styling, lighting, setting.
-- Recommend an avatar treatment that respects the existing photo mood.
-- Flag any quality issues that may need re-shooting (low resolution, motion blur,
-  sunglasses, group photo where the subject is unclear).
-- If the customer overrode a quality flag during upload, comment on whether the
-  override is workable or whether re-uploading would help.
-
-VISUAL STYLE RECOMMENDATION:
-- Derive a palette from the customer's stated brand colors AND the photo tones
-  (if photos were provided).
-- Recommend typography (a typeface family, e.g. "warm sans-serif like Inter").
-- Recommend camera treatment (shot framing, lighting, depth of field).
-- Recommend caption style (kinetic, static, position, color).
-- This output drives the production register selection in Phase 2.
-
-OUTPUT FORMAT:
-- Respond with a single JSON object matching the schema below.
-- Do not include any prose outside the JSON.
-- Do not wrap the JSON in markdown code fences.
-- Do not include comments in the JSON.
-
-[SCHEMA HERE — full TypeScript type literal as in `Output schema` section]
-```
-
-### User prompt (per-call, varies)
-
-```
-Niche brief context:
-[full content of niche-briefs/<niche>.md]
-
-Tier scope:
-[JSON of TIER_SCOPE entry for the chosen tier]
-
-Customer's form responses:
-[full briefs.form_payload as JSON]
-
-[If photos were uploaded:]
-Photos uploaded by the customer. Treat each as a face reference photo for a
-Phase 2 custom AI avatar. Comment on each in the photo_aesthetic block.
-[N image content blocks follow]
-
-Generate the brief analysis now. Return only the JSON.
-```
-
-### API call shape
-
-```typescript
-const response = await anthropic.messages.create({
-  model: 'claude-opus-4-7',
-  max_tokens: 4000,
-  system: systemPrompt,
-  messages: [
-    {
-      role: 'user',
-      content: [
-        { type: 'text', text: userPromptText },
-        ...photoBlocks,  // one image content block per uploaded photo
-      ],
-    },
-  ],
-});
-```
+## 4. Model and call configuration
 
-We do not stream the response (the JSON is structured; partial output is not useful). The full response arrives in 60-120 seconds with vision blocks; 40-80 seconds without.
+| Setting | Value |
+|---|---|
+| Model | `claude-opus-4-7` |
+| `max_tokens` | 8192 |
+| Temperature | 0.4 |
+| `system` | Layer 1, rendered |
+| `messages` | Three `user` messages: Layer 2 (with vision blocks), Layer 3, Layer 4 |
+| Streaming | No (we want the complete JSON before writing to `analysis_runs`) |
+| Timeout | 180 seconds |
+| Retry policy | One retry on 5xx or timeout. Hard fail to `ai_analysis_failed` after second failure. |
 
-## Validation
+Vision blocks are constructed from the `customer-photos` Supabase Storage bucket. Maximum five photos per analysis (form caps at five uploads). Brand logo enters as a separate vision block before the photos.
 
-Output passes through a Zod schema (or equivalent) that enforces:
+The temperature of 0.4 is deliberate. Lower temperatures produce dull, repetitive output; higher temperatures violate the no-fabrication rule by inventing more freely. 0.4 is the band where the model still selects expressive language but stays anchored to the corpus.
 
-- All required fields present
-- All field types correct
-- `recommended_angles` has exactly 3 items
-- `recommended_palette` has 3-5 hex codes
-- `do_say` and `do_not_say` each have 3-5 items
-- `estimated_brief_quality_score` is between 0 and 1
-- `upsell_recommendation.upsell_price_delta` is 0 if `should_upsell` is false
-- If photos were uploaded, `photo_aesthetic` is non-null. If not, `photo_aesthetic` is null.
+## 5. Cost and latency
 
-If validation fails, we retry once with the original prompt + an addendum: "Your previous response did not validate. Specifically: [validation error]. Respond with valid JSON matching the schema exactly."
+| Metric | Typical | Worst case |
+|---|---|---|
+| Input tokens | 18,000 to 32,000 | 48,000 (Calendar tier with 5 photos and rich reference posts) |
+| Output tokens | 3,500 to 6,500 | 8,000 (Calendar tier) |
+| Cost per call (Opus 4.7 pricing as of 2026-05) | $0.30 to $0.55 | $0.85 |
+| Latency | 35 to 75 seconds | 140 seconds |
 
-If the retry also fails, we fall back to a generic-template `analysis_run` with `flags = [{ type: 'low_form_quality', detail: 'AI output validation failed twice' }]` and surface this loudly in the CRM. Founder reviews and either edits the placeholder or re-runs manually.
+Cost analysis is documented in `docs/runbooks/cost-monitoring.md`. The CRM cost-monitoring view queries `llm_calls` for these metrics live.
 
-## Retry and failure handling
+## 6. Output validation
 
-| Failure | Retry strategy | Final fallback |
-| --- | --- | --- |
-| HTTP 5xx from Anthropic | Exponential backoff: 1s, 2s, 4s, 8s, 16s (5 attempts) | Set `ai_analysis_failed`, founder WhatsApp alert |
-| Rate limit (HTTP 429) | Same exponential, but cap concurrent in-flight at 5 | Same |
-| Timeout (>180s) | Retry with same prompt | Same |
-| Malformed JSON | Retry with stricter prompt | Generic template |
-| Schema validation failure | Retry with validation error in addendum | Generic template |
-| Photo download failure | Retry photo fetch 3 times, then run analysis text-only | Run text-only with flag |
-| Vision block parse error (corrupt image) | Drop offending photo, retry without it | Run text-only with flag |
-| Output exceeds 4000 tokens | Truncate at JSON boundary, accept | Founder review catches issues |
+Before writing to `analysis_runs.ai_output`, the service validates the model's JSON:
 
-All failures are logged to `activity_log` with `event_type` like `ai_analysis_retry_attempt_3` or `ai_analysis_failed_validation`.
+1. **Shape validation.** JSON parse must succeed. The top-level shape must contain all six keys (`brand_voice`, `specificity_inventory`, `expertise_map`, `visual_aesthetic`, `calendar_plan`, `fabrication_audit`, `flags_for_review`). Missing keys → fail to `ai_analysis_failed`.
+2. **Slot count validation.** `calendar_plan.length` must equal the tier's video + carousel count. Mismatch → fail.
+3. **Selection validation.** Every `framework_slot` and `archetype_slot` referenced in `calendar_plan` must be present in the selection list passed in Layer 3. A reference outside the selection → fail (this catches model drift).
+4. **Audit validation.** If `fabrication_audit.audit_passed === false` AND `violations_found.length > 0`, the run is written but flagged for the founder with reason `fabrication_audit_failed`. The founder reviews the flagged slots before approval.
 
-## Cost and latency
+Validation failures write to `activity_log` with event `ai_analysis_failed` and a `payload.reason` field that is one of the four cases above.
 
-### Per-call cost (target)
+## 7. Re-analysis paths
 
-- Input tokens: ~3,200 (system: 800, user: 1,400, photos: ~700 token equivalent for 3 photos)
-- Output tokens: ~1,400
-- At Claude Opus 4.7 pricing: ~$0.12 per call
+The founder review screen (per `docs/specs/founder-review-flow.md`) exposes two re-analysis buttons:
 
-### Per-day cost (target at 30 briefs/day)
+- **Re-analyze (same frameworks).** Reuses the framework_seed from the prior run. The selection list does not change. The model receives a `reanalysis_context_block` containing the founder's note and a summary of the fields the founder flagged as needing change.
 
-- 30 briefs × $0.12 = $3.60/day
-- + ~25% overhead for re-analyses = ~$4.50/day
-- Monthly: ~$135
+- **Re-analyze (new frameworks).** Computes a new framework_seed by appending the run_index to the seed inputs (so the hash changes deterministically). Selects a new framework × archetype set, excluding the prior run's set as well as historical pairs. The model receives a new Layer 3 with the new selection.
 
-### Latency
+In both cases:
+- A new row is inserted into `analysis_runs` with `run_index = previous + 1`, `trigger_type = 're_analyze_with_note'`, and the prior run's `is_current` is set to `false`.
+- No row is written to `customer_framework_history` until founder approval. Re-analyses that are subsequently discarded never enter the history.
 
-| Scenario | p50 | p95 |
-| --- | --- | --- |
-| Text-only (no photos) | 60s | 90s |
-| With 1 photo | 75s | 110s |
-| With 3 photos | 90s | 130s |
-| Re-analysis (with founder note) | same as above | same |
+## 8. The fabrication-risk audit — operational notes
 
-Latency target for the customer-facing flow: brief lands in CRM `pending_review` within 3 minutes of submission (p95). This gives the founder a 1-hour budget to review and approve before the brief email lands in the customer's inbox.
+The audit step in Layer 4 is the model's self-check, not the only check. Two further checks happen post-call:
 
-## Observability
+- **Application-side regex sweep.** The service runs a regex sweep over every string in `calendar_plan` for forbidden phrases: `/my (mum|grandmother|mother|grandma)/i`, `/i started this (business|brand|company) because/i`, `/customer transformation/i`, `/in the style of [A-Z][a-z]+ [A-Z][a-z]+/`. Any match is appended to `fabrication_audit.violations_found` post-hoc and the run is flagged.
 
-Every Claude call writes to a `llm_calls` table:
+- **Founder review.** The CRM highlights any line in `calendar_plan` that contains first-person backstory verbs (`started`, `learned from`, `taught me`, `inherited`) for the founder's eye. The founder either confirms the line is grounded in `customer_backstory_verbatim` or rewrites it.
 
-```sql
-CREATE TABLE llm_calls (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  brief_id uuid REFERENCES briefs(id),
-  analysis_run_id uuid REFERENCES analysis_runs(id),
-  model text NOT NULL,
-  input_tokens integer NOT NULL,
-  output_tokens integer NOT NULL,
-  duration_ms integer NOT NULL,
-  cost_usd decimal(8,6) NOT NULL,
-  retry_count integer DEFAULT 0,
-  status text NOT NULL CHECK (status IN ('success','failed','validation_failed')),
-  error_message text,
-  created_at timestamptz DEFAULT now()
-);
-```
+The point of three layers (model self-audit, regex sweep, founder review) is that no single layer catches everything. The model sometimes rationalises violations; regex catches the lexical forms; the founder catches semantic drift the regex misses.
 
-We use this for cost monitoring (alert if any single brief exceeds $0.50 — suggests prompt issue, not photo issue), latency monitoring, retry-rate monitoring (high retry rate = upstream problem).
+## 9. Activity log events
 
-## Prompt engineering — what we've learned
+The service writes the following events to `activity_log`:
 
-These are insights from prior Vision GridAI prompt work that apply here.
+- `ai_analysis_started` — when the job picks up. `payload` includes `brief_id`, `trigger_type`, `seed_hash`.
+- `ai_analysis_completed` — on successful validation. `payload` includes `run_id`, `cost_usd`, `duration_ms`, `audit_passed`, `flags_for_review_count`.
+- `ai_analysis_failed` — on any failure. `payload` includes `reason` (one of the validation failure cases) and `error_detail`.
+- `ai_reanalyze_requested` — when the founder triggers a re-analysis. `payload` includes `note`, `same_or_new_frameworks`.
 
-### Be explicit about output format
+These events are subscribed to by the CRM realtime layer, so the founder sees the queue update without refresh.
 
-Claude is much more reliable when you specify "respond with valid JSON only, no prose, no markdown fences" in the system prompt AND repeat it at the end of the user prompt. Don't rely on a single instruction.
+## 10. What this service is NOT
 
-### Give negative examples sparingly
+To prevent scope creep, the AI brief analysis service does NOT:
 
-Saying "do not be generic" works. Saying "do not say things like X" works for X up to ~5 examples — beyond that, Claude starts treating the negative examples as positive.
+- Produce final shootable scripts. That is Phase 2.
+- Render any video, image, or carousel asset. That is Phase 2.
+- Send any customer-facing communication. The founder review screen is the only path to customer messaging.
+- Make pricing decisions. Pricing is fixed per `docs/pricing-and-packages.md`.
+- Modify the framework or archetype banks. Those are content edits to `docs/specs/script-frameworks.md` and `docs/specs/angle-archetypes.md` and require a deliberate commit.
+- Update `customer_framework_history`. That table is written by the founder-approval handler, not by the analysis service.
 
-### Reference the customer's words
+If a feature request would expand the service into one of these areas, the answer is: it belongs in a different service. Add an ADR.
 
-The most-loved feedback we got in beta was "you actually read what I wrote". The way we get that is the explicit instruction `Reference the customer's actual words back to them in brief_summary`. This produces output like "You mentioned wanting your moisturiser to feel premium without being overpriced — that tension is the whole calendar."
+## 11. Cross-references
 
-### Ground photo analysis in concrete observations
-
-Saying "comment on lighting" is too vague. Saying "describe the lighting as natural-vs-studio, warm-vs-cool, soft-vs-harsh, in 1-2 sentences" produces grounded comments. We've embedded these qualifiers in the prompt.
-
-### Quality score as self-check
-
-The `estimated_brief_quality_score` field forces Claude to evaluate its own output before returning. We see this calibrate well — outputs that score below 0.6 typically have problems the founder catches.
-
-## Re-analysis with founder note
-
-When the founder clicks "Re-analyze with note" in the CRM, we re-call Claude with the original form + photos + a new prompt addendum:
-
-```
-[Standard system prompt]
-[Standard user prompt with form, niche, tier]
-[Standard photo blocks if applicable]
-
-ADDITIONAL CONTEXT FROM THE FOUNDER:
-The founder reviewed the previous analysis and asked for this revision:
-"[founder_note]"
-
-Generate a new analysis taking this guidance into account. Return only JSON.
-```
-
-The previous `analysis_runs` row is set `is_current = false`. The new row is inserted with incremented `run_index` and `trigger_type = 're_analyze_with_note'`.
-
-We can re-analyze multiple times. There's no hard cap on the number of re-runs per brief, but a soft signal: if a single brief has > 5 runs, we flag it in the CRM as "this brief may need a different intervention" — usually means the form data is inadequate or the niche is wrong.
-
-## Inline edit handling
-
-Inline edits are tracked separately from re-analyses. They don't trigger a new Claude call — they directly edit the current `analysis_runs.ai_output` JSON.
-
-When the founder approves a brief that has been edited inline, the edit-applied state is materialised: we deep-merge `analysis_edits` (in chronological order) onto the original `ai_output` to produce the snapshot used for the customer email.
-
-```typescript
-// Sketch
-function materialiseEdits(run: AnalysisRun, edits: AnalysisEdit[]): typeof run.ai_output {
-  let result = structuredClone(run.ai_output);
-  for (const edit of sortBy(edits, 'edited_at')) {
-    setByPath(result, edit.field_path, edit.value_after);
-  }
-  return result;
-}
-```
-
-This snapshot is what the brief email uses. The original `ai_output` is preserved in the DB for audit.
-
-## Where to look next
-
-- `apps/agent/src/lib/claude.ts` — the implementation.
-- `docs/data-model.md` — `analysis_runs`, `analysis_edits`, `llm_calls` schema.
-- `docs/specs/founder-review-flow.md` — how the CRM consumes the output of this service.
-- `docs/specs/email-templates.md` — how the brief email renders the materialised snapshot.
-- `niche-briefs/*.md` — the niche context loaded into the prompt.
+- `docs/specs/content-types-allowed.md` — the no-fabrication rule the prompt enforces.
+- `docs/specs/script-frameworks.md` — the framework bank Layer 3 draws from.
+- `docs/specs/angle-archetypes.md` — the archetype bank Layer 3 draws from.
+- `docs/specs/non-duplication-system.md` — the deterministic seeding system.
+- `docs/specs/research-methodology.md` — the four-lens methodology Layer 4 runs.
+- `docs/specs/founder-review-flow.md` — what happens to this service's output downstream.
+- `docs/data-model.md` — the `analysis_runs`, `analysis_edits`, `customer_framework_history`, and `llm_calls` tables.
+- `docs/runbooks/cost-monitoring.md` — the operational view onto this service's cost.
+- `docs/adr/0010-no-fabrication-content-rule.md` — the architectural decision behind Rule 1.
+- `docs/adr/0011-deterministic-per-customer-seeding.md` — the architectural decision behind the seed system.
+- `docs/adr/0012-frameworks-by-name-not-by-marketer.md` — the architectural decision behind Rule 2.
+- `docs/adr/0013-trending-deferred-to-phase-2.md` — explains the empty `trending_context` slot reserved in Layer 2 for Phase 2.

@@ -1,148 +1,182 @@
-# Niche brief: Fashion / e-commerce
+# Niche brief: Fashion e-commerce (V2)
 
 **Status:** Authoritative for Phase 1.
 **Used by:** AI brief analysis prompt. Phase 2 production agent. Calendar preview component.
+**Last updated:** 2026-05-04.
 
-This document is the operational knowledge the AI consults when a fashion or e-commerce customer submits a brief.
+This document is the operational knowledge the AI consults when a fashion e-commerce customer submits a brief. It pairs with the framework × archetype selection from `docs/specs/non-duplication-system.md` and the no-fabrication rule from `docs/specs/content-types-allowed.md`.
 
 ## 1. Who's in this niche
 
-- Fashion brand founders (ready-to-wear, ankara, occasion wear, streetwear).
-- Bag and accessory brand founders.
-- Footwear brand founders.
-- Bridal and owambe specialists.
-- Fashion e-commerce stores aggregating multiple brands.
-- Stylists and personal shoppers selling services.
+- Ankara, adire, and aso-oke designers selling ready-to-wear.
+- Bespoke / made-to-measure tailors.
+- Modest fashion brands.
+- Streetwear and contemporary brands.
+- Bag, shoe, and accessories makers.
+- Stylist-led brands (founder is also the stylist).
+- Hair and headwear brands (gele, headwraps, wigs as fashion).
 
 Edge cases:
-- Pure tailoring services without product line — fits, but content slants toward UGC craft and bespoke fitting rather than product reveals.
-- Wholesale fashion suppliers — fits awkwardly; their audience is other businesses, not consumers. Flag for content register adjustment.
-- Beauty + fashion combo brands — primary niche is whichever they emphasised in step 2; don't try to serve both at once.
+- Vintage / thrift sellers — fits but slants toward Quality Tells and Process Tour rather than ready-to-wear product launches.
+- Costume / theatrical fashion — flag as restricted-adjacent if claims involve celebrity dressing.
+- Wholesale-only operations — fits but slants toward Process Tour and B2B-leaning archetypes.
 
 ## 2. Tone and voice patterns
 
-Fashion in Nigeria converts on **personality and aspiration in equal measure**. The founder's taste, their backstory, and the product itself all matter. Successful Nigerian fashion content reads like a friend who has style, not like a department store.
+Fashion e-commerce in Nigeria converts on aesthetic + craft-substantiation. The buyer wants the look *and* wants to know it'll last. Content that pairs aspirational visuals with concrete craft details (stitch counts, fabric sourcing, finishing time) outperforms either lane alone.
 
 Common tonal markers:
 
-- Specific styling language: "I paired this with my old jeans and the gold hoops", "the cut hits at the natural waist".
-- Cultural specificity: ankara, owambe, aso ebi, gele references used naturally.
-- Price transparency or deliberate price reveal moments: "this piece is ₦85k — and here's why every fabric in it cost what it cost".
-- Behind-the-scenes craft: tailor cutting, fabric sourcing, fitting sessions.
-- Outfit context: "for the wedding", "for Sunday brunch", "for dropping off your kids and looking together".
+- Specific fabric vocabulary used naturally: ankara, adire, aso-oke, lace, organza, satin, chiffon, brocade.
+- Construction language: lined, French-seamed, hand-finished, pleated, dart-fitted.
+- Time references: "14 hours of hand-finishing", "3-day turnaround".
+- Specific size/fit framing: "fits true to size", "runs a half-size large".
+- Light Naija inflection if customer reference posts use it.
 
 Avoid:
-- Generic "queen / boss" Instagram-influencer register.
-- Aspirational language disconnected from reality ("live your best life").
-- Excessive emoji or all-caps energy in scripts.
-- Photoshopped-thin body imagery as the visual norm.
+- Generic luxury copy ("timeless elegance", "sophistication").
+- Aesthetic-only captions with no substance.
+- Implied custom claims ("each piece is one of a kind") unless the customer's process actually delivers that.
+- "Empowering women" generic framing.
+- First-person biographical anecdotes that we haven't been given.
 
-## 3. Topic library
+## 3. Topic library — by archetype
 
-### 3.1 UGC topics that perform
+### Pricing Breakdown
+- "Why a custom ankara dress costs ₦[X] — fabric, lining, hand-finishing."
+- "What ₦[X] gets you in this collection."
+- "The cost of one bespoke piece, broken down."
 
-- "Style 1 piece 3 ways"
-- "What ₦Xk gets you in bridal"
-- "The fabric difference: why this dress costs more"
-- "Behind the design: how this piece came to be"
-- "Customer outfit reveal — [name] for her engagement"
-- "What I'd wear to [specific Lagos event] right now"
-- "Why I dropped my prices last month (and why I'm not lowering them again)"
-- "Things tailors hate hearing"
-- "How to take care of your ankara so it lasts"
-- "What I'm packing for [destination]"
-- "The piece I'm most proud of, and why"
-- "How my customers actually wear this"
-- "Body shape tips: what works on a [shape]"
-- "The 5-piece capsule that handles a Lagos work week"
+### Product Tour
+- "Inside the [signature collection] — every piece, every detail."
+- "The [bestseller] explained: fabric, fit, finishing."
+- "What's actually in this [piece] — the construction tour."
 
-### 3.2 T2V cinematic topics
+### Process Tour / Behind-the-Work
+- "From fabric to finished piece — a [N]-step tour."
+- "[N] hours of hand-finishing in [N] seconds." (T2V time-lapse style)
+- "The cutting room: how a single dress comes together."
+- "What goes into one ankara piece."
 
-Visual register: editorial, motion-rich, fabric-aware. Fashion T2V should make the viewer want to touch the product or imagine wearing it.
+### Quality Tells
+- "How to spot a well-made ankara piece."
+- "[N] signs your tailor took shortcuts."
+- "Stitch quality tells: the finish that separates premium from rushed."
 
-- Slow-motion fabric flow as a model walks.
-- Hands smoothing the seam of a finished piece.
-- A model styled head-to-toe walking down a Lagos street (Ikoyi, Lagos Island, Ikate).
-- Lookbook stills coming alive — the photo, then the moment-of-photo.
-- Time-lapse from raw fabric to finished garment.
-- Close-up of beadwork, embroidery, or hand-finishing detail.
-- A wide aerial of Lagos with the brand colour echoed in styling.
+### Common Mistake / Decision Framework
+- "Stop washing your ankara like that."
+- "The [N] mistakes that ruin a custom piece."
+- "Bespoke vs ready-to-wear: when each makes sense."
+- "How to size yourself for a custom order without coming to the shop."
 
-### 3.3 Carousel templates
+### Outcome Showcase / Quality Moment (T2V cinematic)
+- Slow-motion fabric in motion (dancing, walking, twirling).
+- Cutting-room close-ups: scissors through fabric, pins on a mannequin.
+- Hand-stitching close-ups.
+- Garment hanging on a wooden hanger, golden-hour window light.
+- Texture macros: weave details, beadwork, embroidery.
 
-- "5 ways to style 1 piece"
-- "What goes into a ₦Xk piece" (cost / craft breakdown)
-- "Owambe lookbook — 8 outfits"
-- "Ankara care guide"
-- "Body-shape styling — what works for [shape]"
-- "Behind-the-scenes — making [signature piece]"
+### Use-Case Spotlight / Adjacent Possibility
+- "[Piece] for a Lagos wedding."
+- "How to style [piece] for owambe vs office."
+- "Three ways to wear our [signature piece]."
 
-## 4. Brand voice variables
+### Industry Pattern / Market Reality
+- "Ankara prices in Lagos right now — by the metre."
+- "What a typical custom-tailoring timeline looks like."
+- "Why turnaround times have shifted in 2026."
+
+### Day-in-the-Output / Use-Case Spotlight
+- "Owambe-ready outfits from our collection."
+- "Office-to-evening pieces."
+- "What our pieces look like during a typical day in Lagos."
+
+## 4. Brand voice variables (defaults; overridden by extraction)
 
 ```
 common_do_say:
-  - specific cultural references (owambe, aso ebi, gele, ankara, asoke)
-  - specific events (wedding, naming ceremony, Sunday brunch, work week)
-  - body-positive language ("works on a fuller frame", "flatters a tall figure")
-  - craft-specific vocabulary (cut, drape, fall, finish, hand-stitched)
-  - price-transparent framing ("yes it's ₦85k — here's why")
+  - fabric and construction vocabulary used naturally
+  - specific time and labour references ("14 hours", "3-day finish")
+  - sensory descriptors ("the drape", "the weight", "the hand-feel")
+  - direct addressing of buyer concerns ("I know you've had pieces ruin in the wash")
+  - light Naija inflection if reference posts support it
 
 common_do_not_say:
-  - "queen", "boss", "diva" used generically
-  - "investment piece" without context
-  - "limited edition" without verifiable rationale
-  - thin-only or single-body-shape framing
-  - English-only when the customer's reference posts use mixed register
+  - "timeless", "iconic", "elegance" without substance
+  - "every piece tells a story" (cliché)
+  - "empowering women" generic
+  - claims about being "the only" or "the best"
+  - first-person biographical claims not in customer material
 ```
 
 ## 5. Restricted claims to flag
 
-- **"Imported" claims** — if the customer says fabric is "imported" or "Italian", flag for confirmation. Local-production fashion is a positive in Nigerian market right now; we don't want to falsely import-ize a local brand.
-- **Designer names dropped without authorisation** — flag any "as worn by [celebrity]" or "trending with [influencer]" without confirmation.
-- **Health claims on shapewear or postpartum wear** — restricted (any "snaps you back" / "transforms" claims need flag).
-- **Counterfeiting risk** — if customer references a luxury brand by name in their content (e.g. "alternative to Chanel"), flag for legal sensitivity.
+- "100% original" / "one-of-a-kind" framing if the customer's process can't substantiate.
+- Specific celebrity dressing claims if not provided with consent.
+- Sustainability claims ("eco-friendly fabric", "ethical sourcing") without substantiation.
+- "Made in Nigeria" framing when fabric is imported and only assembly is local — flag for honest disclosure.
+- Specific durability claims ("lasts 10 years") without reasoning.
 
-## 6. Niche-specific calendar rhythm bias
+## 6. Niche-specific framework × archetype affinity adjustments
 
-Fashion calendars run close to the baseline 60/40:
+- **Process Tour and Behind-the-Work archetypes run very strong.** Fashion is the most visually-rewarded niche for craft visuals.
+- **T2V allocation skews heavier than 40%.** Fabric in motion, cutting-room scenes, finishing close-ups all reward T2V.
+- **Pricing Breakdown is high-trust here.** Fashion buyers regularly ask "why is this so expensive" — answering proactively converts.
+- **Educational Breakdown around fabric and construction performs well.**
+- **Avoid Symptom Diagnosis archetype** — fashion buyers aren't looking for problem-aware content.
 
-- **Strong T2V anchor positions.** Fashion benefits from cinematic mood-piece anchors that establish the brand's visual register early in the calendar — Day 1 of any tier should be a high-quality T2V mood piece, not a UGC.
-- **UGC skews 50/50 between presenter-led (talking head) and craft-led (hands-on-product, no face).** Some fashion founders are camera-shy; the brief flow should detect this from reference posts and bias craft-led UGC for them.
-- **Carousels skew visual.** Less text, more imagery. The 5-page template still applies but the per-page text load is lighter than for beauty or fintech.
+## 7. Sample reference material fallback — observational, not first-person
 
-## 7. Sample reference material fallback
+> Example A (craft-substantiated):
+> "Each piece in this collection takes 14 hours to hand-finish. That's six hours on the cut, four on the construction, three on the finishing details, and one on the final pressing. The price reflects what's in the work."
 
-> Example A (warm / styling-focused):
-> "I styled this piece three ways for my client — date night, work meeting, brunch. Same dress, different energy. The trick is the accessories. Let me show you."
+> Example B (sensory, observational):
+> "There's a moment when a fabric stops being a length on a roll and becomes a piece. Usually it's the second fitting — the line of the shoulder, the way the hem falls. That's the moment we know it's right."
 
-> Example B (craft / behind-the-scenes):
-> "This piece took 14 hours to hand-finish. The neckline alone is 6 hours of beadwork. When I tell you ₦85k is a fair price, this is what I mean."
+> Example C (educational, observational):
+> "If you've had ankara pieces shrink or fade, the fabric isn't the issue — the wash is. Most ankara is dyed using methods that need cold water, gentle handling, and shade-drying. Here's the routine."
 
-> Example C (founder / personal):
-> "I started this brand because I couldn't find a single ankara dress that fit my body and didn't make me feel costumed. Now we make pieces for women who want to feel themselves in their own culture."
+None claim "I designed this in honour of my mother" or "Aisha wore our piece to her engagement". Observational craft framing only.
 
 ## 8. Photo aesthetic notes
 
-Fashion customers often upload photos of:
-- Themselves (founder UGC).
-- Their products on a model.
-- Their products flat-lay on a surface.
-
-For founder UGC photos: note the styling, palette, setting. Fashion founders typically have a strong personal aesthetic that should echo through the brand.
-
-For product / model photos: these don't go through the avatar pipeline. They feed into the visual style block as colour and styling references for cinematic T2V.
+- Customer-modelled photos (founder wearing their own pieces) work very well for avatar generation.
+- Studio-flat photos of garments don't help avatar generation but do help T2V product cinematic.
+- Look-book style (model + setting) is high-quality input for both avatar and T2V.
+- Note dominant fabric palette — informs the visual_style block.
+- Watch for inconsistent lighting across photos — flag if avatar reference data would be ambiguous.
 
 ## 9. Common upsell signals
 
-- Customer has 5+ active SKUs (Starter's 7 videos can't cover).
-- Customer mentioned an upcoming collection drop or seasonal launch.
-- Customer mentioned both ready-to-wear AND custom / bespoke service lines.
-- Customer mentioned active wedding-season pipeline.
+- Multiple collections per year.
+- Frequent custom-order volume.
+- Customer mentioned "launch" of a new line.
+- Customer operates across markets (Lagos + Abuja, or Nigeria + UK diaspora).
 
-Upsell framing: "we can dedicate weeks to your SS25 collection drop, then have full coverage of your wedding-season custom work — that's hard to do in 7 videos."
+Upsell framing: "with 30 videos you can cover the full collection (each piece showcased), the construction story for each fabric type, pricing transparency, and styling content — all in one calendar."
 
-## 10. Compliance and care
+## 10. No-fabrication notes specific to fashion
 
-- Avoid putting unverifiable claims about imported / luxury / celebrity-endorsement in scripts.
-- Default to body-positive framing across all UGC scripts unless customer's reference posts deliberately set a different register.
-- For bridal / occasion-wear customers, the cultural specificity should be high — "owambe" not "Nigerian wedding event".
+Fashion has high fabrication temptation around designer-origin storytelling and customer testimonials. The AI must resist:
+
+- **"This collection was inspired by..."** unless the customer specifically typed the inspiration into step 6.
+- **Specific customer wear stories.** "Aisha wore our piece to her engagement" — off the table without consent.
+- **Family heritage claims.** "My grandmother taught me how to read fabric" — off the table.
+- **Designer journey narratives.** "When I started this brand..." — off the table unless customer typed it.
+
+What we do instead:
+
+- **Construction substantiation** — hours, stitches, finishing detail.
+- **Fabric education** — sourcing, weight, weave, care.
+- **Process visuals** showing the work without narrating biography.
+- **Pricing transparency** — labour and materials breakdown.
+- **Styling guidance** for the kinds of occasions the customer's audience attends.
+- **Defensible opinion** — "ankara wash routines are mostly wrong" needs no biography.
+
+## 11. Cross-references
+
+- `docs/specs/script-frameworks.md`
+- `docs/specs/angle-archetypes.md`
+- `docs/specs/research-methodology.md`
+- `docs/specs/content-types-allowed.md`
+- `niche-briefs/restricted.md`

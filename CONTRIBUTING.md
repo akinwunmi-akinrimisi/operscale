@@ -182,3 +182,18 @@ When a new contributor (human or AI) joins, send them these five files in order:
 5. `docs/data-model.md` — the schema everything else writes against.
 
 If you're updating the project and these five would be misleading after your change, your PR isn't done yet.
+
+## 11. Required reading for content-generation work (V2 doc set)
+
+For anyone working on content generation specifically — the AI brief analysis prompt, the framework or archetype banks, the niche briefs, or any code path that produces customer-facing copy — the V2 doc set is required reading before any change:
+
+1. `docs/specs/content-types-allowed.md` — the no-fabrication rule (ADR 0010).
+2. `docs/specs/script-frameworks.md` — the framework bank (25 entries, named by structural pattern not by marketer).
+3. `docs/specs/angle-archetypes.md` — the archetype bank (25 entries).
+4. `docs/specs/non-duplication-system.md` — the deterministic seeding system that guarantees no two customers receive the same framework × archetype combinations.
+5. `docs/specs/research-methodology.md` — the four-lens methodology (voice, specificity, expertise, visual) the AI runs over each customer's corpus.
+6. `docs/specs/ai-brief-analysis.md` — the integration surface where all of the above converge into one production prompt.
+
+Plus all niche briefs in `niche-briefs/` for the niche your work touches.
+
+If you change any of files 1-5, file 6 (the integration surface) is almost certainly affected and must be updated in the same commit. The MIGRATION-CONTENT-V2.md document captures the architectural decisions; the four ADRs (0010-0013) capture the why.

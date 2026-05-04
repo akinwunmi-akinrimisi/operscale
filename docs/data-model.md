@@ -21,12 +21,12 @@ These principles apply to every table, column, and index in this schema. When in
 
 ## 2. Schema overview
 
-Phase 1 has 12 tables, organised in five logical groups:
+Phase 1 has 13 tables, organised in five logical groups:
 
 | Group | Tables |
 |---|---|
 | Customer + intake | `customers`, `briefs`, `brief_photos`, `brief_consent` |
-| AI analysis + review | `analysis_runs`, `analysis_edits` |
+| AI analysis + review | `analysis_runs`, `analysis_edits`, `customer_framework_history` |
 | Orders + payments | `orders`, `payments` |
 | Communications | `email_log`, `whatsapp_log` |
 | Audit + telemetry | `activity_log`, `llm_calls` |
@@ -159,6 +159,7 @@ create table analysis_runs (
   trigger_type    text not null check (trigger_type in ('initial','re_analyze_with_note')),
   founder_note    text,
   ai_output       jsonb not null,
+  framework_seed  jsonb,
   model           text not null,
   input_tokens    integer,
   output_tokens   integer,
@@ -183,6 +184,28 @@ insert into analysis_runs (brief_id, run_index, ...) values ($1, $next_index, ..
 
 Old runs are NEVER deleted. They're the audit trail and the training data.
 
+The `framework_seed` JSONB column (added in V2 content migration) stores the deterministic seed inputs, hash, selected frameworks, selected archetypes, selected pairs, and exhaustion / LRU flags for each analysis run. Full structure documented in `docs/specs/non-duplication-system.md` section 5. Example contents:
+
+```json
+{
+  "seed_inputs": {
+    "customer_id": "uuid",
+    "niche": "beauty",
+    "order_index": 1,
+    "submission_week_iso": "2026-W18"
+  },
+  "seed_hash": "sha256:abc123...",
+  "selected_frameworks": ["dr_formula", "pas", "myth_buster"],
+  "selected_archetypes": ["pricing_breakdown", "common_mistake", "decoded_jargon"],
+  "selected_pairs": [
+    {"slot": 1, "framework": "dr_formula", "archetype": "pricing_breakdown"},
+    {"slot": 2, "framework": "pas", "archetype": "common_mistake"}
+  ],
+  "exhaustion_warning": false,
+  "lru_fallback_used": false
+}
+```
+
 ### 3.6 `analysis_edits`
 
 ```sql
@@ -201,6 +224,33 @@ create index analysis_edits_recent_idx on analysis_edits (edited_at desc);
 ```
 
 Notes. `field_path` uses dotted notation matching the JSON Pointer-ish convention used in the CRM, e.g. `recommended_angles[0].hook` or `brand_voice.tone_summary`. `edited_by` is the founder's email. We store text representations of before/after even for nested objects (we JSON.stringify them).
+
+### 3.6b `customer_framework_history`
+
+Added in V2 content migration. Tracks every (framework, archetype) pair ever delivered to a customer (i.e. approved by the founder). Used to ensure no pair repeats for a returning customer until the bank exhausts. Full mechanism documented in `docs/specs/non-duplication-system.md`.
+
+```sql
+create table customer_framework_history (
+  customer_id     uuid not null references customers(id) on delete restrict,
+  order_id        uuid not null references orders(id) on delete restrict,
+  framework_slot  text not null,
+  archetype_slot  text not null,
+  used_at         timestamptz default now(),
+  primary key (customer_id, framework_slot, archetype_slot)
+);
+
+create index customer_framework_history_customer_idx
+  on customer_framework_history (customer_id);
+
+create index customer_framework_history_order_idx
+  on customer_framework_history (order_id);
+```
+
+Notes. Rows are written by the founder-approval handler — when a founder approves an analysis run (`founder_approved` event), the application iterates `analysis_runs.framework_seed.selected_pairs` and inserts one row per pair. Re-analyses do not write rows; only approval does. This means a customer who has had two re-analyses and one approval has rows from the approved run only.
+
+The composite primary key `(customer_id, framework_slot, archetype_slot)` enforces that the same pair cannot be recorded twice for the same customer. A subsequent insert with the same key is treated as a no-op (`ON CONFLICT DO NOTHING` from the application).
+
+`ON DELETE RESTRICT` for both foreign keys: rows survive customer deletion via NDPC anonymisation (the customer_id is set to a sentinel UUID rather than the row being dropped) — see section 9 for details. We never want to silently lose history that informs future selections.
 
 ### 3.7 `orders`
 
@@ -382,14 +432,16 @@ customers (root)
    │     │     └── analysis_edits (one-to-many, CASCADE)
    │     └── orders (one-to-many, RESTRICT)
    │             ├── payments (one-to-many, RESTRICT)
+   │             ├── customer_framework_history (one-to-many, RESTRICT — survives customer anonymisation)
    │             ├── email_log (one-to-many, SET NULL — emails outlive orders)
    │             └── whatsapp_log (one-to-many, SET NULL)
+   ├── customer_framework_history (one-to-many, RESTRICT — survives customer anonymisation)
    ├── email_log (one-to-many, RESTRICT)
    ├── whatsapp_log (one-to-many, SET NULL)
    └── activity_log (one-to-many, SET NULL — log survives if customer deleted)
 ```
 
-The asymmetry is intentional. Photos and analyses are owned by briefs, so they cascade. Consent records, orders, and payments outlive the customer record for compliance. Logs survive even if customer/brief/order references go to NULL — we still want the audit trail, even if it's anonymised.
+The asymmetry is intentional. Photos and analyses are owned by briefs, so they cascade. Consent records, orders, payments, and framework history outlive the customer record for compliance and for informing future selections. Logs survive even if customer/brief/order references go to NULL — we still want the audit trail, even if it's anonymised.
 
 ## 5. Activity log event taxonomy
 
@@ -408,7 +460,7 @@ Every event written to `activity_log` uses one of the names below. New event typ
 `email_auto_ack_sent`, `email_brief_sent`, `email_payment_confirmation_sent`, `email_recovery_sent`, `email_bounced`.
 
 **AI analysis:**
-`ai_analysis_started`, `ai_analysis_completed`, `ai_analysis_failed`, `ai_reanalyze_requested` (with `payload.note`).
+`ai_analysis_started`, `ai_analysis_completed`, `ai_analysis_failed`, `ai_reanalyze_requested` (with `payload.note`), `bank_exhausted_lru_fallback` (with `payload.customer_id`, `payload.run_id`).
 
 **Founder review:**
 `founder_opened_review`, `founder_edited_field` (with `payload.field_path`, `payload.before`, `payload.after`), `founder_approved`, `founder_discarded` (with `payload.reason`).

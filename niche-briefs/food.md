@@ -1,158 +1,194 @@
-# Niche brief: Food
+# Niche brief: Food (V2)
 
 **Status:** Authoritative for Phase 1.
 **Used by:** AI brief analysis prompt. Phase 2 production agent. Calendar preview component.
+**Last updated:** 2026-05-04.
 
-This document is the operational knowledge the AI consults when a food customer submits a brief.
+This document is the operational knowledge the AI consults when a food customer submits a brief. It pairs with the framework × archetype selection from `docs/specs/non-duplication-system.md` and the no-fabrication rule from `docs/specs/content-types-allowed.md`.
 
 ## 1. Who's in this niche
 
-- Restaurant owners (sit-down, fine dining, casual).
-- Cloud kitchens and ghost kitchens.
-- Catering businesses (events, corporate, owambe).
-- Specialty food / dish-specific brands (jollof specialists, suya brands, pastry).
-- Packaged-food brands (sauces, spice blends, frozen meals).
-- Pastry and dessert businesses.
-- Beverage brands (juices, infused waters, premium coffee).
+- Catering businesses (events, weddings, owambe, corporate).
+- Bakeries — cake-led, bread-led, pastry-led, custom-cake.
+- Restaurants and cloud kitchens.
+- Specialty food brands (sauces, spices, preserved foods, beverages).
+- Meal-prep and subscription kitchens.
+- Cooking-class providers and culinary educators.
+- Private chefs serving high-net-worth clients.
+- Beverage brands (juices, teas, kombucha).
 
 Edge cases:
-- Pure delivery aggregators — fits awkwardly; their content is more about the platform than food.
-- Cooking-class educators — fits more like education than food.
-- Diet-specific food brands — fits with restricted-niche care if claims drift into health territory.
+- Restaurants with a single famous dish — fits, but content slants very heavily toward that dish; flag if product diversity is needed.
+- Wholesale-only food brands — fits but slants away from Outcome Showcase, toward Process Tour and B2B archetypes.
+- Functional / wellness foods making health claims — route through health restricted-claim flagging.
 
 ## 2. Tone and voice patterns
 
-Food in Nigeria converts on **craft and presence**. The founder in their kitchen, the food being made, the family eating it. Successful Nigerian food content is about the people behind the food and the food itself — not abstract "culinary" framing.
+Food in Nigeria converts on appetite + craft. Visual must trigger hunger; copy must demonstrate care for the work. Content that pairs sensory imagery with concrete craft details (sourcing, prep time, technique) outperforms aesthetic-only content.
 
 Common tonal markers:
 
-- Specific dishes by name: "jollof", "ofada", "amala", "egusi", "suya" — not "Nigerian cuisine".
-- Cooking method specificity: "low fire", "smoky pot", "the right pepper".
-- Personal craft framing: "my grandmother's", "the way we do it in my house", "I tried it 50 ways before I got it right".
-- Price honesty: "₦15k for a portion that feeds 4 — and here's why".
-- Sensory language: "smoky", "deep", "rich", "kick", "aroma".
+- Specific ingredient vocabulary used naturally.
+- Time language: "12-hour fermentation", "3-day cure", "overnight rest".
+- Sensory descriptors: "the crackle of the crust", "spice that hits before sweet".
+- Direct invitation: "your weekend just decided itself".
+- Light Naija inflection — food is a register where Pidgin and local language land naturally.
 
 Avoid:
-- "Authentic" used generically — every Nigerian food brand says authentic.
-- "Modern twist" framing without specifics.
-- "Curated" or "elevated" without context.
-- Generic "comfort food" framing — too American.
-- Photoshop-shiny food imagery as the visual norm.
+- Generic restaurant copy ("delicious", "amazing", "must-try").
+- "Foodie" Twitter aesthetic.
+- Implied health claims ("clean eating", "guilt-free") unless the customer has substantiation.
+- Overstated origin claims ("authentic Italian") if the customer's process doesn't substantiate.
+- First-person biographical anecdotes that we haven't been given.
 
-## 3. Topic library
+## 3. Topic library — by archetype
 
-### 3.1 UGC topics that perform
+### Pricing Breakdown
+- "Why this catering platter is ₦[X] — every ingredient and labour line."
+- "What ₦[X] gets you in our [package]."
+- "The cost of one wedding cake — broken down."
 
-- "How I make my [signature dish]" (slow, real, from one pot)
-- "Why my jollof tastes different from your auntie's"
-- "A day in my kitchen — from market to plate"
-- "What ₦Xk gets you in catering"
-- "The dish my customers always come back for"
-- "Pricing breakdown: where the ₦X goes"
-- "Why I stopped using [common ingredient] and what I use now"
-- "Behind the scenes: catering for a 200-person owambe"
-- "Customer story: how this started ordering from us"
-- "My non-negotiables when I'm cooking [specific dish]"
-- "Things food people hate hearing"
-- "How to taste your food properly"
-- "What goes into our spice blend"
-- "Why I source my pepper from [specific market]"
+### Process Tour / Behind-the-Work
+- "From flour to finished loaf — the [N]-stage process."
+- "[N] hours of [process] in [N] seconds." (T2V time-lapse)
+- "Inside our kitchen during [event type] prep."
+- "The morning of an owambe order — what actually happens."
 
-### 3.2 T2V cinematic topics
+### Quality Moment / Outcome Showcase (T2V cinematic)
+- Slow-motion bread crust crackle.
+- Steam rising from a freshly opened pot.
+- Spoon dragging through sauce.
+- Cake-cut reveal.
+- Plating shots — sauce drag, garnish placement, final swipe.
 
-Visual register: warm, textured, sensory. Food T2V should make the viewer hungry.
+### Insider Checklist / Pre-Decision Audit
+- "[N] questions to ask before ordering catering for any event."
+- "What to check on a wedding-cake quote before paying."
+- "[N] red flags in a Nigerian catering proposal."
 
-- Steam rising from a pot of jollof being uncovered.
-- Hands stirring, hands chopping, hands plating.
-- Knife cuts through fresh vegetables in slow motion.
-- Pour-shots — sauce over meat, oil into the pan, gravy on amala.
-- Wide shot of a kitchen mid-service — controlled chaos.
-- Time-lapse from raw ingredients to finished plate.
-- Close-up of the first cut into the dish — fork through the cake, knife into the fish.
-- Family or customers eating the food and reacting.
+### Common Mistake / Decision Framework
+- "[N] mistakes Lagos brides make when ordering catering."
+- "DIY-vs-cater for your next event — when each makes sense."
+- "How to size a catering order without overshooting."
 
-### 3.3 Carousel templates
+### Quality Tells
+- "How to spot a properly-made [dish]."
+- "[N] signs your caterer cares about the food."
+- "What separates a real artisan baker from a high-volume bakery."
 
-- "5 dishes we're known for"
-- "How our jollof is different" (process / ingredient breakdown)
-- "Catering menu — what's possible at [size] gathering"
-- "Behind the spice blend — what's in it"
-- "Sourcing breakdown — where every ingredient comes from"
-- "Customer reactions" — quote / face / dish carousel
+### Process Demystification
+- "How a single wedding-day catering order actually unfolds."
+- "What 'made-to-order' really means in our kitchen."
+- "From booking to event day — every checkpoint."
 
-## 4. Brand voice variables
+### Decoded Jargon
+- "Sous-vide, confit, fermented — what these actually mean."
+- "Reading a menu without the food-snob translation."
+- "What '[term]' actually means on a catering quote."
+
+### Industry Pattern / Market Reality
+- "Wedding catering pricing in Lagos right now."
+- "Why event-catering costs have shifted in 2026."
+- "The state of the Nigerian baking market."
+
+### Use-Case Spotlight / Adjacent Possibility
+- "Our [signature dish] for a 20-person dinner party."
+- "Beyond owambe — surprising contexts for our catering."
+- "[Product] for an everyday weeknight."
+
+### Day-in-the-Output
+- "What our subscription kitchen sends out on a typical week."
+- "A typical event-day timeline from our side."
+- "Weekday meal-prep with our service."
+
+## 4. Brand voice variables (defaults; overridden by extraction)
 
 ```
 common_do_say:
-  - specific dish names (jollof, egusi, suya, ofada, amala, etc.)
-  - sensory descriptors (smoky, rich, deep, kick, aroma)
-  - process framing (low fire, slow, the right way, my way)
-  - market and source specifics (specific markets, specific peppers, specific oils)
-  - "I", "my customers", "the kitchen"
+  - specific ingredient and technique vocabulary
+  - precise time and labour references ("12 hours", "3-day cure")
+  - sensory descriptors ("the crackle", "the steam", "the texture")
+  - direct invitation to imagine the eating experience
+  - light Naija inflection where reference posts support it
 
 common_do_not_say:
-  - "authentic" used generically
-  - "elevated", "curated", "modern twist" without specifics
-  - "comfort food" (American framing)
-  - generic "delicious", "tasty", "amazing"
-  - "Nigerian cuisine" (too abstract; use specific dishes)
+  - "delicious", "amazing", "must-try" without specifics
+  - "clean eating", "guilt-free" without substantiation
+  - "the best in Lagos" overclaim
+  - "authentic [cuisine]" if process doesn't substantiate
+  - first-person biographical claims not in customer material
 ```
 
 ## 5. Restricted claims to flag
 
-- **Health claims** — "weight-loss meals", "diabetic-friendly", "heart-healthy" — flag for substantiation. Most food brands shouldn't make these claims; if they do, escalate.
-- **Halal / kosher claims** — flag for verification (do they actually have certification?).
-- **Organic claims** — flag for substantiation.
-- **"Premium ingredients"** without specifics — soften to specific named ingredients.
-- **"Award-winning"** without specifics — flag and ask the customer which award.
-- **Allergen safety claims** — "nut-free kitchen", "gluten-free" — flag for confirmation; these have legal liability if wrong.
+- "Authentic [foreign cuisine]" if the customer hasn't substantiated training or sourcing.
+- Health claims ("immunity-boosting", "fat-burning", "detox") — flag for substantiation, often hard-block.
+- "All-natural" / "organic" / "no preservatives" — flag unless customer's process substantiates.
+- Specific allergen claims ("nut-free kitchen") without confirmed kitchen hygiene protocols.
+- Comparisons to specific named restaurants as targets.
+- Claims about exclusive sourcing without confirmation.
 
-The flag should be specific: "Customer mentioned 'diabetic-friendly meals' — flag for clinical-substantiation; if no dietitian involvement, soften to 'lower-glycemic options' framing or remove."
+## 6. Niche-specific framework × archetype affinity adjustments
 
-## 6. Niche-specific calendar rhythm bias
+- **T2V allocation skews toward sensory cinematic.** Food rewards close-up, slow-motion, texture-led visuals more than any other niche.
+- **Quality Moment archetype runs strongest here.** A 5-second sauce-drag clip can outperform a full educational video.
+- **Process Tour and Behind-the-Work run strong** because food work is visually compelling.
+- **Pricing Breakdown converts well** because catering buyers regularly seek transparency.
+- **Decoded Jargon runs lower** than other niches — food jargon is less of a barrier.
+- **Symptom Diagnosis runs lowest** — food buyers aren't problem-aware in the diagnostic sense.
 
-Food calendars deviate from baseline 60/40:
+## 7. Sample reference material fallback — observational, not first-person
 
-- **UGC tilts heavier (70/30 vs 60/40 baseline).** Food founders connect through their kitchen presence; the camera in their kitchen matters more than abstract cinematic.
-- **T2V skews to dish reveals and process shots.** Less narrative, more texture and craft.
-- **Carousels are menu showcases and process explainers.** Customers save these and refer back when ordering.
-- **Avoid early-week aspirational T2V.** Open with the founder in the kitchen on Day 1, not with a moody food close-up.
+> Example A (sensory, observational):
+> "Bread that's been properly fermented sounds different when it cuts. Listen for the crackle in the crust — that's the dough telling you it had time. A 12-hour fermentation gives you that. A 2-hour fermentation gives you something else entirely."
 
-## 7. Sample reference material fallback
+> Example B (craft-substantiated):
+> "A custom 4-tier wedding cake takes us 3 days. Day one: structure baking and crumb-coating. Day two: ganache, fondant, and detail work. Day three: assembly, on-site adjustments, presentation. The price reflects what's in the work."
 
-> Example A (craft / personal):
-> "My jollof recipe is my mum's, with three changes I made over the last 5 years. She uses a different pepper, I use a smokier one. She uses one onion, I use two. She'd kill me if she heard this — but the customers love mine."
+> Example C (educational, observational):
+> "Most catering orders in Lagos overshoot by 30%. The reason isn't generosity — it's a sizing formula nobody questions. Here's the actual math for a 100-guest event."
 
-> Example B (founder / kitchen):
-> "Today I'm cooking 80 portions of jollof for a wedding. This is what 7 hours in the kitchen looks like. The pepper alone takes 2 hours — and I'll tell you why."
-
-> Example C (educational / sensory):
-> "There's a difference between jollof that's smoky and jollof that's burnt. Most people get it wrong by 30 seconds. Here's what to look for."
+None of these claim "I learned this from my grandmother" or "Sade's wedding was the most beautiful event we catered". Observational craft framing only.
 
 ## 8. Photo aesthetic notes
 
-Food customers commonly upload:
-- Themselves (founder UGC).
-- Their kitchen / restaurant space.
-- Their food / signature dishes.
-
-For founder photos: note kitchen wardrobe (apron, chef whites if applicable), lighting register (kitchens often have warm/yellow lighting — note this for avatar treatment).
-
-For food / kitchen photos: these don't go through the avatar pipeline. They feed into the visual style block as colour and styling references for cinematic T2V (warm tones, kitchen palettes, food-photography conventions).
+- Food close-ups (plated dishes) are gold for T2V references.
+- Founder-in-kitchen photos work well for avatar.
+- Avoid harsh fluorescent kitchen photos — flag for production.
+- Note dominant colour palette of food — informs visual_style.
+- Event photos showing tables of catering work well for outcome showcase context.
 
 ## 9. Common upsell signals
 
-- Customer mentioned multiple dishes / menu items (Starter's 7 videos can't cover variety).
-- Customer mentioned catering AND dine-in / delivery service lines.
-- Customer mentioned upcoming menu launch or seasonal items.
-- Customer mentioned hosting events (which need their own content arc).
+- Customer caters for events 4+ times per month.
+- Customer mentioned weddings or owambe season.
+- Customer recently launched a new menu or seasonal range.
+- Customer operates across formats (catering + retail + subscription).
 
-Upsell framing: "with 30 days we can dedicate a week to your signature dishes, a week to behind-the-scenes craft, a week to customer stories, and a week to your catering offerings — that's the full breadth of your kitchen."
+Upsell framing: "30 videos lets you cover the full menu (each signature dish), the catering process, pricing transparency, sensory-cinematic hero shots, and behind-the-kitchen content — perfect for a season's worth of bookings."
 
-## 10. Compliance and care
+## 10. No-fabrication notes specific to food
 
-- Avoid health claims unless customer can substantiate.
-- Avoid "premium" without specifics.
-- Default to specific dish names rather than abstract food framing.
-- For catering customers, ensure event types are realistic and don't promise things they can't deliver.
-- For packaged-food brands with NAFDAC registration: verify before referencing the registration in any script.
+Food has high fabrication temptation around family-recipe origin stories and wedding-customer testimonials. The AI must resist:
+
+- **"This recipe was passed down from my grandmother..."** — off the table unless customer typed it into step 6.
+- **Specific event/customer wedding stories.** "Sade's owambe was 600 guests" — off the table without consent.
+- **"I learned this technique in [foreign country]..."** — off the table unless customer typed it.
+- **Family / village origin narratives.** "In my mother's kitchen growing up..." — off the table.
+
+What we do instead:
+
+- **Process visuals** showing the craft without narrating biography.
+- **Pricing transparency** with labour and ingredient breakdowns.
+- **Sensory cinematic** — appetite triggers via T2V quality moments.
+- **Educational content** about technique, ingredient, timing.
+- **Catering / event guidance** at the category level (sizing, sequencing, season-pricing).
+- **Defensible opinion** on technique, ingredients, sourcing approach.
+
+## 11. Cross-references
+
+- `docs/specs/script-frameworks.md`
+- `docs/specs/angle-archetypes.md`
+- `docs/specs/research-methodology.md`
+- `docs/specs/content-types-allowed.md`
+- `niche-briefs/restricted.md`

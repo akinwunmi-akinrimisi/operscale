@@ -176,6 +176,10 @@ Use for the pricing page and the 7-step form. CRO discipline: friction audit, dr
 
 Use for setting up the `activity_log` event taxonomy and any client-side analytics. Phase 1 uses Supabase activity_log as the canonical event store.
 
+### `claude-vibes-scriptwriting-methodology` (`awesomeskill.ai`)
+
+Use when generating script structure for the AI brief analysis output (`docs/specs/ai-brief-analysis.md`) and the Phase 2 production agent. Covers DR formula, hook stacking, and short-form pacing patterns. Filtered through the convention in ADR 0012 — frameworks are referenced by the name of the framework, never by the name of a marketer. The skill is the toolbox; the names of the people who taught the patterns are not part of the customer's deliverable.
+
 ## Document / artifact generation skills
 
 ### `docx` (`anthropics/skills`)

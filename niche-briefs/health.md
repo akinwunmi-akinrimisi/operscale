@@ -1,173 +1,191 @@
-# Niche brief: Health
+# Niche brief: Health & wellness (V2)
 
 **Status:** Authoritative for Phase 1.
 **Used by:** AI brief analysis prompt. Phase 2 production agent. Calendar preview component.
+**Last updated:** 2026-05-04.
 
-This document is the operational knowledge the AI consults when a health customer submits a brief. **Restricted-niche care applies throughout — this niche is the closest to a hard-block category in Phase 1.**
+This document is the operational knowledge the AI consults when a health & wellness customer submits a brief. It pairs with the framework × archetype selection from `docs/specs/non-duplication-system.md` and the no-fabrication rule from `docs/specs/content-types-allowed.md`. Health, like fintech, is regulatory-sensitive — claims that could be construed as medical advice are tightly controlled.
 
 ## 1. Who's in this niche
 
-In-scope (with restrictions):
-- Wellness coaches and educators (lifestyle, sleep, mental health awareness).
-- Fitness brand founders (gym programs, fitness apparel, equipment).
-- Nutrition educators (food-as-lifestyle, not dietitians without RD-N registration).
-- Functional supplement brands (NAFDAC-registered).
-- Health-tech startups (telemedicine, scheduling, records).
-- Healthcare service providers — clinics, diagnostic centres (with marketing-restraint care).
+- Fitness coaches and personal trainers selling programmes.
+- Nutritionists and registered dieticians.
+- Mental health practitioners (within their licensure scope).
+- Wellness brands (supplements, herbal products — within NAFDAC and advertising scope).
+- Yoga, pilates, and movement instructors.
+- Fertility-and-wellness educators (within scope; medical claims tightly restricted).
+- Sleep and habit coaches.
+- Physiotherapists in private practice.
 
-Out-of-scope (Phase 1 hard-block):
-- Weight-loss-specific brands or coaches with before/after framing as primary.
-- Unregistered supplements or "miracle cures."
-- Skin-bleaching products marketed as "skin lightening treatment."
-- Anything claiming to treat serious illness (cancer, HIV, diabetes, heart disease) without a licensed medical practitioner.
-- Mental health "instant cure" coaching without licensed practitioners.
+Edge cases — restricted by default, requires founder pre-approval:
+- Any business making weight-loss claims with specific numbers / timelines — restricted.
+- Supplements claiming disease treatment — restricted.
+- Detox and "cleanse" products with medical framing — restricted.
+- Fertility / reproductive health products with implied medical efficacy — restricted.
+- Any product implying it cures, treats, or prevents disease — hard-block.
 
-The founder review screen must catch these on submission.
+When the customer's business sits on or near a restricted line, the AI flags the brief for founder review *before* analysis runs.
 
 ## 2. Tone and voice patterns
 
-Health content in Nigeria converts on **measured education**. The category is full of overpromising; trustworthy health voices stand out by being conservative. Successful Nigerian health content sounds like a thoughtful practitioner explaining things, not like an Instagram fitness coach.
+Health & wellness in Nigeria converts on credentials + practical specifics. The audience is sceptical (with reason — wellness scam volume is high) and rewards content that *demonstrates the practitioner's competence* via specifics rather than testimonials.
 
 Common tonal markers:
 
-- Specific habits, not transformations: "I started walking 30 minutes a day after work" beats "transform your body in 30 days".
-- Cultural specificity: Nigerian food (jollof, eba, suya), Lagos commute reality, work-from-home challenges in Nigerian climate.
-- Conservative outcomes: "I sleep better", "I feel less anxious", "my energy is more stable" — NOT "I cured my anxiety".
-- Process and consistency framing: "30 days of small changes", not "the secret to radical transformation".
-- Acknowledgment of context: "this won't work for everyone", "talk to your doctor first".
+- Specific physiological vocabulary used appropriately ("vagal tone", "heart rate variability", "macronutrient ratio") — only when the customer's credentials support it.
+- Practical instruction: "do this for 90 seconds before X", "track this for a week".
+- Direct address of audience confusion: "everyone tells you to do X — here's why it doesn't always work".
+- Light Naija inflection if reference posts use it; otherwise neutral.
 
 Avoid:
-- Before/after weight imagery.
-- "Detox" and "cleanse" framing.
-- Medical claims dressed as wellness ("balances hormones", "boosts immunity", "fights inflammation").
-- Body-shape-judgmental language.
-- "Toxin"-clearing claims.
-- Emotional manipulation around body image.
+- "Holistic" / "balance" / "alignment" without substance.
+- Specific weight-loss numbers or timelines.
+- Implied disease-treatment claims.
+- Customer-transformation narratives ("Sarah lost 10kg in 6 weeks").
+- Hyperbole about ancient wisdom or natural superiority.
+- First-person biographical anecdotes that we haven't been given.
 
-## 3. Topic library
+## 3. Topic library — by archetype
 
-### 3.1 UGC topics that perform
+### Educational Breakdown / Decoded Jargon
+- "What HRV (heart rate variability) actually measures."
+- "Macronutrients explained — without the bro-science."
+- "Decoding food labels: the parts that actually matter."
 
-- "What I changed about my evening routine that helped me sleep better"
-- "30 days of walking 30 minutes — what actually changed"
-- "How I built a simple home workout that I actually do"
-- "Eating Nigerian food and still hitting health goals"
-- "Why I stopped doing extreme diets (and what I do instead)"
-- "Talking to my doctor about [specific common topic]"
-- "My honest review of [wellness app or program]"
-- "What 6 months of therapy taught me about [specific topic]"
-- "How I deal with Lagos stress without losing it"
-- "Behind the work: what I tell my clients in week 1"
-- "The boring habits that actually work"
-- "Things wellness influencers won't tell you"
-- "My non-negotiables for staying healthy in Lagos"
-- "What changed when I stopped tracking calories"
+### Insider Checklist / Pre-Decision Audit
+- "[N] questions to ask any new fitness coach before signing up."
+- "What to check before any new supplement enters your routine."
+- "The pre-session audit for any first session with a [practitioner type]."
 
-### 3.2 T2V cinematic topics
+### Common Mistake / Symptom Diagnosis
+- "[N] common workout mistakes that aren't doing you favours."
+- "Signs your sleep routine isn't working — even when you think it is."
+- "If you have [pattern], here's what's likely happening."
 
-Visual register: warm, natural, body-positive. Health T2V should make wellness feel attainable and human, not aspirational and distant.
+### Process Tour / Service Anatomy
+- "What a typical session with [practitioner type] actually involves."
+- "Inside a [programme] week: training, nutrition, recovery."
+- "From intake to first session: how the process works."
 
-- A morning walk through a Lagos park or estate.
-- Hands cooking a simple Nigerian meal — eba, plantain, vegetable soup.
-- A simple home workout in a normal Nigerian apartment.
-- Wide shot of a yoga or meditation moment with diffused light.
-- Time-lapse of a meal coming together — produce to plate.
-- A founder/coach walking with a client through outdoor space.
-- Quiet morning routine — water, journal, light stretches.
+### Quality Tells
+- "How to tell if a fitness coach actually knows what they're doing."
+- "[N] signs a wellness practice is grounded in science."
+- "What separates real expertise from wellness influencers."
 
-Avoid:
-- Pristine gym aesthetics with model-bodies.
-- Western-style green-juice / acai-bowl content (looks aspirational, lands wrong in Lagos).
-- Before/after body imagery.
+### Category Myth / Frame Re-Set
+- "The [common health myth] Nigerians keep believing."
+- "Stop thinking about [topic] as [old frame] — it's actually [new frame]."
+- "Why [popular wellness advice] doesn't work for everyone."
 
-### 3.3 Carousel templates
+### Industry Pattern / Market Reality
+- "What Nigerian gyms actually deliver vs what they advertise."
+- "The state of mental health support in Lagos right now."
+- "Where [niche] is heading in 2026."
 
-- "5 small habits I actually maintained"
-- "Eating well on a Nigerian budget"
-- "What to ask your doctor at your next visit"
-- "The 'wellness' habits that aren't actually backed by anything"
-- "My week in workouts — for a busy professional"
-- "Sleep hygiene checklist for Lagos heat"
+### Cost of Inaction / Hidden Trap
+- "What chronic [pattern] actually costs over a year."
+- "The wellness trap most Nigerian women fall into."
+- "Why most [behaviour] backfires."
 
-## 4. Brand voice variables
+### Educational Breakdown / Quick-Win
+- "A 90-second [practice] you can do at your desk."
+- "One thing to add to your morning that improves [outcome]."
+- "The shortest workout that still works."
+
+### Outcome Showcase / Quality Moment (T2V — careful)
+- Movement footage (proper form being demonstrated, no specific result claims).
+- Kitchen counter scenes (food prep, no implied transformation).
+- Calm morning routines (T2V).
+- Equipment close-ups during use.
+
+## 4. Brand voice variables (defaults; overridden by extraction)
 
 ```
 common_do_say:
-  - specific habits ("30 minutes", "twice a week")
-  - conservative outcomes ("more energy", "better sleep", "less anxious")
-  - "I", "my clients", "in my experience"
-  - cultural specifics (Nigerian food, Lagos commute, our weather)
-  - "talk to your doctor", "this isn't medical advice"
+  - physiological / methodological vocabulary appropriate to credentials
+  - specific durations, frequencies, intensities
+  - "what we see in practice" — observational expertise
+  - direct addressing of audience confusion
+  - "research shows" with cited source, or "in clinical experience" when clinical experience exists
 
 common_do_not_say:
-  - "transform", "miracle", "cure", "heal"
-  - "detox", "cleanse", "toxins"
-  - "fix" your body
-  - before/after framing
-  - "balance hormones", "boost immunity" (medical claims)
-  - body-shape comparisons or judgments
+  - "holistic", "balance", "alignment" without substance
+  - specific weight-loss numbers
+  - cure / treat / heal / prevent claims
+  - "ancient wisdom" / "natural is always better" framing
+  - first-person biographical claims not in customer material
 ```
 
 ## 5. Restricted claims to flag
 
-This niche has the most flags after fintech:
+- Cure / treat / heal / prevent specific disease — hard-block.
+- Specific weight-loss timeline ("lose 10kg in 6 weeks") — hard-block.
+- Implied medical advice from non-licensed practitioners — flag.
+- Implied medical advice from licensed practitioners that exceeds their licensure — flag.
+- "All-natural" framing implying safety — flag for substantiation.
+- Specific outcome guarantees of any kind — flag.
+- Comparisons to specific medications without medical credentials — flag.
 
-- **Medical claims** — "treats", "cures", "heals", "balances", "boosts" — flag every instance. Soften toward observational language ("supports", "helps with", "associated with").
-- **Weight-loss specific framing** — flag any "lose 10kg", "drop the weight", "transform your body" language.
-- **Before/after imagery** — flag in any reference posts; don't recommend before/after as content angle.
-- **Supplement claims** — if customer mentions a supplement, must verify NAFDAC registration before allowing claims.
-- **Mental health "cure" framing** — anxiety, depression, ADHD as conditions to be cured by content / programs — flag.
-- **Diabetes / heart disease / cancer / HIV mentions** — flag immediately for founder review.
-- **Children's health products without paediatric professional involvement** — flag.
+## 6. Niche-specific framework × archetype affinity adjustments
 
-The flag should always specify the soften: "Customer mentioned 'cure your insomnia' — soften to 'practical habits that may help you sleep more easily' OR escalate for licensed-clinician confirmation."
+- **Educational frameworks dominate.** Genuine expertise needs to be visible.
+- **Quick-Win archetype runs very strong.** Audience reward for "what can I do today" content is high.
+- **Outcome Showcase runs lower than other niches.** Visual outcome claims are high-restriction.
+- **Symptom Diagnosis runs strong, with care.** Helping audience self-identify problems is valuable; making medical claims is not.
+- **Behind-the-Work runs medium.** Some practitioner work is visually compelling (movement, food prep), some isn't.
 
-## 6. Niche-specific calendar rhythm bias
+## 7. Sample reference material fallback — observational, not first-person
 
-Health calendars run close to baseline but with restraint:
+> Example A (specific, methodological):
+> "Heart rate variability is the spacing between heartbeats. Higher variability usually means your nervous system is recovering well. There are three things that consistently move it — sleep, slow breathing in the evening, and not training intensely in the 3 hours before bed."
 
-- **UGC tilts heavier (65/35 vs 60/40 baseline).** Health is a trust-driven category; the founder on camera matters.
-- **T2V skews to lifestyle / mood pieces** rather than product-reveal cinematic. Slow morning walks, calm cooking shots, daylight stretching.
-- **Carousels are educational checklists.** Densely informational, low on hype.
-- **Mood-piece anchors are calmer than other niches.** Less drama, more breath.
+> Example B (educational, observational):
+> "Most people overthink their first workout. The single biggest predictor of whether you'll still be training in 3 months isn't how hard your first week is — it's whether you scheduled the second week before finishing the first."
 
-## 7. Sample reference material fallback
+> Example C (myth-busting, observational):
+> "The 8-glasses-a-day water rule isn't from research — it's from a single 1945 recommendation people misread. Hydration depends on body size, climate, and activity. In Lagos heat with active days, most people need more. In sedentary office days, less."
 
-> Example A (educational / measured):
-> "I'm a wellness coach, not a doctor. What I tell my clients on day one is: pick one small habit, do it for 30 days, then add another. That's how lasting change happens. Anyone selling you a 7-day transformation is selling you a feeling."
-
-> Example B (founder / personal):
-> "Three years ago I was burning out from 70-hour weeks. I didn't transform overnight — I made one small change, then another. Today I sleep 7+ hours, walk 30 min daily, and I'm calmer. Here's what actually worked, and what didn't."
-
-> Example C (cultural / grounded):
-> "Eating well in Lagos doesn't mean kale and quinoa. Egusi is fine. Eba is fine. The problem isn't Nigerian food — it's how we eat it. Here's what I changed."
+None of these claim "I lost X kg" or "my client transformed in Y weeks". Observational, methodological framing only.
 
 ## 8. Photo aesthetic notes
 
-Health customers occasionally upload photos of:
-- Themselves (founder UGC).
-- Clients (with consent — flag if no consent confirmation).
-- Workout / wellness setup spaces.
-
-For founder photos: note wardrobe (often athletic / casual), lighting, setting. The visual style block should bias toward natural daylight, warm tones, body-positive composition.
-
-For client photos: only use if customer explicitly states client consent in step 6 of the form. Otherwise flag and don't reference.
+- Practitioner photos in setting (gym, kitchen, clinic, studio) work well for avatar.
+- Note credentials visible in photos (certifications on walls, equipment) — feeds visual_style.
+- Demonstration photos (form, technique) are valuable for T2V references.
+- Avoid before/after photos — flag if customer's reference material includes them.
 
 ## 9. Common upsell signals
 
-- Customer mentioned program, course, or coaching offering (suggests longer arc).
-- Customer mentioned both consumer wellness AND professional/B2B services.
-- Customer mentioned upcoming launch or seasonal campaign.
+- Customer mentioned launching new programme.
+- Customer is recently certified / accredited (often coincides with content push).
+- Customer operates across formats (in-person + online + cohort).
+- Customer mentioned competing in a saturated sub-niche (e.g. fitness in Lagos) — volume helps.
 
-Upsell framing: "with 14 videos we can dedicate 4-5 to your coaching program's specific value and still have lifestyle content for general visibility — that's hard to do in 7 videos."
+Upsell framing: "30 videos lets you cover practitioner education, process explanation, common myths, and quick-win tactics across the month — without making the kinds of outcome claims that get content flagged."
 
-## 10. Restricted-niche fallback
+## 10. No-fabrication notes specific to health
 
-This niche is the most likely to have a discardable brief. The founder review process is:
+Health is a high-stakes niche where false claims can cause direct physical harm. The AI must resist:
 
-- **Read every claim flag carefully.**
-- **If claims can be softened**, the AI's brief output already includes soften-suggestions. Founder approves with edits.
-- **If claims are inseparable from the customer's offering** (e.g. their entire product is positioned as a cure), founder discards.
-- **If the customer's referenced posts are full of body-image-harmful content**, founder discards.
+- **Outcome transformation stories.** "Tola lost 12kg in 8 weeks" — off the table without documented consent and substantiation, plus this approaches restricted-claim territory regardless.
+- **"I used to weigh / suffer / struggle with..."** — off the table unless customer typed it into step 6.
+- **Specific patient / client narratives.** "When I worked with a client who had X..." — off the table.
+- **Implied insider medical knowledge** — "what your doctor isn't telling you" — off the table.
+- **Anecdotal evidence dressed as data** — "in my practice, 80% of cases..." — flag for substantiation.
 
-When discarding, the founder may write a personal email to the customer redirecting toward a compliant content angle (e.g. "we'd love to help you with content that focuses on lifestyle habits and practitioner-level expertise, not outcome claims"). This is manual.
+What we do instead:
+
+- **Methodological education** about how the body / mind / process actually works.
+- **Practical instruction** with general applicability.
+- **Industry-pattern observations** about what works and what doesn't.
+- **Decision frameworks** for self-evaluation.
+- **Research summaries** with cited sources.
+- **Defensible opinion** on common practice ("most Nigerian gyms over-prescribe cardio" is defensible; "I learned this when..." needs source).
+
+## 11. Cross-references
+
+- `docs/specs/script-frameworks.md`
+- `docs/specs/angle-archetypes.md`
+- `docs/specs/research-methodology.md`
+- `docs/specs/content-types-allowed.md`
+- `niche-briefs/restricted.md`

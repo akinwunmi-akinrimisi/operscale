@@ -1,158 +1,200 @@
-# Niche brief: Education
+# Niche brief: Education (V2)
 
 **Status:** Authoritative for Phase 1.
 **Used by:** AI brief analysis prompt. Phase 2 production agent. Calendar preview component.
+**Last updated:** 2026-05-04.
 
-This document is the operational knowledge the AI consults when an education customer submits a brief.
+This document is the operational knowledge the AI consults when an education customer submits a brief. It pairs with the framework × archetype selection from `docs/specs/non-duplication-system.md` and the no-fabrication rule from `docs/specs/content-types-allowed.md`. Education is the closest niche to Cloudboosta in spirit — heavy on credibility-building through demonstrated expertise.
 
 ## 1. Who's in this niche
 
-- Course creators and online educators (general topic).
-- Coding bootcamps and tech-skills training (e.g. cloud, data, DevOps — the Cloudboosta-adjacent space).
-- Language schools and tutors.
-- Test-preparation providers (JAMB, IELTS, GMAT, etc.).
-- Career coaches and CV / interview specialists.
-- Children's education brands (with paediatric-care flag — see section 5).
-- Professional development providers (project management, leadership, soft skills).
+- Cohort-based course operators (cloud, design, data, marketing, finance, sales, AI).
+- One-on-one tutors offering structured programmes.
+- Online academies and bootcamps.
+- Test-prep providers (JAMB, IELTS, GMAT, CFA, ACCA, etc.).
+- Career coaches selling skills programmes.
+- Business / entrepreneurship educators.
+- Language schools and language coaches.
+- Children's enrichment programme operators.
+- Skills-trade trainers (catering, fashion, beauty, photography, etc.).
 
 Edge cases:
-- University / formal academic institutions — fits awkwardly (very different sales cycle).
-- Aggregator platforms (e.g. Udemy-style marketplaces) — fits but content register is more platform than educator.
-- Religious / spiritual education — fits with niche-specific care.
+- University-level academic tutoring — fits but may need extra restricted-claim care around guaranteed admission.
+- Children's education content marketed at parents — fits, audience pivot affects voice.
+- Religious / faith-based education — flag for restricted-claim care; keep secular framing in scripts unless customer explicitly opts in.
+- Get-rich-quick "business education" — restricted by default; route through fintech-style compliance pre-check.
 
 ## 2. Tone and voice patterns
 
-Education in Nigeria converts on **demonstrable expertise + clear outcomes**. The category is full of self-proclaimed experts; trustworthy education voices stand out by showing rather than telling. Successful Nigerian education content sounds like a teacher who knows their craft and respects the student.
+Education in Nigeria converts on credibility + outcome specificity. The audience is investing time and money, and rewards content that *proves the curriculum is real* rather than promising vague transformation.
 
 Common tonal markers:
 
-- Specific teacher framing: "I've taught 800+ students", "in 6 years of doing this", "the most common mistake my students make".
-- Outcome-specific: "12 of my students just got jobs at [company]", "85% pass rate over 4 years".
-- Curriculum specificity: "in week 3 we cover [specific concept]", not generic "comprehensive curriculum".
-- Honest about effort: "this isn't a shortcut", "consistent 3 hours a week beats one weekend bootcamp".
-- Genuine investment in the student: "we follow up with you 6 months after".
+- Specific curriculum references — module names, week-by-week structure.
+- Outcome specificity grounded in cohort data ("the most recent cohort", "our typical learner").
+- Direct addressing of audience confusion: "you're not bad at maths — your last teacher was".
+- Light professional swagger: "this is what employers actually look for" beats "we're the best academy".
+- Naija inflection if customer's audience is Nigerian; neutral professional if diaspora-heavy.
 
 Avoid:
-- "Transform your career" / "change your life" — too generic.
-- "Limited spots!" scarcity unless verifiable.
-- "Industry expert" claims without substance.
-- Generic "be your best self" register.
-- Outcome promises that aren't grounded in past data.
+- Generic "transform your life" framing.
+- Specific salary or job-placement guarantees.
+- "Industry-leading" / "world-class" without substance.
+- Implied accreditation that the customer hasn't claimed.
+- First-person biographical anecdotes that we haven't been given.
 
-## 3. Topic library
+## 3. Topic library — by archetype
 
-### 3.1 UGC topics that perform
+### Tier Comparison
+- "[Cohort A] vs [Cohort B] — when each is the right fit."
+- "Self-paced vs cohort-based: the trade-offs."
+- "[N]-week intensive vs 12-week deep — how to choose."
 
-- "What I wish I knew when I started teaching [subject]"
-- "The 3 mistakes 80% of my students make"
-- "Inside week 3 of my [course] — what we actually cover"
-- "How [former student] went from [start] to [outcome]"
-- "Why my course is ₦Xk and why that's a fair price"
-- "What I'd tell my younger self about [subject]"
-- "Honest review: my course's hardest week"
-- "5 free resources I recommend before paying for any course"
-- "The skill that gets my students hired faster than anything else"
-- "Things students hate hearing (but need to)"
-- "How I built this curriculum — and what I changed last year"
-- "Behind the scenes: a day teaching cohort 12"
-- "What 'beginner' actually means in [field]"
-- "Why most [topic] courses fail their students"
+### Service Anatomy / What You Get
+- "Inside the [course name] — every module, every assignment, every output."
+- "What lands in your inbox after you enrol."
+- "The [N] deliverables in our [programme]."
 
-### 3.2 T2V cinematic topics
+### Process Tour / Process Demystification
+- "From application to first cohort: how the process works."
+- "What a typical week in [course] looks like."
+- "Behind a single [course] week: instructors, assignments, peer review."
 
-Visual register: aspirational future-state. Education T2V succeeds when it shows the student where they're going.
+### Insider Checklist / Pre-Decision Audit
+- "[N] questions to ask before enrolling in any cohort."
+- "What to check on a course curriculum before paying."
+- "Red flags in any [niche] course offering."
 
-- Students at graduation / certification ceremonies.
-- A light-filled classroom or co-working space mid-session.
-- Time-lapse of a student's journey — first day to project showcase.
-- Wide aerial of a Lagos office building / tech park / university.
-- Close-up of hands typing code, writing, sketching diagrams.
-- Whiteboard or screen filling with concepts as the camera moves.
-- Quiet moment of a student receiving offer letter / certificate.
+### Common Mistake / Decision Framework
+- "Why most [audience] who try to learn [skill] alone give up by week 4."
+- "[N] mistakes self-taught [audience] keep making."
+- "Bootcamp vs degree: when each is the right path."
 
-### 3.3 Carousel templates
+### Quality Tells
+- "How to spot a course that actually teaches vs one that gets clicks."
+- "[N] signs your instructor knows what they're doing."
+- "What separates real curriculum design from repackaged YouTube."
 
-- "What you'll learn in 12 weeks" — week-by-week breakdown
-- "5 careers this skill opens up"
-- "Before / after curriculum" (capability progression)
-- "[Course name] — full syllabus"
-- "Student success stories" — names, outcomes, photos with consent
-- "How to study effectively for [topic]"
+### Decoded Jargon
+- "What '[term]' actually means in a [niche] curriculum."
+- "Decoding course-marketing language."
+- "Reading a syllabus — the parts that actually matter."
 
-## 4. Brand voice variables
+### Educational Breakdown / Quick-Win
+- "A [skill] concept in 60 seconds."
+- "One thing every [audience] should know about [topic]."
+- "The fastest way to [skill outcome] — the version you can use today."
+
+### Industry Pattern / Market Reality
+- "What [industry] actually hires for in 2026."
+- "The state of [niche] careers right now."
+- "Why most [niche] roles look different from what universities teach."
+
+### Cost Reveal / Pricing Breakdown
+- "[Course price]. Here's where every naira goes."
+- "Why our cohort costs ₦[X] — instructors, infrastructure, materials, support."
+- "The real cost of a [niche] career — by the numbers."
+
+### Use-Case Spotlight / Adjacent Possibility
+- "[Programme] for someone who's never written a line of code."
+- "Beyond [common use] — what graduates actually do."
+- "[Course] from the angle of [specific career change]."
+
+### Outcome Showcase (T2V — careful)
+- Cohort completion footage (no specific named graduates without consent).
+- Curriculum visualisation (modules animating across screen).
+- Workspace shots — laptops, notes, learning environments.
+- Instructor-on-camera in teaching pose (avatar reference).
+
+## 4. Brand voice variables (defaults; overridden by extraction)
 
 ```
 common_do_say:
-  - specific student counts and outcomes ("800+ students", "85% pass rate")
-  - specific curriculum details (weeks, modules, projects)
-  - specific employer / outcome examples
-  - "I", "my students", "in cohort N"
-  - honest effort framing ("this takes work", "3 hours weekly")
+  - specific module / week / assignment names
+  - exact cohort sizes, durations, pricing, deliverables
+  - "the most recent cohort", "our typical learner" — observational
+  - direct addressing of audience self-doubt
+  - employer / industry-relevant language
 
 common_do_not_say:
-  - "transform your career" / "change your life" generically
-  - "industry expert" without substance
-  - "limited spots" without verifiable scarcity
-  - "guaranteed job" (unless explicitly contracted)
-  - generic motivational framing
+  - "transform your life" generic
+  - specific salary guarantees
+  - specific job-placement guarantees
+  - "world-class" / "industry-leading" without substance
+  - first-person biographical claims not in customer material
 ```
 
 ## 5. Restricted claims to flag
 
-- **Job guarantee claims** — "guaranteed employment", "we'll get you hired" — flag unless contractually backed and substantiated. Soften to "85% of our students hired within 6 months" with substantiation.
-- **Salary claims** — "earn ₦Xm after our course" — flag unless backed by alumni data.
-- **Specific employer name claims** — "our students work at Microsoft / Google / etc." — flag unless verifiable. Soften to "our students work at top tech companies" if unverifiable.
-- **Children's education products without verified educator credentials** — flag. Soften to "developed by experienced educators" only if true.
-- **Licensing / accreditation claims** — "accredited by [body]" — flag for confirmation.
-- **Pass-rate claims** — flag if unsubstantiated. Soften to "consistently strong pass rates" if numbers can't be verified.
+- Specific salary guarantees ("graduates earn ₦Xm") — hard-block without verified data + disclaimer.
+- Specific job-placement percentages without methodology.
+- Implied university affiliation when none exists.
+- Implied government accreditation when none exists.
+- Specific exam-pass-rate percentages without methodology.
+- "Become a [profession] in 3 months" overclaim — flag for honest timeline.
 
-The flag should be specific: "Customer mentioned 'guaranteed job after course completion' — flag for contractual confirmation; otherwise soften to 'X% of our recent cohort were hired within 6 months' with substantiated number."
+## 6. Niche-specific framework × archetype affinity adjustments
 
-## 6. Niche-specific calendar rhythm bias
+- **Educational frameworks dominate** (consistent with the niche's nature).
+- **Tier Comparison runs strongest here.** Course buyers compare options heavily.
+- **Cost Reveal / Pricing Breakdown convert exceptionally well.** Course pricing scrutiny is high in Nigeria.
+- **Process Demystification matters** — Nigerian buyers are wary of paying for vapourware.
+- **Outcome Showcase runs medium** — high impact when grounded, high risk when not.
+- **Behind-the-Work runs medium** — instructor demos work; admin work doesn't.
 
-Education calendars run close to baseline 60/40:
+## 7. Sample reference material fallback — observational, not first-person
 
-- **UGC tilts toward expertise and authority.** Founders / teachers on camera explaining concepts performs well.
-- **T2V skews to outcome-aspirational moments.** Students at graduations, light-filled study spaces, hands working.
-- **Carousels are syllabi and frameworks.** "What you'll learn in 12 weeks" is high-saving content.
-- **Mood-piece T2V on Day 1** to establish the ambition and visual register.
+> Example A (specificity-led):
+> "Our most recent cohort had 47 learners. 38 completed all 12 weeks. 31 shipped a final project that's currently live. The breakdown of where they came from: 22 self-taught, 14 from other bootcamps, 11 university students. This is the data we look at, not vibes."
 
-## 7. Sample reference material fallback
+> Example B (educational, observational):
+> "Most people who try to learn [skill] alone burn out around week 4. The reason isn't motivation — it's the lack of feedback loops. Here's why structured cohorts solve this and self-study often doesn't."
 
-> Example A (teacher / authoritative):
-> "I've been teaching cloud architecture for 5 years. The single biggest reason students fail the AWS Solutions Architect exam isn't the technical content — it's how they study. Here's the framework I give every student in week 1."
+> Example C (curriculum-grounded):
+> "Week 6 of our programme covers [topic]. By the end of that week, learners build [output] and present it to a peer review group. That's why a learner who finishes our course can show employers a portfolio piece — not just a certificate."
 
-> Example B (founder / outcome-focused):
-> "Cohort 9 just graduated. 23 students. 18 already hired into cloud roles. Average time-to-hire was 4.2 months. Here's what changed in the curriculum that made this our highest placement rate."
-
-> Example C (educator / personal):
-> "I built this course because I was tired of watching smart Nigerian engineers struggle to break into international roles. The technical work isn't the bottleneck — the system around the technical work is. That's what we teach."
+None of these claim "I built this course because I was once that struggling student" or "Tomi went from beginner to senior engineer in 6 months". Observational, curriculum-grounded framing only.
 
 ## 8. Photo aesthetic notes
 
-Education customers often upload:
-- Themselves (founder / educator UGC).
-- Classroom / training space photos.
-- Student photos (with consent — flag if no consent confirmation).
-
-For founder photos: note wardrobe (often professional / business casual), setting (often classroom or office), lighting (varies). The visual style block should bias toward "competent and approachable" — desk lamps, natural window light, professional settings.
-
-For student photos: only use if customer confirmed consent. Flag any reference to outcomes without substantiation.
+- Instructor-in-teaching-pose photos work very well for avatar.
+- Workspace and laptop shots feed visual_style well.
+- Cohort group photos — flag for individual consent before any specific people are referenced; safer to keep generic ("our recent cohort").
+- Whiteboard / curriculum diagram photos work well for T2V references.
 
 ## 9. Common upsell signals
 
-- Customer mentioned multiple courses / programs (Starter's 7 videos can't cover variety).
-- Customer mentioned upcoming cohort launch or registration window.
-- Customer mentioned both consumer and B2B / corporate-training offerings.
-- Customer mentioned a community / alumni network feature.
+- Customer enrols cohorts on a fixed schedule (every 4-12 weeks).
+- Customer mentioned launching new programme or new module.
+- Customer operates across markets (Nigerian + diaspora students).
+- Customer mentioned scaling instructor team.
 
-Upsell framing: "with 14 videos we can dedicate 5-6 to your flagship course details, 4-5 to alumni outcomes, and 3-4 to general expertise content — that's the full picture you need before a registration window opens."
+Upsell framing: "30 videos lets you cover the full curriculum (one module per video for several weeks), pricing breakdown, instructor demos, and outcome content — that's most of a cohort enrolment cycle."
 
-## 10. Compliance and care
+## 10. No-fabrication notes specific to education
 
-- Avoid job-guarantee claims unless contractually backed.
-- Avoid salary specifics unless alumni-data-supported.
-- For children's education, ensure educator credentials are real.
-- For accreditation claims, verify.
-- Default to "in our cohort" framing rather than absolute outcome claims.
-- For tech-bootcamp customers (e.g. Cloudboosta), the AWS / cloud-specific content benefits from technical accuracy review — flag if scripts include technical details for senior-engineer eyes.
+Education is high-stakes for fabrication because false outcome claims can harm audience financial decisions. The AI must resist:
+
+- **Specific graduate transformation stories.** "Tomi went from no-job to senior engineer in 6 months" — off the table without consent and substantiation.
+- **"When I was a student / when I was struggling..."** — off the table unless customer typed it into step 6.
+- **Implied insider hiring knowledge** — "what hiring managers actually look for" — okay only as observational expertise, never as personal-anecdote claims.
+- **Specific-cohort outcome percentages** without methodology — flag.
+- **Implied curriculum credentials** — "this curriculum is recognised by [body]" — off the table unless substantiated.
+
+What we do instead:
+
+- **Curriculum education** — what's actually in the course.
+- **Pricing transparency** — what the cost covers.
+- **Process demystification** — what the cohort experience actually involves.
+- **Decision frameworks** — how to choose among learning paths.
+- **Industry pattern observations** — what [niche] careers actually look like.
+- **Defensible opinion** on pedagogy, employer expectations, niche reality.
+- **Cohort-level data** when available with methodology disclosure.
+
+## 11. Cross-references
+
+- `docs/specs/script-frameworks.md`
+- `docs/specs/angle-archetypes.md`
+- `docs/specs/research-methodology.md`
+- `docs/specs/content-types-allowed.md`
+- `niche-briefs/restricted.md`
