@@ -4,9 +4,11 @@ import {
   computeReanalyzeSeedHash,
   sortPairsByAffinityAndSeed,
   selectPairsFromSorted,
+  selectFrameworksForBrief,
 } from './framework-selector';
 import type {
   FrameworkSeedInputs,
+  FrameworkSeedResult,
   BankCatalog,
   NicheSlug,
   AffinityLevel,
@@ -234,5 +236,140 @@ describe('selectPairsFromSorted', () => {
     const result = selectPairsFromSorted(allPairs9, history, 1, 1);
     expect(result.exhaustion_warning).toBe(true);
     expect(result.lru_fallback_used).toBe(false);
+  });
+});
+
+describe('selectFrameworksForBrief', () => {
+  const inputs: FrameworkSeedInputs = {
+    customer_id: '00000000-0000-0000-0000-000000000001',
+    niche: 'beauty',
+    order_index: 1,
+    submission_week_iso: '2026-W18',
+  };
+
+  function makeStarterCatalog(): BankCatalog {
+    // 3 frameworks × 3 archetypes = 9 pairs — enough to satisfy starter (N=3).
+    return {
+      frameworks: {
+        DR_FORMULA: { slot: 'DR_FORMULA', name: 'DR Formula', family: 'A', markdown: '', affinity: makeAffinity('High') },
+        PAS:        { slot: 'PAS',        name: 'PAS',        family: 'A', markdown: '', affinity: makeAffinity('Med')  },
+        AIDA:       { slot: 'AIDA',       name: 'AIDA',       family: 'A', markdown: '', affinity: makeAffinity('Med')  },
+      } as unknown as BankCatalog['frameworks'],
+      archetypes: {
+        PRICING_BREAKDOWN: { slot: 'PRICING_BREAKDOWN', name: 'Pricing Breakdown', family: 'A', markdown: '', affinity: makeAffinity('High') },
+        SERVICE_ANATOMY:   { slot: 'SERVICE_ANATOMY',   name: 'Service Anatomy',   family: 'A', markdown: '', affinity: makeAffinity('Med')  },
+        PRODUCT_TOUR:      { slot: 'PRODUCT_TOUR',      name: 'Product Tour',      family: 'A', markdown: '', affinity: makeAffinity('Med')  },
+      } as unknown as BankCatalog['archetypes'],
+      niches: {
+        beauty: '', real_estate: '', fashion: '', fintech: '', health: '', food: '', education: '',
+      },
+    };
+  }
+
+  it('initial mode: returns FrameworkSeedResult with seed_hash matching computeSeedHash', async () => {
+    const catalog = makeStarterCatalog();
+    const result = await selectFrameworksForBrief({
+      inputs,
+      tier: 'starter',
+      catalog,
+      fetchHistory: async () => [],
+    });
+    expect(result.seed_hash).toBe(computeSeedHash(inputs));
+    expect(result.seed_inputs).toEqual(inputs);
+  });
+
+  it('initial mode covers full starter tier quota (N=3)', async () => {
+    const catalog = makeStarterCatalog();
+    const result = await selectFrameworksForBrief({
+      inputs,
+      tier: 'starter',
+      catalog,
+      fetchHistory: async () => [],
+    });
+    expect(result.selected_frameworks).toHaveLength(3);
+    expect(result.selected_archetypes).toHaveLength(3);
+    expect(result.lru_fallback_used).toBe(false);
+  });
+
+  it('re-analyze same_frameworks: returns priorSeed verbatim', async () => {
+    const priorSeed: FrameworkSeedResult = {
+      seed_hash: 'fixed-prior-hash',
+      seed_inputs: inputs,
+      selected_frameworks: ['DR_FORMULA', 'PAS'],
+      selected_archetypes: ['PRICING_BREAKDOWN', 'SERVICE_ANATOMY'],
+      selected_pairs: [{ framework: 'DR_FORMULA', archetype: 'PRICING_BREAKDOWN', affinity: 9 }],
+      exhaustion_warning: false,
+      lru_fallback_used: false,
+    };
+    const result = await selectFrameworksForBrief({
+      inputs,
+      tier: 'starter',
+      catalog: makeStarterCatalog(),
+      fetchHistory: async () => [],
+      mode: 'same_frameworks',
+      priorSeed,
+      runIndex: 2,
+    });
+    expect(result.seed_hash).toBe('fixed-prior-hash');
+    expect(result.selected_pairs).toEqual(priorSeed.selected_pairs);
+  });
+
+  it('re-analyze same_frameworks without priorSeed throws', async () => {
+    await expect(
+      selectFrameworksForBrief({
+        inputs,
+        tier: 'starter',
+        catalog: makeStarterCatalog(),
+        fetchHistory: async () => [],
+        mode: 'same_frameworks',
+      }),
+    ).rejects.toThrow(/priorSeed/);
+  });
+
+  it('re-analyze new_frameworks: rotates seed and excludes prior selection from this brief', async () => {
+    const priorSeed: FrameworkSeedResult = {
+      seed_hash: 'fixed-prior-hash',
+      seed_inputs: inputs,
+      selected_frameworks: ['DR_FORMULA'],
+      selected_archetypes: ['PRICING_BREAKDOWN'],
+      selected_pairs: [{ framework: 'DR_FORMULA', archetype: 'PRICING_BREAKDOWN', affinity: 9 }],
+      exhaustion_warning: false,
+      lru_fallback_used: false,
+    };
+    const result = await selectFrameworksForBrief({
+      inputs,
+      tier: 'starter',
+      catalog: makeStarterCatalog(),
+      fetchHistory: async () => [],
+      mode: 'new_frameworks',
+      priorSeed,
+      runIndex: 2,
+    });
+    expect(result.seed_hash).not.toBe('fixed-prior-hash');
+    expect(result.seed_hash).toBe(computeReanalyzeSeedHash(inputs, 2));
+    // Prior pair must not appear in new selection
+    const containsPrior = result.selected_pairs.some(
+      (p) => p.framework === 'DR_FORMULA' && p.archetype === 'PRICING_BREAKDOWN',
+    );
+    expect(containsPrior).toBe(false);
+  });
+
+  it('two different customer_ids in same niche/week get different selections', async () => {
+    const catalog = makeStarterCatalog();
+    const a = await selectFrameworksForBrief({
+      inputs,
+      tier: 'starter',
+      catalog,
+      fetchHistory: async () => [],
+    });
+    const b = await selectFrameworksForBrief({
+      inputs: { ...inputs, customer_id: '00000000-0000-0000-0000-000000000002' },
+      tier: 'starter',
+      catalog,
+      fetchHistory: async () => [],
+    });
+    expect(a.seed_hash).not.toBe(b.seed_hash);
+    // Selected_pairs ordering should differ (tied affinities tie-break differently)
+    expect(JSON.stringify(a.selected_pairs)).not.toBe(JSON.stringify(b.selected_pairs));
   });
 });

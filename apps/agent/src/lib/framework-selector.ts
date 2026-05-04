@@ -1,13 +1,16 @@
 import { createHash } from 'node:crypto';
 import type {
   FrameworkSeedInputs,
+  FrameworkSeedResult,
   BankCatalog,
   FrameworkSlot,
   ArchetypeSlot,
   NicheSlug,
   SelectedPair,
+  ReanalyzeMode,
+  Tier,
 } from './types/v2';
-import { AFFINITY_SCORES } from './types/v2';
+import { AFFINITY_SCORES, TIER_COUNTS } from './types/v2';
 
 /**
  * Deterministic per-customer seed.
@@ -166,5 +169,76 @@ export function selectPairsFromSorted(
     exhaustion_warning,
     lru_fallback_used: lru_pairs_reused !== undefined && lru_pairs_reused.length > 0,
     lru_pairs_reused,
+  };
+}
+
+export interface SelectFrameworksInput {
+  inputs: FrameworkSeedInputs;
+  tier: Tier;
+  catalog: BankCatalog;
+  fetchHistory: (customer_id: string) => Promise<HistoryRow[]>;
+  mode?: ReanalyzeMode;
+  priorSeed?: FrameworkSeedResult;
+  runIndex?: number; // required when mode is 'new_frameworks'
+}
+
+/**
+ * Top-level entry point. Composes seed + sort + select + history.
+ * Source: docs/specs/non-duplication-system.md §3, §7.
+ *
+ * Re-analyze branches:
+ *   - same_frameworks: REUSE prior selection verbatim (must pass priorSeed)
+ *   - new_frameworks:  rotate the seed via the reanalyze salt and exclude
+ *                      the prior selection from this brief AND the customer's
+ *                      historical pairs.
+ */
+export async function selectFrameworksForBrief(
+  input: SelectFrameworksInput,
+): Promise<FrameworkSeedResult> {
+  const { inputs, tier, catalog, fetchHistory, mode, priorSeed, runIndex } = input;
+  const tierCounts = TIER_COUNTS[tier];
+  const nF = tierCounts.frameworks;
+  const nA = tierCounts.archetypes;
+
+  // Re-analyze same_frameworks: reuse prior selection verbatim.
+  if (mode === 'same_frameworks') {
+    if (!priorSeed) {
+      throw new Error('selectFrameworksForBrief: mode=same_frameworks requires priorSeed');
+    }
+    return priorSeed;
+  }
+
+  // Determine seed hash.
+  const seed_hash =
+    mode === 'new_frameworks'
+      ? computeReanalyzeSeedHash(inputs, runIndex ?? 2)
+      : computeSeedHash(inputs);
+
+  // Fetch customer history; for new_frameworks, also exclude prior selection from this brief.
+  const history = await fetchHistory(inputs.customer_id);
+  const effectiveHistory: HistoryRow[] =
+    mode === 'new_frameworks' && priorSeed
+      ? [
+          ...history,
+          ...priorSeed.selected_pairs.map((p) => ({
+            framework: p.framework,
+            archetype: p.archetype,
+            last_used_at: new Date().toISOString(),
+          })),
+        ]
+      : history;
+
+  const sortedPairs = sortPairsByAffinityAndSeed(catalog, inputs.niche, seed_hash);
+  const selection = selectPairsFromSorted(sortedPairs, effectiveHistory, nF, nA);
+
+  return {
+    seed_hash,
+    seed_inputs: inputs,
+    selected_frameworks: selection.selected_frameworks,
+    selected_archetypes: selection.selected_archetypes,
+    selected_pairs: selection.selected_pairs,
+    exhaustion_warning: selection.exhaustion_warning,
+    lru_fallback_used: selection.lru_fallback_used,
+    lru_pairs_reused: selection.lru_pairs_reused,
   };
 }
