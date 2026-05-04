@@ -1576,10 +1576,16 @@ function makeAffinity(level: AffinityLevel): Record<NicheSlug, AffinityLevel> {
 }
 
 function makeMinimalCatalog(): BankCatalog {
+  // Affinities chosen so there is a tie at combined score = 3:
+  //   DR_FORMULA(High) × PRICING_BREAKDOWN(High) = 9
+  //   DR_FORMULA(High) × SERVICE_ANATOMY(Low)    = 3   <- tie
+  //   PAS(Low)         × PRICING_BREAKDOWN(High) = 3   <- tie
+  //   PAS(Low)         × SERVICE_ANATOMY(Low)    = 1
+  // The two tied pairs are where seed-based tie-breaking engages.
   return {
     frameworks: {
       DR_FORMULA:    { slot: 'DR_FORMULA', name: 'DR Formula', family: 'A', markdown: '', affinity: makeAffinity('High') },
-      PAS:           { slot: 'PAS',        name: 'PAS',        family: 'A', markdown: '', affinity: makeAffinity('Med') },
+      PAS:           { slot: 'PAS',        name: 'PAS',        family: 'A', markdown: '', affinity: makeAffinity('Low') },
     } as unknown as BankCatalog['frameworks'],
     archetypes: {
       PRICING_BREAKDOWN: { slot: 'PRICING_BREAKDOWN', name: 'Pricing Breakdown', family: 'A', markdown: '', affinity: makeAffinity('High') },
@@ -1599,15 +1605,15 @@ describe('sortPairsByAffinityAndSeed', () => {
   });
 
   it('orders pairs by combined affinity descending', () => {
-    // Combined affinity:
-    //   DR_FORMULA(3) * PRICING_BREAKDOWN(3) = 9
-    //   DR_FORMULA(3) * SERVICE_ANATOMY(1)  = 3
-    //   PAS(2)        * PRICING_BREAKDOWN(3) = 6
-    //   PAS(2)        * SERVICE_ANATOMY(1)  = 2
+    // Combined affinity (with tie at 3):
+    //   DR_FORMULA(High=3) * PRICING_BREAKDOWN(High=3) = 9
+    //   DR_FORMULA(High=3) * SERVICE_ANATOMY(Low=1)    = 3
+    //   PAS(Low=1)         * PRICING_BREAKDOWN(High=3) = 3
+    //   PAS(Low=1)         * SERVICE_ANATOMY(Low=1)    = 1
     const catalog = makeMinimalCatalog();
     const pairs = sortPairsByAffinityAndSeed(catalog, 'beauty', 'abc123');
     expect(pairs[0].affinity).toBe(9);
-    expect(pairs[pairs.length - 1].affinity).toBe(2);
+    expect(pairs[pairs.length - 1].affinity).toBe(1);
   });
 
   it('breaks affinity ties using hash(seed + framework + archetype)', () => {
