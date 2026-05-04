@@ -39,7 +39,8 @@ ENV HOSTNAME=0.0.0.0
 
 COPY --from=builder --chown=nextjs:nodejs /repo/apps/agent/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /repo/apps/agent/.next/static ./apps/agent/.next/static
-COPY --from=builder --chown=nextjs:nodejs /repo/apps/agent/public ./apps/agent/public
+# Agent is API-only — no apps/agent/public directory exists. The COPY line that
+# was here originally was copy-pasted from the web Dockerfile and broke the build.
 
 USER nextjs
 EXPOSE 3002
