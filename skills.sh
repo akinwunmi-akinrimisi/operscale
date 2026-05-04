@@ -119,11 +119,45 @@ preflight() {
 
   if ! command -v supabase >/dev/null 2>&1; then
     log "Installing Supabase CLI..."
-    if [[ "$(uname -s)" == "Darwin" ]]; then
-      run "brew install supabase/tap/supabase || true"
-    else
-      run "npm install -g supabase"
-    fi
+    case "$(uname -s)" in
+      Darwin*)
+        run "brew install supabase/tap/supabase || true"
+        ;;
+      MINGW*|MSYS*|CYGWIN*)
+        # Windows: npm global install of supabase is unsupported (postinstall script
+        # rejects it). Download the official binary from GitHub releases and drop it
+        # in $HOME/bin (which Git Bash adds to PATH on most setups).
+        local sb_arch="amd64"
+        case "$(uname -m)" in
+          aarch64|arm64) sb_arch="arm64" ;;
+        esac
+        local sb_tmp; sb_tmp=$(mktemp -d)
+        local sb_url
+        sb_url=$(curl -fsSL https://api.github.com/repos/supabase/cli/releases/latest \
+          | grep -oE "https://[^\"]+supabase_windows_${sb_arch}\.tar\.gz" | head -1)
+        if [[ -n "$sb_url" ]]; then
+          run "curl -fsSL -o '$sb_tmp/supabase.tar.gz' '$sb_url'"
+          run "tar -xzf '$sb_tmp/supabase.tar.gz' -C '$sb_tmp'"
+          run "mkdir -p '$HOME/bin'"
+          run "cp '$sb_tmp/supabase.exe' '$HOME/bin/supabase.exe'"
+          run "rm -rf '$sb_tmp'"
+          if ! echo ":$PATH:" | grep -q ":$HOME/bin:"; then
+            warn "$HOME/bin is not on PATH — add it so 'supabase' resolves in future shells."
+          fi
+        else
+          warn "Could not resolve Supabase CLI release asset for windows_${sb_arch}."
+          warn "  Install manually from https://github.com/supabase/cli/releases"
+        fi
+        ;;
+      *)
+        # Linux: try the official install script first; fall back to npm only as a last resort.
+        if command -v apt-get >/dev/null 2>&1; then
+          run "curl -fsSL https://raw.githubusercontent.com/supabase/cli/main/install.sh | sh || true"
+        else
+          run "npm install -g supabase || true"
+        fi
+        ;;
+    esac
   fi
   ok "Supabase CLI $(supabase --version 2>/dev/null || echo unavailable)"
 }
@@ -143,6 +177,14 @@ install_skills() {
   fi
 
   log "Installing agent skills from skills.sh ecosystem..."
+
+  # Several upstream repos referenced below have been renamed, archived, or moved
+  # (e.g., awesomeskill-ai/scriptwriting-methodology, sentry/dev — both 404 as of
+  # 2026-05). Rather than halt the entire install on a single 404, disable strict
+  # mode for this section so individual `npx skills add` failures only emit
+  # warnings and the script proceeds to the project-deps stage (which produces
+  # the lockfile). Strict mode is re-enabled at end-of-function.
+  set +e
 
   # Foundational discovery skill — lets future sessions find more skills
   log "  -> find-skills (vercel-labs/skills)"
@@ -209,8 +251,11 @@ install_skills() {
 
   # Scriptwriting methodology (awesomeskill.ai) — DR formula and hook-stacking patterns,
   # filtered through ADR 0012 (frameworks by name of framework, not by name of marketer).
-  log "  -> Scriptwriting methodology (awesomeskill.ai)"
-  run "npx -y skills add awesomeskill-ai/scriptwriting-methodology --skill claude-vibes-scriptwriting-methodology -g -y"
+  # NOTE: github.com/awesomeskill-ai org returns 404 (does not exist or was renamed).
+  # Skill is non-essential per ADR 0012, so the install is tolerant of failure.
+  # TODO: locate the actual upstream and update this URL.
+  log "  -> Scriptwriting methodology (awesomeskill.ai) [optional]"
+  run "npx -y skills add awesomeskill-ai/scriptwriting-methodology --skill claude-vibes-scriptwriting-methodology -g -y || warn 'scriptwriting-methodology repo unreachable — skipped'"
 
   # Observability — Sentry CLI for error tracking
   log "  -> Observability (sentry/dev)"
@@ -224,7 +269,9 @@ install_skills() {
   # better-auth (Phase 1 uses Supabase magic-link, but this is on standby for Phase 2 customer dashboard if ever needed)
   # Skipping for now — keeps the install lean.
 
-  ok "All skills installed."
+  # Re-enable strict mode for the rest of the script.
+  set -e
+  ok "All skills installed (any 404/auth-failed clones logged above as warnings)."
 }
 
 # ──────────────────────────────────────────────────────────────────────
@@ -340,6 +387,10 @@ ENV
 # ──────────────────────────────────────────────────────────────────────
 ensure_gitignore() {
   log "Ensuring .gitignore covers secrets..."
+  if [[ -f .gitignore ]]; then
+    log "  -> .gitignore already exists, leaving it alone (project-hardened version preferred)"
+    return
+  fi
   cat > .gitignore <<'GITIGNORE'
 # dependencies
 node_modules/
