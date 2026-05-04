@@ -1,0 +1,25 @@
+{
+  "name": "operscale-calendar-platform",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Operscale content calendar platform — Phase 1 (intake → AI brief → founder approval → payment).",
+  "engines": {
+    "node": ">=20.11.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel --stream dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md,sql}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md,sql}\"",
+    "check:brand": "bash scripts/check-brand-placeholder.sh",
+    "check:env": "bash scripts/check-env-scoping.sh"
+  },
+  "devDependencies": {
+    "prettier": "3.3.3",
+    "typescript": "5.6.3"
+  }
+}

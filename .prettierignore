@@ -1,0 +1,10 @@
+node_modules
+.next
+dist
+out
+build
+.pnpm-store
+coverage
+supabase/.branches
+supabase/.temp
+pnpm-lock.yaml

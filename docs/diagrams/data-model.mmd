@@ -1,0 +1,180 @@
+%% Data model — Phase 1 ER diagram
+%% Source of truth: docs/data-model.md
+%% Render: paste into mermaid.live
+
+erDiagram
+    customers ||--o{ briefs : "has"
+    customers ||--o{ orders : "places"
+    customers ||--o{ email_log : "receives"
+    customers ||--o{ whatsapp_log : "messaged"
+    customers ||--o{ activity_log : "logged"
+
+    briefs ||--o{ brief_photos : "owns (CASCADE)"
+    briefs ||--o{ brief_consent : "signs (RESTRICT)"
+    briefs ||--o{ analysis_runs : "analyzed (CASCADE)"
+    briefs ||--o{ orders : "becomes (RESTRICT)"
+
+    analysis_runs ||--o{ analysis_edits : "edited (CASCADE)"
+    orders ||--o| analysis_runs : "approved (SET NULL)"
+    orders ||--o{ payments : "pays (RESTRICT)"
+    orders ||--o{ email_log : "triggers (SET NULL)"
+    orders ||--o{ whatsapp_log : "triggers (SET NULL)"
+
+    customers {
+        uuid id PK
+        text email
+        text email_lower "generated, UNIQUE"
+        text full_name
+        text whatsapp_number
+        text business_name
+        text niche
+        text source
+        timestamptz first_seen_at
+        timestamptz last_seen_at
+    }
+
+    briefs {
+        uuid id PK
+        uuid customer_id FK
+        text tier_intent
+        jsonb form_payload
+        text save_token "UNIQUE"
+        int current_step "1-7"
+        timestamptz submitted_at
+        timestamptz auto_ack_sent_at
+    }
+
+    brief_photos {
+        uuid id PK
+        uuid brief_id FK
+        uuid customer_id FK
+        int photo_index "1-3"
+        text storage_path
+        text mime_type "jpeg or png"
+        int size_bytes "max 10MB"
+        bool face_detected
+        numeric sharpness_score
+        bool quality_check_passed
+        timestamptz uploaded_at
+        timestamptz scheduled_delete_at
+        timestamptz deleted_at
+    }
+
+    brief_consent {
+        uuid id PK
+        uuid brief_id FK
+        text consent_type "photo_upload or terms"
+        text consent_text_version
+        text consent_text_hash "sha-256"
+        timestamptz signed_at
+        inet ip_address
+        text user_agent
+    }
+
+    analysis_runs {
+        uuid id PK
+        uuid brief_id FK
+        int run_index "1, 2, 3..."
+        text trigger_type "initial or re_analyze_with_note"
+        text founder_note
+        jsonb ai_output
+        text model
+        int input_tokens
+        int output_tokens
+        numeric cost_usd
+        int duration_ms
+        bool is_current "one per brief"
+        timestamptz ran_at
+    }
+
+    analysis_edits {
+        uuid id PK
+        uuid analysis_run_id FK
+        text field_path
+        text value_before
+        text value_after
+        text edited_by
+        timestamptz edited_at
+    }
+
+    orders {
+        uuid id PK
+        uuid customer_id FK
+        uuid brief_id FK
+        uuid approved_analysis_run_id FK "nullable"
+        text tier "starter/standard/calendar"
+        int amount_ngn
+        text status "9 valid values"
+        text paystack_tx_ref "UNIQUE"
+        jsonb paystack_authorization
+        timestamptz founder_approved_at
+        text founder_approved_by
+        timestamptz brief_email_sent_at
+        timestamptz payment_initiated_at
+        timestamptz paid_at
+        timestamptz delivered_at
+        timestamptz refunded_at
+    }
+
+    payments {
+        uuid id PK
+        uuid order_id FK
+        text paystack_event_id "UNIQUE"
+        text event_type
+        int amount_ngn
+        jsonb raw_payload
+        timestamptz webhook_received_at
+    }
+
+    email_log {
+        uuid id PK
+        uuid customer_id FK
+        uuid brief_id FK "nullable"
+        uuid order_id FK "nullable"
+        text template_key
+        text resend_message_id "UNIQUE"
+        text to_email
+        text subject
+        text body_snapshot
+        timestamptz sent_at
+        timestamptz delivered_at
+        timestamptz bounced_at
+    }
+
+    whatsapp_log {
+        uuid id PK
+        uuid customer_id FK "nullable"
+        uuid order_id FK "nullable"
+        text evolution_message_id "UNIQUE"
+        text to_number
+        text template_key
+        text body
+        text direction "outbound or inbound"
+        timestamptz sent_at
+        timestamptz delivered_at
+    }
+
+    activity_log {
+        bigserial id PK
+        uuid customer_id FK "nullable"
+        uuid brief_id FK "nullable"
+        uuid order_id FK "nullable"
+        text event_type
+        text actor "customer/founder/system/webhook"
+        jsonb payload
+        timestamptz occurred_at
+    }
+
+    llm_calls {
+        uuid id PK
+        text purpose
+        uuid brief_id FK "nullable"
+        uuid analysis_run_id FK "nullable"
+        text model
+        int input_tokens
+        int output_tokens
+        numeric cost_usd
+        int duration_ms
+        text status "ok/retry/failed"
+        timestamptz called_at
+    }

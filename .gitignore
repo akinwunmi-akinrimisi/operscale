@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+.next/
+dist/
+out/
+build/
+
+# Next.js standalone output
+.next/standalone/
+.next/static/
+
+# Env files — NEVER commit these. .env.example is the only allowed env file.
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.vscode/
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Supabase local dev
+supabase/.branches/
+supabase/.temp/
+
+# Local Docker volumes (if any developer runs compose locally)
+.volumes/
+
+# Local secrets that aren't .env (defensive)
+*.pem
+*.key
+!**/public/**/*.key
+secrets/
+
+# Evolution API WhatsApp pairing QR codes — these are session credentials.
+# Re-fetched on demand via the API; never store under version control.
+evolution-*-qr.png
+*.qr.png

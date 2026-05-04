@@ -1,0 +1,58 @@
+%% Photo lifecycle
+%% Source of truth: docs/specs/photo-upload-and-retention.md
+%% Render: paste into mermaid.live
+
+flowchart TD
+    A([Customer at form step 5]) --> B{Upload photos?}
+    B -->|No, skip| Z1([Skip step 5<br/>Use stock AI presenter at production])
+    B -->|Yes| C[Drag-and-drop or click upload<br/>Max 3 photos, 10MB each]
+
+    C --> D[Browser-side quality check<br/>BlazeFace + Laplacian + brightness]
+    D --> E{Quality OK?}
+    E -->|Yes| F[Show green pill on thumbnail]
+    E -->|No| G[Show warning + 'Use anyway' option]
+    G --> F
+
+    F --> H{Customer ticks consent checkbox?}
+    H -->|No| H1[Next button disabled]
+    H1 --> H
+    H -->|Yes| I[Click Next]
+
+    I --> J[Service-role upload endpoint]
+    J --> K[Write to Supabase Storage:<br/>customer-photos/customer_id/brief_id/photo_N.jpg]
+    K --> L[Insert brief_photos rows<br/>scheduled_delete_at = uploaded_at + 30 days]
+    L --> M[Insert brief_consent row<br/>consent_text_hash, ip_address, user_agent]
+    M --> N[activity_log: photo_uploaded x N + consent_signed]
+
+    N --> O([Brief proceeds to step 6])
+
+    O --> P{Customer pays?}
+    P -->|No, within 30 days| Q[Daily retention sweep deletes photos<br/>30 days after upload]
+    P -->|Yes| R[Order moves to PAID]
+
+    R --> S[Update brief_photos:<br/>scheduled_delete_at = now + 180 days placeholder]
+    S --> T[Phase 2 production starts]
+    T --> U[HeyGen avatar created from photos]
+    U --> V[Order delivered]
+    V --> W[Update brief_photos:<br/>scheduled_delete_at = delivered_at + 90 days]
+
+    W --> X[Daily retention sweep at 03:00 WAT]
+    X --> Y{scheduled_delete_at <= now?}
+    Y -->|Yes| Y1[Delete file from Storage<br/>UPDATE brief_photos SET deleted_at = now<br/>activity_log: photo_deleted_by_retention_sweep]
+    Y -->|No| X
+
+    Q --> Y1
+    Y1 --> Z2([Photos gone, metadata kept])
+
+    %% Customer-requested early deletion path
+    EQ([Customer emails privacy@ requesting deletion]) --> ER[Founder opens order in CRM]
+    ER --> ES[Click 'Delete customer photos early']
+    ES --> ET[Update scheduled_delete_at = now]
+    ET --> Y1
+
+    style L fill:#9FE1CB,stroke:#0F6E56,color:#04342C
+    style M fill:#FAC775,stroke:#854F0B,color:#412402
+    style W fill:#B5D4F4,stroke:#0C447C,color:#042C53
+    style Y1 fill:#F7C1C1,stroke:#791F1F,color:#501313
+    style Z2 fill:#D3D1C7,stroke:#444441,color:#2C2C2A
+    style EQ fill:#CECBF6,stroke:#3C3489,color:#26215C

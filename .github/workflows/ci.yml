@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  brand-and-env-checks:
+    name: Brand placeholder + env scoping
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Brand placeholder check
+        run: bash scripts/check-brand-placeholder.sh
+      - name: Env scoping check (no NEXT_PUBLIC_*_KEY leaks)
+        run: bash scripts/check-env-scoping.sh
+      - name: No hardcoded API keys
+        run: |
+          set -e
+          PATTERNS='(sk-ant-[a-zA-Z0-9_-]{20,})|(sk_live_[a-zA-Z0-9]{20,})|(sk_test_[a-zA-Z0-9]{20,})|(re_[a-zA-Z0-9]{30,})|(eyJ[a-zA-Z0-9_-]{40,}\.eyJ)'
+          if grep -rIEn "$PATTERNS" \
+              --include='*.ts' --include='*.tsx' --include='*.js' \
+              --include='*.json' --include='*.yml' --include='*.yaml' \
+              --include='*.sql' --include='*.md' --include='*.sh' \
+              --exclude-dir=node_modules --exclude-dir=.git \
+              .; then
+            echo "::error::Hardcoded API key detected"
+            exit 1
+          fi
+
+  typecheck:
+    name: TypeScript typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r typecheck
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r lint
+
+  format-check:
+    name: Prettier format check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check

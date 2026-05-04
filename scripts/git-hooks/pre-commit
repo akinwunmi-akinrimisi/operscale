@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# scripts/git-hooks/pre-commit
+#
+# Belt-and-suspenders defense layer 4 (alongside .gitignore, find-no-env,
+# secret-pattern grep, and CI). Blocks the commit if ANY staged file looks
+# like a real .env or contains a known secret shape.
+#
+# Activation (one-time, automatic via scripts/setup.sh):
+#   git config core.hooksPath scripts/git-hooks
+#
+# Bypass: never. If a real false positive ever occurs, fix the pattern below
+# rather than --no-verify. The repo is PUBLIC; one mistake is permanent.
+
+set -euo pipefail
+
+red() { printf '\033[31m%s\033[0m\n' "$*"; }
+
+# 1. Reject any staged file whose name looks like .env (except .env.example).
+ENV_VIOLATIONS=$(git diff --cached --name-only --diff-filter=ACMR \
+  | grep -E '(^|/)\.env($|\.[^e]|\.e[^x]|\.ex[^a]|\.exa[^m]|\.exam[^p]|\.examp[^l]|\.exampl[^e]|\.example[^.])' || true)
+# The negative lookahead approximation: anything starting with .env that ISN'T .env.example.
+# Simpler: list .env files, then filter out .env.example.
+ENV_VIOLATIONS=$(git diff --cached --name-only --diff-filter=ACMR \
+  | grep -E '(^|/)\.env(\.|$)' \
+  | grep -vE '(^|/)\.env\.example$' || true)
+
+if [[ -n "$ENV_VIOLATIONS" ]]; then
+  red "pre-commit: refusing to commit .env file(s):"
+  red "$ENV_VIOLATIONS"
+  red ""
+  red "  This repo is PUBLIC — committing a .env exposes every secret in it."
+  red "  If you intend to commit a TEMPLATE, rename it to .env.example."
+  exit 1
+fi
+
+# 2. Scan staged content for known secret shapes.
+SECRET_PATTERN='(sk-ant-api[0-9]{2}-[A-Za-z0-9_-]{30,})|(sk_live_[A-Za-z0-9]{20,})|(re_[A-Za-z0-9]{30,})|(eyJ[A-Za-z0-9_-]{40,}\.eyJ[A-Za-z0-9_-]{40,}\.)|(GOCSPX-[A-Za-z0-9_-]{20,})|(evo_[a-f0-9]{32,})'
+SECRET_HITS=$(git diff --cached -U0 \
+  | grep -E '^\+' \
+  | grep -vE '^\+\+\+ ' \
+  | grep -EHn "$SECRET_PATTERN" || true)
+
+if [[ -n "$SECRET_HITS" ]]; then
+  red "pre-commit: secret-shaped string detected in staged diff:"
+  red "$SECRET_HITS"
+  red ""
+  red "  Use environment variables instead. The repo is PUBLIC."
+  exit 1
+fi
+
+# 3. Big-file guard: refuse files > 5 MB to avoid accidental binary uploads.
+BIG_FILES=$(git diff --cached --name-only --diff-filter=ACMR \
+  | while read -r f; do
+      if [[ -f "$f" ]] && [[ $(wc -c < "$f") -gt 5242880 ]]; then
+        echo "$f ($(wc -c < "$f") bytes)"
+      fi
+    done)
+if [[ -n "$BIG_FILES" ]]; then
+  red "pre-commit: file(s) over 5 MB staged:"
+  red "$BIG_FILES"
+  red "  Use git-lfs, or move large assets out of the repo."
+  exit 1
+fi
+
+exit 0

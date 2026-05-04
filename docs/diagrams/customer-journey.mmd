@@ -1,0 +1,53 @@
+%% Customer journey state diagram
+%% Source of truth: docs/customer-journey.md
+%% Render: paste into mermaid.live or any mermaid-supporting markdown renderer.
+
+stateDiagram-v2
+    [*] --> ARRIVED
+
+    ARRIVED --> VIEWED_PRICING : visit /pricing
+    VIEWED_PRICING --> STARTED_FORM : click Start your calendar
+
+    STARTED_FORM --> FORM_STEP_3 : complete steps 1-3 (save token issued)
+    FORM_STEP_3 --> PHOTO_UPLOADED : complete step 5 with photos + consent
+    FORM_STEP_3 --> SUBMITTED : skip step 5, complete steps 6-7
+    PHOTO_UPLOADED --> SUBMITTED : complete steps 6-7
+
+    state SUBMITTED_FANOUT <<fork>>
+    SUBMITTED --> SUBMITTED_FANOUT
+    SUBMITTED_FANOUT --> AUTO_ACK_SENT : Resend, instant template
+    SUBMITTED_FANOUT --> AI_ANALYSIS_RUNNING : queued job
+
+    AI_ANALYSIS_RUNNING --> PENDING_FOUNDER_REVIEW : Anthropic returns
+    AI_ANALYSIS_RUNNING --> PENDING_FOUNDER_REVIEW_MANUAL : 5x retry failed (manual fallback)
+
+    PENDING_FOUNDER_REVIEW --> FOUNDER_APPROVED : founder clicks Approve
+    PENDING_FOUNDER_REVIEW --> AI_ANALYSIS_RUNNING : founder clicks Re-analyze with note
+    PENDING_FOUNDER_REVIEW --> DISCARDED : founder clicks Discard
+
+    FOUNDER_APPROVED --> BRIEF_EMAIL_SENT : Resend success
+    BRIEF_EMAIL_SENT --> PAYMENT_INITIATED : customer clicks Pay link
+    PAYMENT_INITIATED --> PAID : Paystack webhook charge.success
+    PAYMENT_INITIATED --> REFUNDED : refund issued (rare pre-paid)
+
+    PAID --> HANDED_TO_PHASE_2 : status -> production
+    PAID --> REFUNDED : refund issued post-paid
+
+    DISCARDED --> [*]
+    REFUNDED --> [*]
+    HANDED_TO_PHASE_2 --> [*]
+
+    note right of FORM_STEP_3
+      Save-and-resume email fires here.
+      Drop-off recovery candidates source from this state.
+    end note
+
+    note right of PENDING_FOUNDER_REVIEW
+      Founder gets WhatsApp alert at 2h
+      unreviewed during business hours.
+    end note
+
+    note right of PAID
+      Triggers: payment confirmation email,
+      WhatsApp confirmation, production start.
+    end note

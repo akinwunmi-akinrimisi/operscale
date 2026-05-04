@@ -1,0 +1,38 @@
+%% Founder review flow
+%% Source of truth: docs/specs/founder-review-flow.md and docs/runbooks/crm-runbook.md
+%% Render: paste into mermaid.live
+
+flowchart TD
+    A([New brief lands in Pending Review queue]) --> B{Founder opens<br/>Review screen}
+    B --> C[3-column layout:<br/>Form / AI output / Actions]
+    C --> D{Founder evaluates AI output}
+
+    D -->|Looks good| E[Approve and send]
+    D -->|Small fix needed| F[Inline edit field]
+    D -->|Bigger reframe needed| G[Re-analyze with note]
+    D -->|Spam / fake / out-of-scope| H[Discard]
+
+    F --> I[Edit saves on blur]
+    I --> J[analysis_edits row written]
+    J --> D
+
+    G --> K[Modal: founder writes note]
+    K --> L[Anthropic re-runs with note appended]
+    L --> M[New analysis_runs row, run_index++]
+    M --> N[Old run is_current = false<br/>Edits to old run preserved in audit]
+    N --> D
+
+    E --> O[Single transaction:<br/>orders.status -> brief_sent<br/>orders.approved_analysis_run_id set<br/>email_log row written<br/>activity_log: founder_approved + email_brief_sent]
+    O --> P[Brief email fires via Resend<br/>Customer receives personalised brief + payment link]
+    P --> Q([Order moves to Awaiting Payment])
+
+    H --> R[Modal: founder enters reason]
+    R --> S[orders.status -> discarded<br/>activity_log: founder_discarded]
+    S --> T([No further automated emails<br/>Customer keeps auto-ack only])
+
+    style E fill:#9FE1CB,stroke:#0F6E56,color:#04342C
+    style F fill:#FAC775,stroke:#854F0B,color:#412402
+    style G fill:#B5D4F4,stroke:#0C447C,color:#042C53
+    style H fill:#F7C1C1,stroke:#791F1F,color:#501313
+    style P fill:#9FE1CB,stroke:#0F6E56,color:#04342C
+    style T fill:#D3D1C7,stroke:#444441,color:#2C2C2A

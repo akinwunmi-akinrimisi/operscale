@@ -1,0 +1,56 @@
+# Supabase project config (local dev).
+# Production project lives at supabase.operscale.cloud (shared with Vision GridAI per ADR 0001).
+# Migrations in supabase/migrations/ are applied to the shared project via `supabase db push`.
+
+project_id = "operscale-calendar-local"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[storage]
+enabled = true
+file_size_limit = "10MiB"
+
+[auth]
+enabled = true
+site_url = "http://localhost:3001"
+additional_redirect_urls = ["http://localhost:3001/admin"]
+jwt_expiry = 3600
+enable_signup = false
+enable_confirmations = false
+
+[auth.email]
+enable_signup = false
+double_confirm_changes = true
+enable_confirmations = true
+
+# Magic-link only — no passwords. See ADR + docs/specs/founder-review-flow.md.
+[auth.email.template.magic_link]
+subject = "Operscale CRM sign-in link"
+
+# Auth hooks — see supabase/migrations/0004_edge_function_helpers.sql.
+# These names match the Supabase dashboard hook configuration.
+[auth.hook.custom_access_token]
+enabled = true
+uri = "pg-functions://postgres/auth/custom_access_token_hook"
+
+[auth.hook.send_email]
+enabled = true
+uri = "pg-functions://postgres/auth/send_email_hook"
+
+[edge_runtime]
+enabled = true
+inspector_port = 8083
