@@ -164,12 +164,40 @@ function renderPairTable(seed: FrameworkSeedResult): string {
   return [header, ...rows].join('\n');
 }
 
-// Forward declaration; full body lands in Task 6.
+function escapeQuotes(s: string): string {
+  return s.replace(/"/g, '\\"');
+}
+
 export function renderReanalysisContextBlock(prior?: PriorRunContext): string {
   if (!prior) {
     return '(none — this is the initial analysis for this brief)';
   }
-  return '(re-analysis context — implemented in Task 6)';
+
+  const editsBlock =
+    prior.edits.length === 0
+      ? '(no edits — note-only re-analysis)'
+      : prior.edits
+          .map(
+            (e) =>
+              `Field: ${e.field_path}\n  from: "${escapeQuotes(e.before)}"\n  to:   "${escapeQuotes(e.after)}"`,
+          )
+          .join('\n\n');
+
+  return `Prior run id: ${prior.prior_run_id}
+Prior run index: ${prior.prior_run_index}
+Re-analysis mode: ${prior.mode}
+
+### Founder note (verbatim)
+
+${prior.founder_note}
+
+### Edits the founder applied to the prior run
+
+These edits are evidence of founder intent. They are NOT auto-applied to your new output —
+treat them as a guide to where the prior run missed the mark, then re-derive the affected
+fields from the customer corpus and the lenses.
+
+${editsBlock}`;
 }
 
 export function renderLayer3(

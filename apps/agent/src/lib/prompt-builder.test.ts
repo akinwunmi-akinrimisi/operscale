@@ -301,3 +301,81 @@ describe('renderLayer3', () => {
     expect(() => renderLayer3(SAMPLE_BRIEF, seedWithUnknownSlot, catalog)).toThrow(/AIDA/);
   });
 });
+
+import { renderReanalysisContextBlock as renderReanalysis } from './prompt-builder';
+import type { PriorRunContext } from './types/v2';
+
+const SAMPLE_PRIOR: PriorRunContext = {
+  prior_run_id: '22222222-2222-2222-2222-222222222222',
+  prior_run_index: 1,
+  mode: 'new_frameworks',
+  founder_note: "The hooks were too generic — push for craft specifics like '14 hours of hand-finishing'.",
+  edits: [
+    {
+      field_path: 'calendar_plan[0].hook',
+      before: 'Five reasons our pieces last',
+      after: '14 hours of hand-finishing — this is what that looks like',
+    },
+    {
+      field_path: 'brand_voice.voice_phrases[1]',
+      before: 'timeless',
+      after: 'crafted',
+    },
+  ],
+};
+
+describe('renderReanalysisContextBlock', () => {
+  it('returns the empty marker when prior is undefined', () => {
+    expect(renderReanalysis(undefined)).toBe('(none — this is the initial analysis for this brief)');
+  });
+
+  it('emits the prior run reference and re-analysis mode', () => {
+    const out = renderReanalysis(SAMPLE_PRIOR);
+    expect(out).toContain('Prior run id: 22222222-2222-2222-2222-222222222222');
+    expect(out).toContain('Prior run index: 1');
+    expect(out).toContain('Re-analysis mode: new_frameworks');
+  });
+
+  it('includes the founder note verbatim under a labelled section', () => {
+    const out = renderReanalysis(SAMPLE_PRIOR);
+    expect(out).toContain('### Founder note (verbatim)');
+    expect(out).toContain("The hooks were too generic — push for craft specifics like '14 hours of hand-finishing'.");
+  });
+
+  it('renders each edit as a from/to entry tied to its field_path', () => {
+    const out = renderReanalysis(SAMPLE_PRIOR);
+    expect(out).toContain('### Edits the founder applied to the prior run');
+    expect(out).toContain('Field: calendar_plan[0].hook');
+    expect(out).toContain('  from: "Five reasons our pieces last"');
+    expect(out).toContain('  to:   "14 hours of hand-finishing — this is what that looks like"');
+    expect(out).toContain('Field: brand_voice.voice_phrases[1]');
+    expect(out).toContain('  from: "timeless"');
+    expect(out).toContain('  to:   "crafted"');
+  });
+
+  it('explicitly tells the model the edits are evidence, not to be copied verbatim', () => {
+    const out = renderReanalysis(SAMPLE_PRIOR);
+    expect(out).toContain('These edits are evidence of founder intent');
+    expect(out).toContain('NOT auto-applied');
+  });
+
+  it('renders an empty edits list with a marker (founder-note-only re-analysis)', () => {
+    const noteOnly: PriorRunContext = { ...SAMPLE_PRIOR, edits: [] };
+    const out = renderReanalysis(noteOnly);
+    expect(out).toContain('### Edits the founder applied to the prior run');
+    expect(out).toContain('(no edits — note-only re-analysis)');
+  });
+
+  it('escapes embedded double quotes in before/after values', () => {
+    const withQuotes: PriorRunContext = {
+      ...SAMPLE_PRIOR,
+      edits: [
+        { field_path: 'hook', before: 'She said "no thanks"', after: 'They said "yes"' },
+      ],
+    };
+    const out = renderReanalysis(withQuotes);
+    // Outer quotes wrap the value; embedded double quotes are escaped.
+    expect(out).toContain('  from: "She said \\"no thanks\\""');
+    expect(out).toContain('  to:   "They said \\"yes\\""');
+  });
+});
