@@ -46,6 +46,7 @@ Each framework below documents:
 These are the workhorses of conversion-driving content. Heavy on outcome promise and CTA clarity. Use sparingly across a calendar — too much DR feels salesy.
 
 ### 3.1 DR Formula
+<!-- slot: DR_FORMULA -->
 
 **What it is.** The classic Direct Response structure: hook → problem → solution → value proposition → social proof signal → call to action. Originated in long-form sales letters, adapted for short-form video.
 
@@ -75,6 +76,7 @@ These are the workhorses of conversion-driving content. Heavy on outcome promise
 **No-fabrication notes.** Social proof signal must be a specific, verifiable category statement ("over 100 SMEs we've audited", "in 4 years of this work") — never a fake customer name, never a made-up testimonial, never an invented outcome.
 
 ### 3.2 PAS (Problem–Agitation–Solution)
+<!-- slot: PAS -->
 
 **What it is.** Lighter cousin of DR. Strip out the value-prop and social-proof slots, keep the emotional arc. State the problem, agitate it, present the solution.
 
@@ -101,6 +103,7 @@ These are the workhorses of conversion-driving content. Heavy on outcome promise
 **No-fabrication notes.** "Three years ago I'd have told you..." style hooks must be re-cast as observational ("Most people would tell you..." or "The conventional wisdom is...") to avoid implying personal history we haven't collected.
 
 ### 3.3 AIDA (Attention–Interest–Desire–Action)
+<!-- slot: AIDA -->
 
 **What it is.** The advertising classic. Get attention, build interest, escalate to desire, close with action. More gradient than DR — the audience is gently led rather than confronted.
 
@@ -128,6 +131,7 @@ These are the workhorses of conversion-driving content. Heavy on outcome promise
 **No-fabrication notes.** "Desire" stage must paint outcomes the customer's offering can plausibly deliver — never invented transformation stories.
 
 ### 3.4 PAIPS (Problem–Agitation–Invalidation–Promise–Solution)
+<!-- slot: PAIPS -->
 
 **What it is.** Aggressive direct-response variant. After agitating the problem, *invalidate* the audience's existing solutions before promising a better one. Heavy lift; high impact.
 
@@ -156,6 +160,7 @@ These are the workhorses of conversion-driving content. Heavy on outcome promise
 **No-fabrication notes.** Invalidation targets *categories of approach* not specific named competitors. We don't make ads that punch down at specific other businesses.
 
 ### 3.5 Value Equation
+<!-- slot: VALUE_EQUATION -->
 
 **What it is.** Frame the offering as the result of a math equation: dream outcome × perceived likelihood ÷ time delay × effort. Make the numerator big and the denominator small. Originally a sales-call framework, adapted for video.
 
@@ -187,6 +192,7 @@ These are the workhorses of conversion-driving content. Heavy on outcome promise
 These are attention-engineering frameworks. Less about persuasion arc, more about *winning the first 3 seconds*. Layer them under any other framework, or use them as standalone for awareness-building content.
 
 ### 4.1 3-Layer Hook Stack
+<!-- slot: THREE_LAYER_HOOK_STACK -->
 
 **What it is.** Three independent hook signals stacked in the first 3 seconds: visual hook (something visually arresting), text hook (on-screen text that earns the read), audio hook (an opening line that earns the listen). Audience can only ignore the video if all three fail simultaneously.
 
@@ -211,6 +217,7 @@ All three independent. All three on-message.
 **No-fabrication notes.** Visual hook must be achievable from customer-provided photos OR generic stock-equivalent T2V — never depict a specific scenario we haven't been told happened.
 
 ### 4.2 Pattern Interrupt
+<!-- slot: PATTERN_INTERRUPT -->
 
 **What it is.** Open with something that breaks the audience's default scrolling pattern. Counter-intuitive statement, visual incongruity, sudden shift in tempo or register.
 
@@ -237,6 +244,7 @@ All three independent. All three on-message.
 **No-fabrication notes.** The "resolution" stage must contextualize honestly — no false setups that imply a story we don't have.
 
 ### 4.3 Open Loop
+<!-- slot: OPEN_LOOP -->
 
 **What it is.** Pose a question or set up a tension in the opening, but don't resolve it until the end. The unfinished loop creates pull through the middle.
 
@@ -263,6 +271,7 @@ All three independent. All three on-message.
 **No-fabrication notes.** "I'll tell you" must be re-cast as "the answer is" to avoid implying personal narration we haven't sourced.
 
 ### 4.4 Curiosity Gap
+<!-- slot: CURIOSITY_GAP -->
 
 **What it is.** Reveal just enough to make the audience NEED to know the rest. Distinct from Open Loop — Curiosity Gap doesn't pose a question, it teases an answer.
 
@@ -289,6 +298,7 @@ All three independent. All three on-message.
 **No-fabrication notes.** The "reveal" must be a real piece of information drawn from the customer's domain (their pricing, their methodology, their industry data) — never a fabricated insight.
 
 ### 4.5 Specificity Stack
+<!-- slot: SPECIFICITY_STACK -->
 
 **What it is.** Open with an unusually specific number or detail. Specificity signals authority because vague claims are easy to make and specific ones aren't.
 
@@ -319,6 +329,7 @@ All three independent. All three on-message.
 These build authority by teaching. They convert by proving competence rather than asking for the sale. Use these heavily — most of a customer's calendar should be educational.
 
 ### 5.1 Quick-Win
+<!-- slot: QUICK_WIN -->
 
 **What it is.** A single small, immediately-actionable tip. The audience can apply it in under 60 seconds of effort. The implicit promise: if this small thing works, imagine what the full offering does.
 
@@ -344,6 +355,7 @@ These build authority by teaching. They convert by proving competence rather tha
 **No-fabrication notes.** The tip must be genuinely useful and within the customer's domain expertise — not generic advice repackaged.
 
 ### 5.2 Educational Breakdown
+<!-- slot: EDUCATIONAL_BREAKDOWN -->
 
 **What it is.** Deconstruct a concept, process, or thing the audience finds confusing. Make the abstract concrete.
 
@@ -371,6 +383,7 @@ These build authority by teaching. They convert by proving competence rather tha
 **No-fabrication notes.** Explanation must be factually accurate. AI flags any uncertainty for founder review before approving the script.
 
 ### 5.3 Process Demystification
+<!-- slot: PROCESS_DEMYSTIFICATION -->
 
 **What it is.** Cousin of Educational Breakdown, but specifically about *what happens behind a service*. Show the audience what the customer does in a typical engagement, deliverable by deliverable.
 
@@ -397,6 +410,7 @@ These build authority by teaching. They convert by proving competence rather tha
 **No-fabrication notes.** Process steps must be drawn from customer-stated reality. AI surfaces uncertain steps for founder confirmation.
 
 ### 5.4 Numbered List
+<!-- slot: NUMBERED_LIST -->
 
 **What it is.** "5 things to check before X." "3 mistakes to avoid in Y." Structurally simplest framework — the number is the entire promise.
 
@@ -422,6 +436,7 @@ These build authority by teaching. They convert by proving competence rather tha
 **No-fabrication notes.** Each item must be a real piece of advice. No padding with fluff items just to hit the number.
 
 ### 5.5 Checklist Reveal
+<!-- slot: CHECKLIST_REVEAL -->
 
 **What it is.** A specific checklist used in a specific context, presented as a usable artifact. The audience saves the video to refer back to.
 
@@ -451,6 +466,7 @@ These build authority by teaching. They convert by proving competence rather tha
 These shift the audience's perspective. Use moderately — too much can feel preachy.
 
 ### 6.1 Myth-Buster
+<!-- slot: MYTH_BUSTER -->
 
 **What it is.** Identify a widely-held belief in the niche, then dismantle it with specifics.
 
@@ -478,6 +494,7 @@ These shift the audience's perspective. Use moderately — too much can feel pre
 **No-fabrication notes.** The "actual truth" must be substantiated. Flag anything uncertain.
 
 ### 6.2 Comparison
+<!-- slot: COMPARISON -->
 
 **What it is.** Compare two approaches/products/options side by side, surface the trade-offs, recommend one.
 
@@ -505,6 +522,7 @@ These shift the audience's perspective. Use moderately — too much can feel pre
 **No-fabrication notes.** Comparisons stay at the *category* level — "Lekki vs Ikoyi" is fine, "[Specific Competitor X] vs [Specific Competitor Y]" is not.
 
 ### 6.3 Anti-Trend
+<!-- slot: ANTI_TREND -->
 
 **What it is.** Take a popular niche trend and argue against it. Stake a contrarian position with reasoning.
 
@@ -532,6 +550,7 @@ These shift the audience's perspective. Use moderately — too much can feel pre
 **No-fabrication notes.** The contrarian position must be *defensible* — flag anything that's contrarian without backing.
 
 ### 6.4 Industry Insider
+<!-- slot: INDUSTRY_INSIDER -->
 
 **What it is.** Position the audience as someone receiving privileged insider information. The implicit framing: "you're getting the version professionals know but don't say publicly."
 
@@ -557,6 +576,7 @@ These shift the audience's perspective. Use moderately — too much can feel pre
 **No-fabrication notes.** "What professionals know" must be drawn from the customer's actual expertise. No invented insider claims.
 
 ### 6.5 Cost Reveal
+<!-- slot: COST_REVEAL -->
 
 **What it is.** Break down what something actually costs — to make, to deliver, to operate. Honest pricing transparency framed as a respectful gesture toward the audience.
 
@@ -587,6 +607,7 @@ These shift the audience's perspective. Use moderately — too much can feel pre
 These are storytelling frameworks adapted for our no-fabrication rule. They tell stories *about the work*, *about the data*, *about the industry* — never about a specific person whose biography we don't have.
 
 ### 7.1 Behind-the-Work
+<!-- slot: BEHIND_THE_WORK -->
 
 **What it is.** Show the work being done. Not the founder's story; the work itself. Hands cutting fabric. Pots simmering. Documents being reviewed. Code being written.
 
@@ -612,6 +633,7 @@ These are storytelling frameworks adapted for our no-fabrication rule. They tell
 **No-fabrication notes.** This framework is the *substitute* for founder-origin narrative. Show the work; don't narrate the founder's life. Captions stay observational ("hand-finishing the seam" not "I learned this technique from my grandmother").
 
 ### 7.2 Dataset Reveal
+<!-- slot: DATASET_REVEAL -->
 
 **What it is.** Present an interesting dataset — survey results, operational stats, industry numbers. The data is the story.
 
@@ -637,6 +659,7 @@ These are storytelling frameworks adapted for our no-fabrication rule. They tell
 **No-fabrication notes.** Data must be drawn from customer's stated experience or cited public industry data. Numbers without source = flag for founder review.
 
 ### 7.3 Decoded Jargon
+<!-- slot: DECODED_JARGON -->
 
 **What it is.** Take a piece of niche jargon and translate it into plain language with examples. Cousin of Educational Breakdown but specifically focused on terminology.
 
@@ -662,6 +685,7 @@ These are storytelling frameworks adapted for our no-fabrication rule. They tell
 **No-fabrication notes.** Definitions must be accurate. AI flags uncertainty.
 
 ### 7.4 Steel-Man
+<!-- slot: STEEL_MAN -->
 
 **What it is.** Take an opposing position to the customer's offering, present it in its strongest form, then surgically respond. Demonstrates intellectual honesty.
 
@@ -689,6 +713,7 @@ These are storytelling frameworks adapted for our no-fabrication rule. They tell
 **No-fabrication notes.** The steel-man must be fair, not a strawman dressed up. The response must engage with substance, not deflect.
 
 ### 7.5 Frame Re-Set
+<!-- slot: FRAME_RE_SET -->
 
 **What it is.** Take the audience's existing mental frame for a topic and replace it with a new one. Not myth-busting (which dismantles); frame re-set rebuilds.
 
