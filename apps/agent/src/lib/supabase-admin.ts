@@ -80,8 +80,10 @@ export async function writeActivityLog(
   // calls this from a finally block; throwing would mask the real error.
   const { error } = await sb.from('activity_log').insert(row);
   if (error) {
-    // Swallow — the caller handles the primary path; activity_log is observability.
-    // We deliberately don't even rethrow.
-    void error;
+    // Swallow the throw so callers' try/finally is not masked, but log to stderr
+    // so Loki/container logs capture failed observability writes — otherwise an
+    // oncall engineer has no signal when activity_log silently goes dark.
+    // eslint-disable-next-line no-console
+    console.error('[supabase-admin] activity_log insert failed (best-effort):', error.message ?? error);
   }
 }

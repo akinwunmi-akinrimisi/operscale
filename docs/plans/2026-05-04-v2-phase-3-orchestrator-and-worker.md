@@ -1781,8 +1781,12 @@ async function writeLlmCall(
     http_status: args.http_status,
     error_detail: args.error_detail,
   });
-  // Best-effort: design §4.3 invariant #9.
-  if (error) void error;
+  // Best-effort: design §4.3 invariant #9. Swallow but log to stderr so
+  // failed cost-telemetry writes still surface in Loki/container logs.
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error('[claude] llm_calls insert failed (best-effort):', error.message ?? error);
+  }
 }
 ```
 
