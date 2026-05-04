@@ -14,6 +14,8 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import type { NextRequest, NextResponse } from 'next/server';
 
+type CookieSet = { name: string; value: string; options: CookieOptions };
+
 function readEnv(): { url: string; anonKey: string } {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -35,7 +37,7 @@ export async function getSupabaseServer() {
       getAll() {
         return cookieStore.getAll();
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet: CookieSet[]) {
         try {
           for (const { name, value, options } of cookiesToSet) {
             cookieStore.set(name, value, options);
@@ -59,12 +61,8 @@ export function getSupabaseMiddleware(req: NextRequest, res: NextResponse) {
       getAll() {
         return req.cookies.getAll();
       },
-      setAll(cookiesToSet) {
-        for (const { name, value, options } of cookiesToSet as {
-          name: string;
-          value: string;
-          options: CookieOptions;
-        }[]) {
+      setAll(cookiesToSet: CookieSet[]) {
+        for (const { name, value, options } of cookiesToSet) {
           req.cookies.set(name, value);
           res.cookies.set(name, value, options);
         }
