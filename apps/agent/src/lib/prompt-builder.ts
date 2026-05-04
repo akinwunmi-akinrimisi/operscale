@@ -259,3 +259,167 @@ ${renderExhaustionBlock(seed)}
 
 ${renderReanalysisContextBlock(prior)}`;
 }
+
+// ─── Layer 4 — Generation instructions (ai-brief-analysis.md §3.4) ──────────
+const LAYER_4 = `# GENERATION INSTRUCTIONS
+
+Run the following process in order. Do not skip steps. Each lens informs the next.
+
+## Lens 1 — Voice extraction
+
+Read the customer's reference posts (Layer 2 step 6) and stated voice. Identify:
+  - Two to four phrases the customer uses repeatedly that are theirs (not generic).
+  - The customer's typical sentence rhythm (short and punchy / mid-length / dense).
+  - Words the customer would NOT use (terms that would feel out of register).
+  - Energy register (calm, urgent, playful, authoritative, irreverent, warm).
+
+If reference posts are absent or thin, fall back to the niche brief defaults but flag the
+thinness in \`flags_for_review\` with reason 'thin_voice_corpus'.
+
+## Lens 2 — Specificity inventory
+
+Read the customer's offer description, audience description, and any URL-fetched bodies. Extract:
+  - Concrete numbers (price points, time-to-result, quantities).
+  - Concrete proper nouns (brand names, neighbourhood names, product line names).
+  - Concrete process steps the customer described (do not invent — only extract).
+
+These specifics will be re-used across scripts so the calendar reads as informed, not generic.
+If the corpus is empty of specifics, flag 'thin_specificity_corpus'.
+
+## Lens 3 — Expertise mapping
+
+Read the offer description and identify what the customer KNOWS that their audience does not.
+Phrase each expertise nugget as: "Customers in this niche often don't realise that {{X}}."
+These nuggets seed Educational / Myth-Buster / Decoded-Jargon scripts.
+
+## Lens 4 — Visual aesthetic
+
+If photos are present (vision blocks in Layer 2), describe:
+  - Lighting register (warm/cool/neutral; soft/harsh).
+  - Setting type (studio, home, retail, outdoor).
+  - Wardrobe and prop register.
+  - Photo quality and confidence (do NOT critique — describe).
+
+If no photos, infer from the niche brief's photo-aesthetic notes and the customer's stated voice;
+flag 'no_photos_uploaded' so the founder knows to set Phase 2 production toward stock-presenter.
+
+## Compose the analysis
+
+Produce a single JSON object with this exact shape:
+
+{
+  "brand_voice": {
+    "voice_phrases": ["string", ...],
+    "sentence_rhythm": "short_punchy | mid_length | dense",
+    "avoid_words": ["string", ...],
+    "energy_register": "calm | urgent | playful | authoritative | irreverent | warm",
+    "voice_corpus_quality": "thick | thin | absent"
+  },
+  "specificity_inventory": {
+    "numbers": ["string", ...],
+    "proper_nouns": ["string", ...],
+    "process_steps": ["string", ...],
+    "specificity_corpus_quality": "thick | thin | absent"
+  },
+  "expertise_map": [
+    {"nugget": "string", "framework_affinity": ["framework_slot", ...]}
+  ],
+  "visual_aesthetic": {
+    "lighting": "string",
+    "setting": "string",
+    "wardrobe_props": "string",
+    "photo_quality_summary": "string",
+    "photos_present": true | false
+  },
+  "calendar_plan": [
+    {
+      "slot_index": 1,
+      "day": 1,
+      "format": "ugc_30s | ugc_60s | t2v_quality | t2v_budget | carousel",
+      "framework_slot": "string (must be in selected_frameworks)",
+      "archetype_slot": "string (must be in selected_archetypes)",
+      "topic": "string (the angle this slot covers, derived from the lenses above)",
+      "hook": "string (one-line opener that obeys the framework's hook style)",
+      "core_beats": ["string", ...],
+      "cta": "string",
+      "fabrication_risk_check": "passed | escalate"
+    }
+  ],
+  "fabrication_audit": {
+    "lines_checked": "integer",
+    "violations_found": [
+      {"slot_index": "integer", "line": "string", "violation": "string"}
+    ],
+    "audit_passed": true | false
+  },
+  "flags_for_review": [
+    {"reason": "string (e.g. 'bank_exhausted_lru_fallback', 'thin_voice_corpus')", "detail": "string"}
+  ]
+}
+
+## Run the fabrication audit
+
+After composing \`calendar_plan\`, walk every \`hook\`, every entry in \`core_beats\`, and every \`cta\`.
+For each line, ask:
+  - Does this line claim a biographical fact about the customer? If yes, is that fact in
+    \`customer_backstory_verbatim\` from Layer 2? If not, the line FAILS.
+  - Does this line attribute a story to a named individual customer? If yes, the line FAILS.
+  - Does this line use a phrase like "in the style of [marketer]"? If yes, the line FAILS.
+
+Set \`fabrication_risk_check\` per slot. If any slot fails, populate \`fabrication_audit.violations_found\`
+and set \`audit_passed = false\`. Re-write the offending slots BEFORE finalising the JSON. Do not
+emit a JSON with \`audit_passed = false\` unless you have rewritten and the violations persist —
+in which case the founder review will catch it.
+
+## Output
+
+Emit ONLY the JSON object. No prose. No code fence. No preamble.`;
+
+export function renderLayer4(): string {
+  return LAYER_4;
+}
+
+// ─── Top-level: buildPromptMessages ─────────────────────────────────────────
+export function buildPromptMessages(args: {
+  brief: BriefAnalyzerInput;
+  seed: FrameworkSeedResult;
+  catalog: BankCatalog;
+  photos: PhotoBlock[];
+  logo?: PhotoBlock;
+  prior?: PriorRunContext;
+}): BuiltPrompt {
+  const { brief, seed, catalog, photos, logo, prior } = args;
+
+  const nicheBrief = catalog.niches[brief.niche_slug];
+  if (typeof nicheBrief !== 'string' || nicheBrief.length === 0) {
+    throw new Error(`buildPromptMessages: niche brief for "${brief.niche_slug}" missing from catalog`);
+  }
+
+  const layer2Text = renderLayer2Text(brief, nicheBrief);
+  const layer3Text = renderLayer3(brief, seed, catalog, prior);
+  const layer4Text = renderLayer4();
+
+  // First user message: logo (if any) + photos + Layer 2 text.
+  const firstContent: PromptUserContentBlock[] = [];
+  if (logo) {
+    firstContent.push({
+      type: 'image',
+      source: { type: 'base64', media_type: logo.mediaType, data: logo.base64 },
+    });
+  }
+  for (const p of photos) {
+    firstContent.push({
+      type: 'image',
+      source: { type: 'base64', media_type: p.mediaType, data: p.base64 },
+    });
+  }
+  firstContent.push({ type: 'text', text: layer2Text });
+
+  const messages: PromptUserMessage[] = [
+    { role: 'user', content: firstContent },
+    { role: 'user', content: [{ type: 'text', text: layer3Text }] },
+    { role: 'user', content: [{ type: 'text', text: layer4Text }] },
+  ];
+
+  return { system: renderLayer1(), messages };
+}

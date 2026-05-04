@@ -379,3 +379,126 @@ describe('renderReanalysisContextBlock', () => {
     expect(out).toContain('  to:   "They said \\"yes\\""');
   });
 });
+
+import { renderLayer4, buildPromptMessages } from './prompt-builder';
+import type { PhotoBlock } from './types/v2';
+
+describe('renderLayer4', () => {
+  it('opens with # GENERATION INSTRUCTIONS', () => {
+    expect(renderLayer4()).toContain('# GENERATION INSTRUCTIONS');
+  });
+
+  it('lists all four lenses in order', () => {
+    const out = renderLayer4();
+    const l1 = out.indexOf('## Lens 1 — Voice extraction');
+    const l2 = out.indexOf('## Lens 2 — Specificity inventory');
+    const l3 = out.indexOf('## Lens 3 — Expertise mapping');
+    const l4 = out.indexOf('## Lens 4 — Visual aesthetic');
+    expect(l1).toBeGreaterThan(0);
+    expect(l2).toBeGreaterThan(l1);
+    expect(l3).toBeGreaterThan(l2);
+    expect(l4).toBeGreaterThan(l3);
+  });
+
+  it('contains the JSON schema fragment for calendar_plan', () => {
+    const out = renderLayer4();
+    expect(out).toContain('"calendar_plan":');
+    expect(out).toContain('"slot_index": 1');
+    expect(out).toContain('"format": "ugc_30s | ugc_60s | t2v_quality | t2v_budget | carousel"');
+    expect(out).toContain('"fabrication_risk_check": "passed | escalate"');
+  });
+
+  it('contains the fabrication audit instructions', () => {
+    const out = renderLayer4();
+    expect(out).toContain('## Run the fabrication audit');
+    expect(out).toContain('Does this line claim a biographical fact about the customer?');
+  });
+
+  it('ends with the "Emit ONLY the JSON object" instruction', () => {
+    const out = renderLayer4();
+    expect(out).toContain('Emit ONLY the JSON object. No prose. No code fence. No preamble.');
+  });
+});
+
+describe('buildPromptMessages', () => {
+  const catalog = makeCatalogStub();
+
+  it('returns BuiltPrompt with system + 3 user messages', () => {
+    const out = buildPromptMessages({ brief: SAMPLE_BRIEF, seed: SAMPLE_SEED, catalog, photos: [] });
+    expect(out.system).toEqual(renderLayer1());
+    expect(out.messages).toHaveLength(3);
+    expect(out.messages.every((m) => m.role === 'user')).toBe(true);
+  });
+
+  it('first user message contains the Layer 2 text', () => {
+    const out = buildPromptMessages({ brief: SAMPLE_BRIEF, seed: SAMPLE_SEED, catalog, photos: [] });
+    const first = out.messages[0]!;
+    const textBlock = first.content.find((b) => b.type === 'text');
+    expect(textBlock).toBeDefined();
+    expect((textBlock as { type: 'text'; text: string }).text).toContain('# CUSTOMER CORPUS');
+  });
+
+  it('first user message has zero image blocks when no photos and no logo', () => {
+    const out = buildPromptMessages({ brief: SAMPLE_BRIEF, seed: SAMPLE_SEED, catalog, photos: [] });
+    const imageBlocks = out.messages[0]!.content.filter((b) => b.type === 'image');
+    expect(imageBlocks).toHaveLength(0);
+  });
+
+  it('first user message has logo block first, then photo blocks, then text — when both supplied', () => {
+    const photos: PhotoBlock[] = [
+      { role: 'reference', mediaType: 'image/jpeg', base64: 'PHOTO1' },
+      { role: 'reference', mediaType: 'image/jpeg', base64: 'PHOTO2' },
+    ];
+    const logo: PhotoBlock = { role: 'logo', mediaType: 'image/png', base64: 'LOGO' };
+    const out = buildPromptMessages({ brief: SAMPLE_BRIEF, seed: SAMPLE_SEED, catalog, photos, logo });
+    const blocks = out.messages[0]!.content;
+    expect(blocks[0]!.type).toBe('image');
+    expect((blocks[0] as { source: { data: string } }).source.data).toBe('LOGO');
+    expect(blocks[1]!.type).toBe('image');
+    expect((blocks[1] as { source: { data: string } }).source.data).toBe('PHOTO1');
+    expect(blocks[2]!.type).toBe('image');
+    expect((blocks[2] as { source: { data: string } }).source.data).toBe('PHOTO2');
+    expect(blocks[3]!.type).toBe('text');
+  });
+
+  it('second user message is the Layer 3 text', () => {
+    const out = buildPromptMessages({ brief: SAMPLE_BRIEF, seed: SAMPLE_SEED, catalog, photos: [] });
+    expect(out.messages[1]!.content[0]!.type).toBe('text');
+    expect((out.messages[1]!.content[0] as { text: string }).text).toContain('# SELECTION INPUTS');
+  });
+
+  it('third user message is the Layer 4 text', () => {
+    const out = buildPromptMessages({ brief: SAMPLE_BRIEF, seed: SAMPLE_SEED, catalog, photos: [] });
+    expect((out.messages[2]!.content[0] as { text: string }).text).toContain('# GENERATION INSTRUCTIONS');
+  });
+
+  it('passes prior context through to Layer 3 when supplied', () => {
+    const out = buildPromptMessages({
+      brief: SAMPLE_BRIEF,
+      seed: SAMPLE_SEED,
+      catalog,
+      photos: [],
+      prior: SAMPLE_PRIOR,
+    });
+    const layer3 = (out.messages[1]!.content[0] as { text: string }).text;
+    expect(layer3).toContain('### Founder note (verbatim)');
+    expect(layer3).toContain("The hooks were too generic");
+  });
+
+  it('uses the niche markdown from the catalog for the brief\'s niche', () => {
+    const richCatalog = {
+      ...catalog,
+      niches: { ...catalog.niches, fashion: '# fashion brief\n\nFashion is craft-substantiated.' },
+    };
+    const out = buildPromptMessages({ brief: SAMPLE_BRIEF, seed: SAMPLE_SEED, catalog: richCatalog, photos: [] });
+    const layer2 = (out.messages[0]!.content.find((b) => b.type === 'text') as { text: string }).text;
+    expect(layer2).toContain('Fashion is craft-substantiated.');
+  });
+
+  it('throws when the catalog is missing the brief\'s niche', () => {
+    const brokenCatalog = { ...catalog, niches: {} as BankCatalog['niches'] };
+    expect(() =>
+      buildPromptMessages({ brief: SAMPLE_BRIEF, seed: SAMPLE_SEED, catalog: brokenCatalog, photos: [] }),
+    ).toThrow(/niche.*fashion/i);
+  });
+});
