@@ -80,8 +80,8 @@ Rules for Phase 2: customer dashboards (if we ever add them — we currently don
 | Secret | Where | Who can read |
 | --- | --- | --- |
 | Supabase anon JWT | Web `.env`, public client bundle | Everyone |
-| Supabase service-role JWT | Agent `.env`, chmod 600 | Agent container only |
-| Anthropic API key | Agent `.env` | Agent container only |
+| Supabase service-role JWT | Agent `.env` and Worker `.env`, both chmod 600 | Agent and Worker containers only |
+| Anthropic API key | Agent `.env` and Worker `.env` | Agent and Worker containers only |
 | Paystack public key | Web `.env`, public client bundle | Everyone |
 | Paystack secret key | Agent `.env` | Agent container only |
 | Resend API key | Agent `.env` | Agent container only |

@@ -96,7 +96,7 @@ Contents covered in `architecture.md` section "Production environment variables"
 sudo mkdir -p /etc/operscale-calendar
 sudo chmod 750 /etc/operscale-calendar
 sudo chown docker:docker /etc/operscale-calendar
-sudo touch /etc/operscale-calendar/web.env /etc/operscale-calendar/agent.env
+sudo touch /etc/operscale-calendar/web.env /etc/operscale-calendar/agent.env /etc/operscale-calendar/worker.env
 sudo chmod 600 /etc/operscale-calendar/*.env
 sudo chown docker:docker /etc/operscale-calendar/*.env
 
@@ -104,6 +104,7 @@ sudo chown docker:docker /etc/operscale-calendar/*.env
 # "Operscale Calendar — production env"
 sudo vim /etc/operscale-calendar/web.env
 sudo vim /etc/operscale-calendar/agent.env
+sudo vim /etc/operscale-calendar/worker.env
 ```
 
 ## Dockerfiles
