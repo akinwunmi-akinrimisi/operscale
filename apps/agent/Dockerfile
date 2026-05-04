@@ -12,7 +12,10 @@ FROM base AS deps
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY apps/agent/package.json apps/agent/
 COPY apps/web/package.json apps/web/
-RUN pnpm install --frozen-lockfile --filter=@operscale-calendar/agent...
+# First-deploy mode: --no-frozen-lockfile because the repo doesn't yet ship
+# a pnpm-lock.yaml. The first build generates one and pnpm caches it; a
+# follow-up commit will pin it and we'll switch back to --frozen-lockfile.
+RUN pnpm install --no-frozen-lockfile --filter=@operscale-calendar/agent...
 
 # ---- build stage ---------------------------------------------------------
 FROM base AS builder
