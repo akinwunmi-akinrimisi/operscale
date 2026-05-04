@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { FrameworkEntry, FrameworkSlot, NicheSlug, AffinityLevel } from './types/v2';
+import type { ArchetypeEntry, ArchetypeSlot, FrameworkEntry, FrameworkSlot, NicheSlug, AffinityLevel } from './types/v2';
 
 export class NicheBriefMissingError extends Error {
   constructor(public readonly nicheSlug: string, cause?: unknown) {
@@ -208,4 +208,41 @@ export async function parseFrameworksFile(
   }
 
   return entries as Record<FrameworkSlot, FrameworkEntry>;
+}
+
+/**
+ * Parse an angle-archetypes markdown file and return a map of slot ID →
+ * ArchetypeEntry. Permissive: sections without a matching affinity row are
+ * silently dropped. The completeness validator (Task 8) catches gaps.
+ *
+ * Structurally identical to parseFrameworksFile — reuses the same private
+ * extractSections and parseAffinityMatrix helpers. The affinity table header
+ * reads "| Archetype | ..." instead of "| Framework | ..." but parseAffinityMatrix
+ * ignores the first-column label, so no change is needed there.
+ */
+export async function parseArchetypesFile(
+  path: string,
+): Promise<Record<ArchetypeSlot, ArchetypeEntry>> {
+  const text = await readFile(path, 'utf-8');
+  const sections = extractSections(text);
+  const affinityByName = parseAffinityMatrix(text);
+  const entries: Partial<Record<ArchetypeSlot, ArchetypeEntry>> = {};
+
+  for (const sec of sections) {
+    const affinity =
+      affinityByName[sec.name] ?? affinityByName[sec.name.replace(/-/g, ' ')];
+    if (affinity === undefined) {
+      // Permissive: parser doesn't fail here. Completeness validator (Task 8) will catch.
+      continue;
+    }
+    entries[sec.slot as ArchetypeSlot] = {
+      slot: sec.slot as ArchetypeSlot,
+      name: sec.name,
+      family: sec.family,
+      markdown: sec.markdown,
+      affinity,
+    };
+  }
+
+  return entries as Record<ArchetypeSlot, ArchetypeEntry>;
 }

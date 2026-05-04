@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'node:path';
-import { loadNicheBrief, NicheBriefMissingError, parseFrameworksFile } from './bank-catalog';
+import { loadNicheBrief, NicheBriefMissingError, parseFrameworksFile, parseArchetypesFile } from './bank-catalog';
 
 const FIXTURE_DIR = join(__dirname, '__fixtures__');
 
@@ -71,5 +71,23 @@ describe('parseFrameworksFile', () => {
     // the validator handle the cross-check.
     const entries = await parseFrameworksFile(fixturePath);
     expect(Object.keys(entries)).toHaveLength(2);
+  });
+});
+
+describe('parseArchetypesFile', () => {
+  const fixturePath = join(FIXTURE_DIR, 'sample-archetypes.md');
+
+  it('returns one entry per archetype slot', async () => {
+    const entries = await parseArchetypesFile(fixturePath);
+    expect(Object.keys(entries)).toEqual(
+      expect.arrayContaining(['PRICING_BREAKDOWN', 'SERVICE_ANATOMY']),
+    );
+  });
+
+  it('parses affinity from the §8 archetype table (note: header column "Archetype" not "Framework")', async () => {
+    const entries = await parseArchetypesFile(fixturePath);
+    expect(entries.PRICING_BREAKDOWN.affinity.beauty).toBe('High');
+    expect(entries.PRICING_BREAKDOWN.affinity.fintech).toBe('Low');
+    expect(entries.SERVICE_ANATOMY.affinity.real_estate).toBe('High');
   });
 });
