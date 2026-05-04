@@ -9,16 +9,12 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 /**
- * Defence-in-depth: throws if called from a browser-side context.
- * Call this at the top of any server-only entry point that imports this module.
- * The compile-time guard is the agent container's bundler config; this is the
- * runtime backstop.
+ * Defence-in-depth: throws if this module is loaded from a browser-side bundle.
+ * Called at module load (just below) so the very first import anywhere fires
+ * the check; production callers (worker.ts, API route handlers, etc.) get the
+ * guard for free without needing to remember to invoke anything.
  *
- * Note: this function is NOT called at module-load time here because dynamic
- * import() in test environments needs to be able to import the module and then
- * call this function to verify its behaviour. Callers in production entry points
- * (e.g. worker.ts, API route handlers) should invoke assertServerSide() at
- * their own module load.
+ * Tests verify the throw via `await expect(import('./supabase-admin')).rejects.toThrow(...)`.
  */
 export function assertServerSide(): void {
   if (typeof window !== 'undefined') {
@@ -29,6 +25,8 @@ export function assertServerSide(): void {
     );
   }
 }
+
+assertServerSide();
 
 let _client: SupabaseClient | null = null;
 

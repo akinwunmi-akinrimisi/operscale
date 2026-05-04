@@ -68,14 +68,15 @@ describe('assertServerSide', () => {
     expect(() => assertServerSide()).not.toThrow();
   });
 
-  it('throws a clear error when window is defined (browser context)', async () => {
-    // Inject a global `window` to simulate browser-side import.
+  it('throws at module load when window is defined (browser context)', async () => {
+    // Inject a global `window` to simulate browser-side import. The module's
+    // top-level `assertServerSide()` call should fire during import itself,
+    // so the import promise rejects — strongest possible guard.
     const origWindow = (globalThis as any).window;
     (globalThis as any).window = { document: {} };
     try {
       vi.resetModules();
-      const { assertServerSide } = await import('./supabase-admin');
-      expect(() => assertServerSide()).toThrow(/server-side|service.role|browser/i);
+      await expect(import('./supabase-admin')).rejects.toThrow(/server-side|service.role|browser/i);
     } finally {
       (globalThis as any).window = origWindow;
     }
