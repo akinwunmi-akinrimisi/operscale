@@ -1,6 +1,7 @@
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import type { ArchetypeEntry, ArchetypeSlot, FrameworkEntry, FrameworkSlot, NicheSlug, AffinityLevel } from './types/v2';
+import { readFile, stat } from 'node:fs/promises';
+import { join, dirname } from 'node:path';
+import type { ArchetypeEntry, ArchetypeSlot, BankCatalog, FrameworkEntry, FrameworkSlot, NicheSlug, AffinityLevel } from './types/v2';
+import { FRAMEWORK_SLOTS, ARCHETYPE_SLOTS, NICHE_SLUGS } from './types/v2';
 
 export class NicheBriefMissingError extends Error {
   constructor(public readonly nicheSlug: string, cause?: unknown) {
@@ -179,6 +180,39 @@ function parseAffinityMatrix(text: string): Record<string, Record<NicheSlug, Aff
 }
 
 /**
+ * Read a file and normalize line endings to LF.
+ * The real spec files are committed with CRLF on Windows; the regex anchors
+ * (^ and $) in extractSections / parseAffinityMatrix require clean LF lines.
+ */
+async function readNormalized(path: string): Promise<string> {
+  const raw = await readFile(path, 'utf-8');
+  return raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
+/**
+ * Look up affinity for a section name, trying progressively shorter forms:
+ * 1. Exact name (e.g. "DR Formula")
+ * 2. Name with dashes replaced by spaces (e.g. "Quick-Win" → "Quick Win")
+ * 3. Name stripped of any parenthetical suffix (e.g. "PAS (Problem–Agitation–Solution)" → "PAS")
+ * 4. Stripped name with dashes replaced by spaces
+ *
+ * Headings like "### 3.2 PAS (Problem–Agitation–Solution)" produce the full
+ * parenthetical name, but the affinity matrix row only has "PAS".
+ */
+function lookupAffinity(
+  affinityByName: Record<string, Record<NicheSlug, AffinityLevel>>,
+  name: string,
+): Record<NicheSlug, AffinityLevel> | undefined {
+  const baseName = name.replace(/\s*\(.*\)$/, '').trim();
+  return (
+    affinityByName[name] ??
+    affinityByName[name.replace(/-/g, ' ')] ??
+    affinityByName[baseName] ??
+    affinityByName[baseName.replace(/-/g, ' ')]
+  );
+}
+
+/**
  * Parse a script-frameworks markdown file and return a map of slot ID →
  * FrameworkEntry. Permissive: sections without a matching affinity row are
  * silently dropped. The completeness validator (Task 8) catches gaps.
@@ -186,14 +220,13 @@ function parseAffinityMatrix(text: string): Record<string, Record<NicheSlug, Aff
 export async function parseFrameworksFile(
   path: string,
 ): Promise<Record<FrameworkSlot, FrameworkEntry>> {
-  const text = await readFile(path, 'utf-8');
+  const text = await readNormalized(path);
   const sections = extractSections(text);
   const affinityByName = parseAffinityMatrix(text);
   const entries: Partial<Record<FrameworkSlot, FrameworkEntry>> = {};
 
   for (const sec of sections) {
-    const affinity =
-      affinityByName[sec.name] ?? affinityByName[sec.name.replace(/-/g, ' ')];
+    const affinity = lookupAffinity(affinityByName, sec.name);
     if (affinity === undefined) {
       // Permissive: parser doesn't fail here. Completeness validator (Task 8) will catch.
       continue;
@@ -223,14 +256,13 @@ export async function parseFrameworksFile(
 export async function parseArchetypesFile(
   path: string,
 ): Promise<Record<ArchetypeSlot, ArchetypeEntry>> {
-  const text = await readFile(path, 'utf-8');
+  const text = await readNormalized(path);
   const sections = extractSections(text);
   const affinityByName = parseAffinityMatrix(text);
   const entries: Partial<Record<ArchetypeSlot, ArchetypeEntry>> = {};
 
   for (const sec of sections) {
-    const affinity =
-      affinityByName[sec.name] ?? affinityByName[sec.name.replace(/-/g, ' ')];
+    const affinity = lookupAffinity(affinityByName, sec.name);
     if (affinity === undefined) {
       // Permissive: parser doesn't fail here. Completeness validator (Task 8) will catch.
       continue;
@@ -245,4 +277,91 @@ export async function parseArchetypesFile(
   }
 
   return entries as Record<ArchetypeSlot, ArchetypeEntry>;
+}
+
+// ─── Top-level loader + completeness validator ────────────────────────────────
+
+/**
+ * Maps NICHE_SLUGS values to their on-disk filename stems (without .md).
+ * When a niche file was named differently from the slug (e.g. real-estate.md
+ * for the "real_estate" slug), the mapping entry overrides the default.
+ */
+const NICHE_FILENAME_MAP: Partial<Record<NicheSlug, string>> = {
+  real_estate: 'real-estate',
+  fashion: 'fashion-ecom',
+};
+
+export class BankCatalogIncompleteError extends Error {
+  constructor(public readonly missing: { kind: string; slug: string }[]) {
+    super(
+      `BankCatalog is incomplete. Missing entries: ${missing
+        .map((m) => `${m.kind}=${m.slug}`)
+        .join(', ')}`,
+    );
+    this.name = 'BankCatalogIncompleteError';
+  }
+}
+
+export interface LoadBankCatalogOptions {
+  /** Repo root (defaults to process.cwd() ascended until pnpm-workspace.yaml is found). */
+  repoRoot?: string;
+}
+
+async function findRepoRoot(start: string): Promise<string> {
+  let cur = start;
+  for (let i = 0; i < 8; i++) {
+    try {
+      await stat(join(cur, 'pnpm-workspace.yaml'));
+      return cur;
+    } catch {
+      // continue ascending
+    }
+    const parent = dirname(cur);
+    if (parent === cur) break;
+    cur = parent;
+  }
+  return start;
+}
+
+export async function loadBankCatalog(opts: LoadBankCatalogOptions = {}): Promise<BankCatalog> {
+  const repoRoot = opts.repoRoot ?? (await findRepoRoot(process.cwd()));
+  const frameworksPath = join(repoRoot, 'docs/specs/script-frameworks.md');
+  const archetypesPath = join(repoRoot, 'docs/specs/angle-archetypes.md');
+  const nichesDir = join(repoRoot, 'niche-briefs');
+
+  const [frameworks, archetypes] = await Promise.all([
+    parseFrameworksFile(frameworksPath),
+    parseArchetypesFile(archetypesPath),
+  ]);
+
+  const niches: Partial<Record<(typeof NICHE_SLUGS)[number], string>> = {};
+  for (const slug of NICHE_SLUGS) {
+    const filenameStem = NICHE_FILENAME_MAP[slug] ?? slug;
+    try {
+      niches[slug] = await loadNicheBrief(filenameStem, nichesDir);
+    } catch (err) {
+      if (err instanceof NicheBriefMissingError) continue;
+      throw err;
+    }
+  }
+
+  const missing: { kind: string; slug: string }[] = [];
+  for (const slot of FRAMEWORK_SLOTS) {
+    if (!frameworks[slot]) missing.push({ kind: 'framework', slug: slot });
+  }
+  for (const slot of ARCHETYPE_SLOTS) {
+    if (!archetypes[slot]) missing.push({ kind: 'archetype', slug: slot });
+  }
+  for (const slug of NICHE_SLUGS) {
+    if (!niches[slug]) missing.push({ kind: 'niche', slug });
+  }
+  if (missing.length > 0) {
+    throw new BankCatalogIncompleteError(missing);
+  }
+
+  return {
+    frameworks,
+    archetypes,
+    niches: niches as Record<(typeof NICHE_SLUGS)[number], string>,
+  };
 }

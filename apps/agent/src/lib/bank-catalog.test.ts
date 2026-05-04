@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'node:path';
-import { loadNicheBrief, NicheBriefMissingError, parseFrameworksFile, parseArchetypesFile } from './bank-catalog';
+import { loadNicheBrief, NicheBriefMissingError, parseFrameworksFile, parseArchetypesFile, loadBankCatalog, BankCatalogIncompleteError } from './bank-catalog';
+import { FRAMEWORK_SLOTS, ARCHETYPE_SLOTS, NICHE_SLUGS } from './types/v2';
 
 const FIXTURE_DIR = join(__dirname, '__fixtures__');
 
@@ -89,5 +90,46 @@ describe('parseArchetypesFile', () => {
     expect(entries.PRICING_BREAKDOWN.affinity.beauty).toBe('High');
     expect(entries.PRICING_BREAKDOWN.affinity.fintech).toBe('Low');
     expect(entries.SERVICE_ANATOMY.affinity.real_estate).toBe('High');
+  });
+});
+
+describe('loadBankCatalog (with real repo files)', () => {
+  it('loads all 25 framework slots from docs/specs/script-frameworks.md', async () => {
+    const catalog = await loadBankCatalog();
+    for (const slot of FRAMEWORK_SLOTS) {
+      expect(catalog.frameworks[slot]).toBeDefined();
+      expect(catalog.frameworks[slot].markdown.length).toBeGreaterThan(50);
+    }
+  });
+
+  it('loads all 25 archetype slots from docs/specs/angle-archetypes.md', async () => {
+    const catalog = await loadBankCatalog();
+    for (const slot of ARCHETYPE_SLOTS) {
+      expect(catalog.archetypes[slot]).toBeDefined();
+    }
+  });
+
+  it('loads all 7 niche briefs from niche-briefs/', async () => {
+    const catalog = await loadBankCatalog();
+    for (const niche of NICHE_SLUGS) {
+      expect(catalog.niches[niche]).toBeDefined();
+      expect(catalog.niches[niche].length).toBeGreaterThan(50);
+    }
+  });
+
+  it('every framework has a complete affinity entry across all 7 niches', async () => {
+    const catalog = await loadBankCatalog();
+    for (const slot of FRAMEWORK_SLOTS) {
+      const entry = catalog.frameworks[slot];
+      for (const niche of NICHE_SLUGS) {
+        expect(entry.affinity[niche]).toMatch(/^(High|Med|Low)$/);
+      }
+    }
+  });
+
+  it('throws BankCatalogIncompleteError when a slot is missing from spec', async () => {
+    // Force a partial-files scenario via a fake repo root with empty fixture files
+    const tmpRoot = join(FIXTURE_DIR, '__incomplete-fixture__');
+    await expect(loadBankCatalog({ repoRoot: tmpRoot })).rejects.toThrow(/missing/i);
   });
 });
