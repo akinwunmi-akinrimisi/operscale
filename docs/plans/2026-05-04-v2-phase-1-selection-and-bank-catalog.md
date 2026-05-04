@@ -1612,8 +1612,8 @@ describe('sortPairsByAffinityAndSeed', () => {
     //   PAS(Low=1)         * SERVICE_ANATOMY(Low=1)    = 1
     const catalog = makeMinimalCatalog();
     const pairs = sortPairsByAffinityAndSeed(catalog, 'beauty', 'abc123');
-    expect(pairs[0].affinity).toBe(9);
-    expect(pairs[pairs.length - 1].affinity).toBe(1);
+    expect(pairs[0]?.affinity).toBe(9);
+    expect(pairs[pairs.length - 1]?.affinity).toBe(1);
   });
 
   it('breaks affinity ties using hash(seed + framework + archetype)', () => {
@@ -1780,7 +1780,7 @@ describe('selectPairsFromSorted', () => {
       { framework: 'AIDA',       archetype: 'SERVICE_ANATOMY',   affinity: 4 },
       { framework: 'AIDA',       archetype: 'PRODUCT_TOUR',      affinity: 2 },
     ];
-    const history = allPairs9.slice(0, 7).map((p) => ({
+    const history = allPairs9.slice(0, 8).map((p) => ({
       framework: p.framework,
       archetype: p.archetype,
       last_used_at: '2026-01-01T00:00:00Z',

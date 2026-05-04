@@ -1,6 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { computeSeedHash, computeReanalyzeSeedHash, sortPairsByAffinityAndSeed } from './framework-selector';
-import type { FrameworkSeedInputs, BankCatalog, NicheSlug, AffinityLevel } from './types/v2';
+import {
+  computeSeedHash,
+  computeReanalyzeSeedHash,
+  sortPairsByAffinityAndSeed,
+  selectPairsFromSorted,
+} from './framework-selector';
+import type {
+  FrameworkSeedInputs,
+  BankCatalog,
+  NicheSlug,
+  AffinityLevel,
+  FrameworkSlot,
+  ArchetypeSlot,
+  SelectedPair,
+} from './types/v2';
 
 describe('computeSeedHash', () => {
   const inputs: FrameworkSeedInputs = {
@@ -109,8 +122,8 @@ describe('sortPairsByAffinityAndSeed', () => {
     //   PAS(Low=1)         * SERVICE_ANATOMY(Low=1)    = 1
     const catalog = makeMinimalCatalog();
     const pairs = sortPairsByAffinityAndSeed(catalog, 'beauty', 'abc123');
-    expect(pairs[0].affinity).toBe(9);
-    expect(pairs[pairs.length - 1].affinity).toBe(1);
+    expect(pairs[0]?.affinity).toBe(9);
+    expect(pairs[pairs.length - 1]?.affinity).toBe(1);
   });
 
   it('breaks affinity ties using hash(seed + framework + archetype)', () => {
@@ -129,5 +142,97 @@ describe('sortPairsByAffinityAndSeed', () => {
     const a = sortPairsByAffinityAndSeed(catalog, 'beauty', 'fixed-seed');
     const b = sortPairsByAffinityAndSeed(catalog, 'beauty', 'fixed-seed');
     expect(a).toEqual(b);
+  });
+});
+
+describe('selectPairsFromSorted', () => {
+  const allPairs: SelectedPair[] = [
+    { framework: 'DR_FORMULA', archetype: 'PRICING_BREAKDOWN', affinity: 9 },
+    { framework: 'PAS',        archetype: 'PRICING_BREAKDOWN', affinity: 6 },
+    { framework: 'DR_FORMULA', archetype: 'SERVICE_ANATOMY',   affinity: 3 },
+    { framework: 'PAS',        archetype: 'SERVICE_ANATOMY',   affinity: 2 },
+  ];
+
+  it('picks N unique frameworks and N unique archetypes from the top of the sorted list', () => {
+    const result = selectPairsFromSorted(allPairs, [], 2, 2);
+    expect(result.selected_frameworks).toEqual(expect.arrayContaining(['DR_FORMULA', 'PAS']));
+    expect(result.selected_archetypes).toEqual(
+      expect.arrayContaining(['PRICING_BREAKDOWN', 'SERVICE_ANATOMY']),
+    );
+    expect(result.lru_fallback_used).toBe(false);
+  });
+
+  it('skips pairs already in customer_framework_history', () => {
+    const history = [
+      {
+        framework: 'DR_FORMULA' as FrameworkSlot,
+        archetype: 'PRICING_BREAKDOWN' as ArchetypeSlot,
+        last_used_at: '2026-01-01T00:00:00Z',
+      },
+    ];
+    const result = selectPairsFromSorted(allPairs, history, 1, 1);
+    // Best non-excluded pair is PAS x PRICING_BREAKDOWN
+    expect(result.selected_pairs[0]).toEqual({
+      framework: 'PAS',
+      archetype: 'PRICING_BREAKDOWN',
+      affinity: 6,
+    });
+  });
+
+  it('uses LRU fallback when available pool is insufficient', () => {
+    const history = [
+      {
+        framework: 'DR_FORMULA' as FrameworkSlot,
+        archetype: 'PRICING_BREAKDOWN' as ArchetypeSlot,
+        last_used_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        framework: 'PAS' as FrameworkSlot,
+        archetype: 'PRICING_BREAKDOWN' as ArchetypeSlot,
+        last_used_at: '2026-02-01T00:00:00Z',
+      },
+      {
+        framework: 'DR_FORMULA' as FrameworkSlot,
+        archetype: 'SERVICE_ANATOMY' as ArchetypeSlot,
+        last_used_at: '2026-03-01T00:00:00Z',
+      },
+      {
+        framework: 'PAS' as FrameworkSlot,
+        archetype: 'SERVICE_ANATOMY' as ArchetypeSlot,
+        last_used_at: '2026-04-01T00:00:00Z',
+      },
+    ];
+    const result = selectPairsFromSorted(allPairs, history, 2, 2);
+    expect(result.lru_fallback_used).toBe(true);
+    expect(result.lru_pairs_reused).toBeDefined();
+    // The oldest-used pair should be reused first.
+    expect(result.lru_pairs_reused?.[0]?.last_used_at).toBe('2026-01-01T00:00:00Z');
+  });
+
+  it('emits exhaustion_warning when available pairs is below 2x N but not yet exhausted', () => {
+    // Per non-duplication-system.md §6.1, warning fires when
+    //   available < 2 × max(N_frameworks, N_archetypes)
+    // and LRU only fires when available < required. With N=1, the warning
+    // band is exactly available=1: 1 < 2 (warns), 1 >= 1 (no LRU).
+    // 9-pair catalog with 8 in history → 1 available.
+    const allPairs9: SelectedPair[] = [
+      { framework: 'DR_FORMULA', archetype: 'PRICING_BREAKDOWN', affinity: 9 },
+      { framework: 'DR_FORMULA', archetype: 'SERVICE_ANATOMY',   affinity: 6 },
+      { framework: 'DR_FORMULA', archetype: 'PRODUCT_TOUR',      affinity: 3 },
+      { framework: 'PAS',        archetype: 'PRICING_BREAKDOWN', affinity: 6 },
+      { framework: 'PAS',        archetype: 'SERVICE_ANATOMY',   affinity: 4 },
+      { framework: 'PAS',        archetype: 'PRODUCT_TOUR',      affinity: 2 },
+      { framework: 'AIDA',       archetype: 'PRICING_BREAKDOWN', affinity: 6 },
+      { framework: 'AIDA',       archetype: 'SERVICE_ANATOMY',   affinity: 4 },
+      { framework: 'AIDA',       archetype: 'PRODUCT_TOUR',      affinity: 2 },
+    ];
+    const history = allPairs9.slice(0, 8).map((p) => ({
+      framework: p.framework,
+      archetype: p.archetype,
+      last_used_at: '2026-01-01T00:00:00Z',
+    }));
+    const result = selectPairsFromSorted(allPairs9, history, 1, 1);
+    expect(result.exhaustion_warning).toBe(true);
+    expect(result.lru_fallback_used).toBe(false);
   });
 });
