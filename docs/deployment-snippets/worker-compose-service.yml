@@ -1,0 +1,20 @@
+# Append this service block to /srv/operscale-calendar/docker-compose.yml
+# under `services:` (sibling to `web:` and `agent:`).
+#
+# - Same image as agent — different CMD.
+# - No traefik labels: worker has no HTTP listener.
+# - supabase-internal network: needs to reach the Supabase Postgres.
+# - env_file points at /etc/operscale-calendar/worker.env (chmod 600, server-side).
+
+worker:
+  container_name: operscale-calendar-worker
+  image: operscale-calendar-agent:latest
+  restart: unless-stopped
+  command: ["node", "apps/agent/dist/worker.js"]
+  env_file: /etc/operscale-calendar/worker.env
+  networks:
+    - supabase-internal
+  # No expose, no ports, no traefik labels. Worker speaks only outbound
+  # (to Supabase Postgres + Storage and Anthropic API).
+  deploy:
+    replicas: 1   # scale by raising if Anthropic latency demands; one is enough for V1.

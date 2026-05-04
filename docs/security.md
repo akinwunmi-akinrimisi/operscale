@@ -158,6 +158,8 @@ For admin (CRM) operations:
 
 If any one JWT in this chain is rotated without rotating the others, the chain breaks silently — symptoms look like one specific service is broken but the actual issue is auth mismatch. Document every rotation and its verification step.
 
+**Phase 3 adds a 6th sync point: the worker container.** As of Phase 3, `worker.env` holds its own copies of `ANTHROPIC_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` (separate file from `agent.env`, chmod 600 at `/etc/operscale-calendar/worker.env`). When rotating either of those keys, update all three files — `agent.env`, `worker.env`, and the upstream provider — in the same deployment. Rotating one without the other produces the same silent-401 failure mode described above. The rotation procedure in the "Rotation procedure (general)" section applies; add `worker.env` as an additional step alongside `agent.env`.
+
 ## RLS lockdown
 
 We default-deny everything for `anon`. Every table that exposes data to the customer must have explicit RLS policies.

@@ -62,6 +62,17 @@ services:
       - "traefik.http.services.opscal-agent.loadbalancer.server.port=3002"
       - "traefik.docker.network=traefik"
 
+  worker:
+    container_name: operscale-calendar-worker
+    image: operscale-calendar-agent:latest
+    restart: unless-stopped
+    command: ["node", "apps/agent/dist/worker.js"]
+    env_file: /etc/operscale-calendar/worker.env
+    networks:
+      - supabase-internal
+    deploy:
+      replicas: 1
+
 networks:
   traefik:
     external: true
@@ -75,6 +86,7 @@ Live on the VPS, NOT in the repo:
 
 - `/etc/operscale-calendar/web.env` — owner `docker`, mode `600`
 - `/etc/operscale-calendar/agent.env` — owner `docker`, mode `600`
+- `/etc/operscale-calendar/worker.env` — owner `docker`, mode `600`. Holds `ANTHROPIC_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY`. **Does NOT** contain `NEXT_PUBLIC_*` keys (they belong to the customer-facing web service only).
 
 Contents covered in `architecture.md` section "Production environment variables".
 
