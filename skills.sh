@@ -178,12 +178,14 @@ install_skills() {
 
   log "Installing agent skills from skills.sh ecosystem..."
 
-  # Several upstream repos referenced below have been renamed, archived, or moved
-  # (e.g., awesomeskill-ai/scriptwriting-methodology, sentry/dev — both 404 as of
-  # 2026-05). Rather than halt the entire install on a single 404, disable strict
-  # mode for this section so individual `npx skills add` failures only emit
-  # warnings and the script proceeds to the project-deps stage (which produces
-  # the lockfile). Strict mode is re-enabled at end-of-function.
+  # The skill list below pulls from ~10 third-party GitHub repos. Any one can
+  # be renamed, archived, or moved at any time (it has happened twice already:
+  # awesomeskill-ai/scriptwriting-methodology -> mike-coulbourn/claude-vibes,
+  # and sentry/dev -> getsentry/sentry-agent-skills). To keep one stale URL
+  # from blocking the entire install — especially the pnpm install step that
+  # produces the lockfile — strict mode is disabled for this section.
+  # Individual `npx skills add` failures emit warnings and the script
+  # continues. Strict mode is re-enabled at end-of-function.
   set +e
 
   # Foundational discovery skill — lets future sessions find more skills
@@ -249,17 +251,20 @@ install_skills() {
   run "npx -y skills add coreyhaines31/marketingskills --skill form-cro -g -y"
   run "npx -y skills add coreyhaines31/marketingskills --skill analytics-tracking -g -y"
 
-  # Scriptwriting methodology (awesomeskill.ai) — DR formula and hook-stacking patterns,
-  # filtered through ADR 0012 (frameworks by name of framework, not by name of marketer).
-  # NOTE: github.com/awesomeskill-ai org returns 404 (does not exist or was renamed).
-  # Skill is non-essential per ADR 0012, so the install is tolerant of failure.
-  # TODO: locate the actual upstream and update this URL.
-  log "  -> Scriptwriting methodology (awesomeskill.ai) [optional]"
-  run "npx -y skills add awesomeskill-ai/scriptwriting-methodology --skill claude-vibes-scriptwriting-methodology -g -y || warn 'scriptwriting-methodology repo unreachable — skipped'"
+  # Scriptwriting methodology — DR formula, PAS/AIDA/PAIPS structures, hook
+  # stacking. Filtered through ADR 0012 (frameworks by name of framework, not
+  # by name of marketer). Listed on awesomeskill.ai marketplace; canonical
+  # source is mike-coulbourn/claude-vibes (skill at plugins/vibes/skills/).
+  log "  -> Scriptwriting methodology (mike-coulbourn/claude-vibes)"
+  run "npx -y skills add mike-coulbourn/claude-vibes --skill scriptwriting-methodology -g -y"
 
-  # Observability — Sentry CLI for error tracking
-  log "  -> Observability (sentry/dev)"
-  run "npx -y skills add sentry/dev --skill sentry-cli -g -y"
+  # Observability — Sentry agent skills. The original sentry/dev path used here
+  # 404s; getsentry/sentry-agent-skills is the working repo (archived by Sentry
+  # but still installable; future-state replacement is getsentry/sentry-for-ai
+  # which uses the plugin-marketplace mechanism, not `npx skills add`).
+  # sentry-fix-issues is the closest analogue to "error-tracking CLI workflow".
+  log "  -> Observability (getsentry/sentry-agent-skills)"
+  run "npx -y skills add getsentry/sentry-agent-skills --skill sentry-fix-issues -g -y"
 
   # Playwright for end-to-end testing
   log "  -> Playwright (microsoft/playwright-cli, currents-dev best-practices)"
