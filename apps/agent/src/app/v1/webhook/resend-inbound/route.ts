@@ -12,9 +12,13 @@
 // Idempotency: email_log.resend_message_id UNIQUE.
 
 import { NextResponse } from 'next/server';
+import { webhookGetExplainer } from '@/lib/webhook-405';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+
+export const GET = () =>
+  webhookGetExplainer({ caller: 'Resend (Svix)', spec: 'docs/specs/email-templates.md' });
 
 export async function POST() {
   // TODO(Operscale): implement per docs/specs/email-templates.md

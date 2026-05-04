@@ -24,9 +24,13 @@
 // body bytes reach us unmodified — see docs/deployment.md.
 
 import { NextResponse } from 'next/server';
+import { webhookGetExplainer } from '@/lib/webhook-405';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs'; // node:crypto needed for timingSafeEqual
+
+export const GET = () =>
+  webhookGetExplainer({ caller: 'Paystack', spec: 'docs/specs/paystack-integration.md' });
 
 export async function POST() {
   // TODO(Operscale): implement per docs/specs/paystack-integration.md

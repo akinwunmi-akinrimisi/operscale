@@ -9,9 +9,13 @@
 // Verify webhook signature per Evolution API docs.
 
 import { NextResponse } from 'next/server';
+import { webhookGetExplainer } from '@/lib/webhook-405';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+
+export const GET = () =>
+  webhookGetExplainer({ caller: 'Evolution API (WhatsApp)', spec: 'docs/specs/whatsapp-flow.md' });
 
 export async function POST() {
   // TODO(Operscale): implement per docs/specs/whatsapp-flow.md
