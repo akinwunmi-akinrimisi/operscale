@@ -3242,10 +3242,16 @@ describe('L2 integration — initial / fashion / tier-standard', () => {
       : undefined;
     const cassetteClient = createCassetteClient({ cassettePath, realClient });
 
+    // NB: `temperature` is deprecated for Claude Opus 4.7 (the API rejects it
+    // with 400 invalid_request_error). The model uses its built-in default
+    // for output sampling. ai-brief-analysis.md §4 was updated in lockstep
+    // with this code change (2026-05-04).
     const response = await cassetteClient.messages.create({
       model: 'claude-opus-4-7',
-      max_tokens: 8192,
-      temperature: 0.4,
+      // 16384 covers tier-standard's 21-slot output with margin (8192 truncated
+      // tier-standard mid-string in early recording attempts). Calendar tier
+      // (44 slots) may need 24576+.
+      max_tokens: 16384,
       system: built.system,
       messages: built.messages,
     });

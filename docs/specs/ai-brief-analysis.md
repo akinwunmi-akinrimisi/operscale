@@ -349,8 +349,7 @@ Emit ONLY the JSON object. No prose. No code fence. No preamble.
 | Setting | Value |
 |---|---|
 | Model | `claude-opus-4-7` |
-| `max_tokens` | 8192 |
-| Temperature | 0.4 |
+| `max_tokens` | 16384 (tier-standard) — bump to 24576+ for tier-calendar's 44-slot output |
 | `system` | Layer 1, rendered |
 | `messages` | Three `user` messages: Layer 2 (with vision blocks), Layer 3, Layer 4 |
 | Streaming | No (we want the complete JSON before writing to `analysis_runs`) |
@@ -359,7 +358,7 @@ Emit ONLY the JSON object. No prose. No code fence. No preamble.
 
 Vision blocks are constructed from the `customer-photos` Supabase Storage bucket. Maximum five photos per analysis (form caps at five uploads). Brand logo enters as a separate vision block before the photos.
 
-The temperature of 0.4 is deliberate. Lower temperatures produce dull, repetitive output; higher temperatures violate the no-fabrication rule by inventing more freely. 0.4 is the band where the model still selects expressive language but stays anchored to the corpus.
+**Temperature note (2026-05-04 update).** The `temperature` parameter is deprecated for Claude Opus 4.7 — the API returns `400 invalid_request_error: "temperature is deprecated for this model"` if the field is present. The model uses its built-in default for output sampling. An earlier draft of this spec mandated `temperature: 0.4`; that mandate is removed and the field MUST NOT be sent. Output stability is now governed by the deterministic seed system (`docs/specs/non-duplication-system.md`) and the strict Layer 4 schema rather than by client-side temperature shaping.
 
 ## 5. Cost and latency
 

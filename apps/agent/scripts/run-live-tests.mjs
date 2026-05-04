@@ -2,11 +2,17 @@
 // Cross-platform runner for cassette-recording mode.
 // Usage:  pnpm test:claude:live           — runs all integration tests in record mode
 //         pnpm test:claude:live <pattern> — runs only matching test names
-// Loads master .env from repo parent dir via Node 20 --env-file flag.
+//
+// Loads master .env from the repo parent dir by parsing it directly and
+// merging into the spawned child's env. We deliberately do NOT use Node's
+// --env-file flag because (a) it cannot be passed via NODE_OPTIONS (Node
+// disallows it there) and (b) we spawn pnpm (a shell script on Unix and a
+// .cmd shim on Windows), so direct flag passing to node isn't an option.
+// Manual parse keeps zero deps and works on every platform.
 
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -20,14 +26,35 @@ if (!existsSync(masterEnvPath)) {
   process.exit(1);
 }
 
-// NODE_OPTIONS is whitespace-tokenised by Node and offers no quoting. A space
-// anywhere in masterEnvPath would silently split --env-file= and the env file
-// would never load — leaving cassette recording to fail later as a confusing
-// auth error. Fail loudly here instead.
-if (/\s/.test(masterEnvPath)) {
-  console.error(`[run-live-tests] masterEnvPath contains whitespace: ${masterEnvPath}`);
-  console.error('[run-live-tests] NODE_OPTIONS cannot quote paths with spaces.');
-  console.error('[run-live-tests] Move the repo to a whitespace-free path and retry.');
+// Minimal KEY=VALUE .env parser. Skips blank lines and `#` comments. Strips
+// surrounding single or double quotes from the value. Does NOT do interpolation
+// — the master .env at the repo parent is plain literal values.
+function parseEnvFile(filePath) {
+  const out = {};
+  const text = readFileSync(filePath, 'utf8');
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+    const eq = line.indexOf('=');
+    if (eq < 0) continue;
+    const key = line.slice(0, eq).trim();
+    let value = line.slice(eq + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    if (key) out[key] = value;
+  }
+  return out;
+}
+
+const masterEnv = parseEnvFile(masterEnvPath);
+
+if (!masterEnv.ANTHROPIC_API_KEY) {
+  console.error(`[run-live-tests] master .env at ${masterEnvPath} has no ANTHROPIC_API_KEY.`);
+  console.error('[run-live-tests] cassette recording requires a valid Anthropic key.');
   process.exit(1);
 }
 
@@ -37,8 +64,8 @@ const child = spawn('pnpm', vitestArgs, {
   shell: process.platform === 'win32',
   env: {
     ...process.env,
+    ...masterEnv,            // master values win over the controller's env
     CLAUDE_LIVE: '1',
-    NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --env-file=${masterEnvPath}`.trim(),
   },
 });
 child.on('exit', (code) => process.exit(code ?? 1));

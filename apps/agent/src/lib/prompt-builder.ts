@@ -240,7 +240,13 @@ ${archetypeExcerpts}
 
 ## Selected pairs
 
-The deterministic pairing assigns each video slot a (framework, archetype) pair as follows:
+Your \`calendar_plan\` output MUST contain exactly ${input.video_count + input.carousel_count} entries:
+the first ${input.video_count} are VIDEO slots (use one of: \`ugc_30s\`, \`ugc_60s\`, \`t2v_quality\`, \`t2v_budget\`),
+the last ${input.carousel_count} are CAROUSEL slots (\`format\` MUST be \`"carousel"\`).
+For each calendar slot k (1-indexed), assign a (framework, archetype) by cycling through the
+deterministic pair list below — slot k gets pair index ((k - 1) mod ${seed.selected_pairs.length}).
+
+The deterministic pairs are:
 
 ${renderPairTable(seed)}
 
