@@ -8,6 +8,28 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
+/**
+ * Defence-in-depth: throws if called from a browser-side context.
+ * Call this at the top of any server-only entry point that imports this module.
+ * The compile-time guard is the agent container's bundler config; this is the
+ * runtime backstop.
+ *
+ * Note: this function is NOT called at module-load time here because dynamic
+ * import() in test environments needs to be able to import the module and then
+ * call this function to verify its behaviour. Callers in production entry points
+ * (e.g. worker.ts, API route handlers) should invoke assertServerSide() at
+ * their own module load.
+ */
+export function assertServerSide(): void {
+  if (typeof window !== 'undefined') {
+    throw new Error(
+      'supabase-admin.ts must NOT be imported from browser/client code; ' +
+        'service-role keys are server-side only (CLAUDE.md secrets rule 3). ' +
+        'For client-side Supabase access use supabase-browser with the founder JWT.',
+    );
+  }
+}
+
 let _client: SupabaseClient | null = null;
 
 export function getSupabaseAdmin(): SupabaseClient {
@@ -32,8 +54,8 @@ export function getSupabaseAdmin(): SupabaseClient {
   return _client;
 }
 
-// Convenience helper for the activity_log "scene-by-scene" write pattern
-// (CLAUDE.md gotcha #11). Every state transition writes here BEFORE side-effects.
+// activity_log writer — best-effort per CLAUDE.md gotcha #11.
+// Caller may pass a Supabase client (worker uses its own; routes use getSupabaseAdmin()).
 export interface ActivityLogInput {
   eventType: string;
   actor: 'customer' | 'founder' | 'system' | 'webhook';
@@ -43,9 +65,25 @@ export interface ActivityLogInput {
   payload?: Record<string, unknown>;
 }
 
-export async function writeActivityLog(_input: ActivityLogInput): Promise<void> {
-  // TODO(Operscale): implement
-  //   const sb = getSupabaseAdmin();
-  //   await sb.from('activity_log').insert({ ... })
-  throw new Error('writeActivityLog not implemented');
+export async function writeActivityLog(
+  input: ActivityLogInput,
+  client?: SupabaseClient,
+): Promise<void> {
+  const sb = client ?? getSupabaseAdmin();
+  const row = {
+    event_type: input.eventType,
+    actor: input.actor,
+    customer_id: input.customerId ?? null,
+    brief_id: input.briefId ?? null,
+    order_id: input.orderId ?? null,
+    payload: input.payload ?? {},
+  };
+  // Best-effort: do not throw if the insert fails. The orchestrator's try/finally
+  // calls this from a finally block; throwing would mask the real error.
+  const { error } = await sb.from('activity_log').insert(row);
+  if (error) {
+    // Swallow — the caller handles the primary path; activity_log is observability.
+    // We deliberately don't even rethrow.
+    void error;
+  }
 }
