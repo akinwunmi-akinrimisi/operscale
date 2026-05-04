@@ -63,6 +63,62 @@ export function renderLayer1(): string {
 // ─── Layer 2 — Customer corpus (ai-brief-analysis.md §3.2) ──────────────────
 // Photos and brand logo enter as image blocks at message-assembly time
 // (buildPromptMessages). This function returns only the text portion.
+export function renderLayer2Text(input: BriefAnalyzerInput, nicheBriefMarkdown: string): string {
+  return `# CUSTOMER CORPUS
+
+## Form payload
+
+The customer submitted this form on ${input.submitted_at_iso} (WAT).
+
+### Step 1 — Who they are
+- Brand name: ${input.brand_name}
+- Owner name: ${input.owner_name}
+- WhatsApp: ${input.phone_e164}
+- Email: ${input.email}
+
+### Step 2 — Niche and offer
+- Niche: ${input.niche_slug} (${input.niche_label})
+- One-line description: ${input.one_line_description}
+- What they sell: ${input.offer_description}
+- Price point band: ${input.price_point_band}
+
+### Step 3 — Audience
+- Primary audience: ${input.primary_audience_description}
+- Audience age range: ${input.audience_age_range}
+- Audience location: ${input.audience_location}
+- What audience already believes: ${input.audience_belief}
+- What audience needs to believe to buy: ${input.audience_belief_target}
+
+### Step 4 — Brand assets
+- Logo uploaded: ${input.logo_uploaded_yes_no}
+- Brand colours (if stated): ${input.brand_colours}
+- Existing IG handle: ${input.instagram_handle}
+
+### Step 5 — Photos
+- Photos uploaded: ${input.photo_count} (see vision blocks above)
+- Photo consent: ${input.photo_consent_yes_no}
+
+### Step 6 — Voice and references
+- Stated brand voice: ${input.stated_voice}
+- Reference posts (verbatim text and URL-fetched bodies):
+  ${input.reference_posts_block || '(none provided)'}
+- What customer wrote about their backstory (verbatim, may be empty):
+  ${input.customer_backstory_verbatim || '(empty)'}
+
+### Step 7 — Calendar choice
+- Tier: ${input.tier}
+- Number of videos: ${input.video_count}
+- Number of carousels: ${input.carousel_count}
+
+## Niche brief
+
+The following is the agency's niche brief for ${input.niche_slug}. Use it as authoritative context on
+audience, voice, restricted claims, and topic library — but never substitute it for the customer's
+own stated voice or facts.
+
+${nicheBriefMarkdown}`;
+}
+
 // ─── Layer 3 — Selection inputs (ai-brief-analysis.md §3.3) ─────────────────
 function renderHistoryBlock(seed: FrameworkSeedResult): string {
   if (!seed.lru_fallback_used || !seed.lru_pairs_reused || seed.lru_pairs_reused.length === 0) {
@@ -174,63 +230,4 @@ ${renderExhaustionBlock(seed)}
 ## Re-analysis context
 
 ${renderReanalysisContextBlock(prior)}`;
-}
-
-// ─── Layer 2 — Customer corpus (ai-brief-analysis.md §3.2) ──────────────────
-// Photos and brand logo enter as image blocks at message-assembly time
-// (buildPromptMessages). This function returns only the text portion.
-export function renderLayer2Text(input: BriefAnalyzerInput, nicheBriefMarkdown: string): string {
-  return `# CUSTOMER CORPUS
-
-## Form payload
-
-The customer submitted this form on ${input.submitted_at_iso} (WAT).
-
-### Step 1 — Who they are
-- Brand name: ${input.brand_name}
-- Owner name: ${input.owner_name}
-- WhatsApp: ${input.phone_e164}
-- Email: ${input.email}
-
-### Step 2 — Niche and offer
-- Niche: ${input.niche_slug} (${input.niche_label})
-- One-line description: ${input.one_line_description}
-- What they sell: ${input.offer_description}
-- Price point band: ${input.price_point_band}
-
-### Step 3 — Audience
-- Primary audience: ${input.primary_audience_description}
-- Audience age range: ${input.audience_age_range}
-- Audience location: ${input.audience_location}
-- What audience already believes: ${input.audience_belief}
-- What audience needs to believe to buy: ${input.audience_belief_target}
-
-### Step 4 — Brand assets
-- Logo uploaded: ${input.logo_uploaded_yes_no}
-- Brand colours (if stated): ${input.brand_colours}
-- Existing IG handle: ${input.instagram_handle}
-
-### Step 5 — Photos
-- Photos uploaded: ${input.photo_count} (see vision blocks above)
-- Photo consent: ${input.photo_consent_yes_no}
-
-### Step 6 — Voice and references
-- Stated brand voice: ${input.stated_voice}
-- Reference posts (verbatim text and URL-fetched bodies):
-  ${input.reference_posts_block || '(none provided)'}
-- What customer wrote about their backstory (verbatim, may be empty):
-  ${input.customer_backstory_verbatim || '(empty)'}
-
-### Step 7 — Calendar choice
-- Tier: ${input.tier}
-- Number of videos: ${input.video_count}
-- Number of carousels: ${input.carousel_count}
-
-## Niche brief
-
-The following is the agency's niche brief for ${input.niche_slug}. Use it as authoritative context on
-audience, voice, restricted claims, and topic library — but never substitute it for the customer's
-own stated voice or facts.
-
-${nicheBriefMarkdown}`;
 }
