@@ -147,3 +147,157 @@ describe('renderLayer2Text', () => {
     expect(out).toContain('see vision blocks above');
   });
 });
+
+import { renderLayer3 } from './prompt-builder';
+import type { BankCatalog, FrameworkSeedResult } from './types/v2';
+
+function makeCatalogStub(): BankCatalog {
+  // Minimal catalog with only the two slots used by SAMPLE_SEED below.
+  return {
+    frameworks: {
+      DR_FORMULA: {
+        slot: 'DR_FORMULA',
+        name: 'DR Formula',
+        family: 'Family A — Direct response',
+        markdown: '### 3.1 DR Formula\n\nProblem → Promise → Proof → CTA.\n\nHook style: blunt promise opener.',
+        affinity: { beauty: 'Med', real_estate: 'High', fashion: 'Med', fintech: 'High', health: 'Med', food: 'Med', education: 'Med' },
+      },
+      PAS: {
+        slot: 'PAS',
+        name: 'PAS',
+        family: 'Family A — Direct response',
+        markdown: '### 3.2 PAS\n\nProblem → Agitate → Solution.\n\nHook style: pain-naming opener.',
+        affinity: { beauty: 'Low', real_estate: 'Med', fashion: 'Low', fintech: 'High', health: 'High', food: 'Med', education: 'Low' },
+      },
+    } as BankCatalog['frameworks'],
+    archetypes: {
+      PRICING_BREAKDOWN: {
+        slot: 'PRICING_BREAKDOWN',
+        name: 'Pricing Breakdown',
+        family: 'Family A — Customer-stated facts',
+        markdown: '### 3.1 Pricing Breakdown\n\nWhat goes into the price.',
+        affinity: { beauty: 'Med', real_estate: 'High', fashion: 'High', fintech: 'High', health: 'Med', food: 'Med', education: 'Low' },
+      },
+      PROCESS_TOUR: {
+        slot: 'PROCESS_TOUR',
+        name: 'Process Tour',
+        family: 'Family B — Customer expertise',
+        markdown: '### 4.4 Process Tour\n\nThe steps inside how a thing is made.',
+        affinity: { beauty: 'High', real_estate: 'Med', fashion: 'High', fintech: 'Low', health: 'Med', food: 'High', education: 'Med' },
+      },
+    } as BankCatalog['archetypes'],
+    niches: { fashion: '# fashion', beauty: '# beauty', real_estate: '# re', fintech: '# ft', health: '# h', food: '# f', education: '# e' } as BankCatalog['niches'],
+  };
+}
+
+const SAMPLE_SEED: FrameworkSeedResult = {
+  seed_hash: 'a3f9e2d18c4b7a05',
+  seed_inputs: {
+    customer_id: '11111111-1111-1111-1111-111111111111',
+    niche: 'fashion',
+    order_index: 1,
+    submission_week_iso: '2026-W18',
+  },
+  selected_frameworks: ['DR_FORMULA', 'PAS'],
+  selected_archetypes: ['PRICING_BREAKDOWN', 'PROCESS_TOUR'],
+  selected_pairs: [
+    { framework: 'DR_FORMULA', archetype: 'PRICING_BREAKDOWN', affinity: 9 },
+    { framework: 'PAS', archetype: 'PROCESS_TOUR', affinity: 4 },
+  ],
+  exhaustion_warning: false,
+  lru_fallback_used: false,
+};
+
+describe('renderLayer3', () => {
+  const catalog = makeCatalogStub();
+
+  it('starts with # SELECTION INPUTS', () => {
+    const out = renderLayer3(SAMPLE_BRIEF, SAMPLE_SEED, catalog);
+    expect(out).toContain('# SELECTION INPUTS');
+  });
+
+  it('renders seed_inputs and seed_hash from §3.3', () => {
+    const out = renderLayer3(SAMPLE_BRIEF, SAMPLE_SEED, catalog);
+    expect(out).toContain('customer_id: 11111111-1111-1111-1111-111111111111');
+    expect(out).toContain('niche: fashion');
+    expect(out).toContain('order_index: 1');
+    expect(out).toContain('submission_week_iso: 2026-W18');
+    expect(out).toContain('seed_hash: a3f9e2d18c4b7a05');
+  });
+
+  it('emits N selected frameworks under "Selected frameworks (for this <tier> order)"', () => {
+    const out = renderLayer3(SAMPLE_BRIEF, SAMPLE_SEED, catalog);
+    expect(out).toContain('## Selected frameworks (for this standard order)');
+    expect(out).toContain('You will use these 2 frameworks, no others:');
+    expect(out).toContain('### DR_FORMULA — DR Formula');
+    expect(out).toContain('Problem → Promise → Proof → CTA.');
+    expect(out).toContain('### PAS — PAS');
+  });
+
+  it('emits N selected archetypes under "Selected archetypes (for this <tier> order)"', () => {
+    const out = renderLayer3(SAMPLE_BRIEF, SAMPLE_SEED, catalog);
+    expect(out).toContain('## Selected archetypes (for this standard order)');
+    expect(out).toContain('You will use these 2 archetypes, no others:');
+    expect(out).toContain('### PRICING_BREAKDOWN — Pricing Breakdown');
+    expect(out).toContain('### PROCESS_TOUR — Process Tour');
+  });
+
+  it('renders the pair-assignments table with all selected_pairs', () => {
+    const out = renderLayer3(SAMPLE_BRIEF, SAMPLE_SEED, catalog);
+    expect(out).toContain('## Selected pairs');
+    expect(out).toContain('| slot | framework | archetype | affinity |');
+    expect(out).toContain('|------|-----------|-----------|----------|');
+    expect(out).toContain('|    1 | DR_FORMULA | PRICING_BREAKDOWN | 9 |');
+    expect(out).toContain('|    2 | PAS | PROCESS_TOUR | 4 |');
+  });
+
+  it('renders the customer-history excluded-pairs block (empty when no LRU fallback)', () => {
+    const out = renderLayer3(SAMPLE_BRIEF, SAMPLE_SEED, catalog);
+    expect(out).toContain('## Customer history (repeat customers only)');
+    expect(out).toContain('(no historical pairs to exclude — first-time customer or fresh bank)');
+  });
+
+  it('lists LRU-reused pairs when lru_fallback_used is true', () => {
+    const seedWithLru: FrameworkSeedResult = {
+      ...SAMPLE_SEED,
+      lru_fallback_used: true,
+      lru_pairs_reused: [
+        { framework: 'DR_FORMULA', archetype: 'PRICING_BREAKDOWN', last_used_at: '2026-02-10T00:00:00Z' },
+      ],
+    };
+    const out = renderLayer3(SAMPLE_BRIEF, seedWithLru, catalog);
+    expect(out).toContain('## Customer history (repeat customers only)');
+    expect(out).toContain('DR_FORMULA × PRICING_BREAKDOWN (last used 2026-02-10');
+  });
+
+  it('renders the not-exhausted bank exhaustion message when exhaustion_warning=false', () => {
+    const out = renderLayer3(SAMPLE_BRIEF, SAMPLE_SEED, catalog);
+    expect(out).toContain('## Bank exhaustion flag');
+    expect(out).toContain('Not exhausted. Selection drew from the unused bank for this customer.');
+  });
+
+  it('renders the exhausted-bank instructions when exhaustion_warning=true', () => {
+    const exhaustedSeed: FrameworkSeedResult = { ...SAMPLE_SEED, exhaustion_warning: true, lru_fallback_used: true };
+    const out = renderLayer3(SAMPLE_BRIEF, exhaustedSeed, catalog);
+    expect(out).toContain('EXHAUSTED — this customer has run through the unused bank.');
+    expect(out).toContain("'bank_exhausted_lru_fallback'");
+  });
+
+  it('omits the re-analysis context block when no prior context', () => {
+    const out = renderLayer3(SAMPLE_BRIEF, SAMPLE_SEED, catalog);
+    // Section header still appears, with empty marker
+    expect(out).toContain('## Re-analysis context');
+    expect(out).toContain('(none — this is the initial analysis for this brief)');
+  });
+
+  it('throws when a selected slot is missing from the catalog', () => {
+    const seedWithUnknownSlot: FrameworkSeedResult = {
+      ...SAMPLE_SEED,
+      selected_frameworks: ['DR_FORMULA', 'AIDA'],
+      selected_pairs: [
+        { framework: 'AIDA', archetype: 'PROCESS_TOUR', affinity: 4 },
+      ],
+    };
+    expect(() => renderLayer3(SAMPLE_BRIEF, seedWithUnknownSlot, catalog)).toThrow(/AIDA/);
+  });
+});

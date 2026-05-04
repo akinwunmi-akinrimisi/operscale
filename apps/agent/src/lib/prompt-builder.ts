@@ -63,6 +63,122 @@ export function renderLayer1(): string {
 // ─── Layer 2 — Customer corpus (ai-brief-analysis.md §3.2) ──────────────────
 // Photos and brand logo enter as image blocks at message-assembly time
 // (buildPromptMessages). This function returns only the text portion.
+// ─── Layer 3 — Selection inputs (ai-brief-analysis.md §3.3) ─────────────────
+function renderHistoryBlock(seed: FrameworkSeedResult): string {
+  if (!seed.lru_fallback_used || !seed.lru_pairs_reused || seed.lru_pairs_reused.length === 0) {
+    return '(no historical pairs to exclude — first-time customer or fresh bank)';
+  }
+  return seed.lru_pairs_reused
+    .map((p) => `- ${p.framework} × ${p.archetype} (last used ${p.last_used_at})`)
+    .join('\n');
+}
+
+function renderExhaustionBlock(seed: FrameworkSeedResult): string {
+  if (!seed.exhaustion_warning) {
+    return 'Not exhausted. Selection drew from the unused bank for this customer.';
+  }
+  return [
+    "EXHAUSTED — this customer has run through the unused bank. The selection above",
+    "used least-recently-used pairs as fallback. Flag this for the founder in your",
+    "output's `flags_for_review` field with reason 'bank_exhausted_lru_fallback'.",
+  ].join('\n');
+}
+
+function renderFrameworkExcerpt(slot: string, catalog: BankCatalog): string {
+  const entry = catalog.frameworks[slot as keyof typeof catalog.frameworks];
+  if (!entry) {
+    throw new Error(`renderLayer3: framework slot ${slot} not found in catalog`);
+  }
+  return `### ${entry.slot} — ${entry.name}\n\n${entry.markdown.trim()}`;
+}
+
+function renderArchetypeExcerpt(slot: string, catalog: BankCatalog): string {
+  const entry = catalog.archetypes[slot as keyof typeof catalog.archetypes];
+  if (!entry) {
+    throw new Error(`renderLayer3: archetype slot ${slot} not found in catalog`);
+  }
+  return `### ${entry.slot} — ${entry.name}\n\n${entry.markdown.trim()}`;
+}
+
+function renderPairTable(seed: FrameworkSeedResult): string {
+  const header = '| slot | framework | archetype | affinity |\n|------|-----------|-----------|----------|';
+  const rows = seed.selected_pairs.map(
+    (p, idx) => `| ${String(idx + 1).padStart(4, ' ')} | ${p.framework} | ${p.archetype} | ${p.affinity} |`,
+  );
+  return [header, ...rows].join('\n');
+}
+
+// Forward declaration; full body lands in Task 6.
+export function renderReanalysisContextBlock(prior?: PriorRunContext): string {
+  if (!prior) {
+    return '(none — this is the initial analysis for this brief)';
+  }
+  return '(re-analysis context — implemented in Task 6)';
+}
+
+export function renderLayer3(
+  input: BriefAnalyzerInput,
+  seed: FrameworkSeedResult,
+  catalog: BankCatalog,
+  prior?: PriorRunContext,
+): string {
+  const frameworkExcerpts = seed.selected_frameworks
+    .map((slot) => renderFrameworkExcerpt(slot, catalog))
+    .join('\n\n');
+  const archetypeExcerpts = seed.selected_archetypes
+    .map((slot) => renderArchetypeExcerpt(slot, catalog))
+    .join('\n\n');
+
+  return `# SELECTION INPUTS
+
+## Framework seed
+
+The deterministic seed for this analysis was computed as:
+
+  seed_inputs:
+    customer_id: ${seed.seed_inputs.customer_id}
+    niche: ${seed.seed_inputs.niche}
+    order_index: ${seed.seed_inputs.order_index}
+    submission_week_iso: ${seed.seed_inputs.submission_week_iso}
+  seed_hash: ${seed.seed_hash}
+
+## Selected frameworks (for this ${input.tier} order)
+
+You will use these ${seed.selected_frameworks.length} frameworks, no others:
+
+${frameworkExcerpts}
+
+## Selected archetypes (for this ${input.tier} order)
+
+You will use these ${seed.selected_archetypes.length} archetypes, no others:
+
+${archetypeExcerpts}
+
+## Selected pairs
+
+The deterministic pairing assigns each video slot a (framework, archetype) pair as follows:
+
+${renderPairTable(seed)}
+
+## Customer history (repeat customers only)
+
+The following (framework, archetype) pairs have been delivered to this customer in prior orders
+and are excluded from re-use unless the bank is exhausted:
+
+${renderHistoryBlock(seed)}
+
+## Bank exhaustion flag
+
+${renderExhaustionBlock(seed)}
+
+## Re-analysis context
+
+${renderReanalysisContextBlock(prior)}`;
+}
+
+// ─── Layer 2 — Customer corpus (ai-brief-analysis.md §3.2) ──────────────────
+// Photos and brand logo enter as image blocks at message-assembly time
+// (buildPromptMessages). This function returns only the text portion.
 export function renderLayer2Text(input: BriefAnalyzerInput, nicheBriefMarkdown: string): string {
   return `# CUSTOMER CORPUS
 
