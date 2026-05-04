@@ -20,6 +20,17 @@ if (!existsSync(masterEnvPath)) {
   process.exit(1);
 }
 
+// NODE_OPTIONS is whitespace-tokenised by Node and offers no quoting. A space
+// anywhere in masterEnvPath would silently split --env-file= and the env file
+// would never load — leaving cassette recording to fail later as a confusing
+// auth error. Fail loudly here instead.
+if (/\s/.test(masterEnvPath)) {
+  console.error(`[run-live-tests] masterEnvPath contains whitespace: ${masterEnvPath}`);
+  console.error('[run-live-tests] NODE_OPTIONS cannot quote paths with spaces.');
+  console.error('[run-live-tests] Move the repo to a whitespace-free path and retry.');
+  process.exit(1);
+}
+
 const vitestArgs = ['exec', 'vitest', 'run', 'test/integration', ...process.argv.slice(2)];
 const child = spawn('pnpm', vitestArgs, {
   stdio: 'inherit',
