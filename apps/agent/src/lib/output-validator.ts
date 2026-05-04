@@ -80,3 +80,92 @@ export const aiOutputSchema = z.object({
   fabrication_audit: fabricationAudit,
   flags_for_review: z.array(reviewFlag),
 }) satisfies z.ZodType<AiOutput>;
+
+import {
+  TIER_COUNTS,
+  type FrameworkSeedResult,
+  type Tier,
+  type ValidationFailure,
+} from './types/v2';
+
+export type ValidationResult =
+  | { ok: true; value: AiOutput }
+  | { ok: false; failure: ValidationFailure };
+
+export function validateAiOutput(
+  raw: unknown,
+  seed: FrameworkSeedResult,
+  tier: Tier,
+): ValidationResult {
+  // 1. JSON parse if input is a string.
+  let candidate: unknown = raw;
+  if (typeof raw === 'string') {
+    try {
+      candidate = JSON.parse(raw);
+    } catch (err) {
+      return {
+        ok: false,
+        failure: {
+          reason: 'malformed_json',
+          detail: err instanceof Error ? err.message : String(err),
+        },
+      };
+    }
+  }
+
+  // 2. zod shape validation.
+  const parsed = aiOutputSchema.safeParse(candidate);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      failure: {
+        reason: 'schema_mismatch',
+        detail: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '),
+        zodIssues: parsed.error.issues,
+      },
+    };
+  }
+  const value = parsed.data;
+
+  // 3. Slot count check (video_count + carousel_count must equal calendar_plan.length).
+  const counts = TIER_COUNTS[tier];
+  const expectedSlots = counts.video_count + counts.carousel_count;
+  if (value.calendar_plan.length !== expectedSlots) {
+    return {
+      ok: false,
+      failure: {
+        reason: 'slot_count_mismatch',
+        detail: `tier ${tier} requires ${expectedSlots} slots; got ${value.calendar_plan.length}`,
+        expected: expectedSlots,
+        actual: value.calendar_plan.length,
+      },
+    };
+  }
+
+  // 4. Selection-list membership check.
+  const allowedFrameworks = new Set<string>(seed.selected_frameworks);
+  const allowedArchetypes = new Set<string>(seed.selected_archetypes);
+  const offenders: string[] = [];
+  for (const slot of value.calendar_plan) {
+    if (!allowedFrameworks.has(slot.framework_slot)) {
+      offenders.push(`framework:${slot.framework_slot}`);
+    }
+    if (!allowedArchetypes.has(slot.archetype_slot)) {
+      offenders.push(`archetype:${slot.archetype_slot}`);
+    }
+  }
+  if (offenders.length > 0) {
+    const unique = Array.from(new Set(offenders));
+    return {
+      ok: false,
+      failure: {
+        reason: 'unauthorized_slot',
+        detail: `slots used outside the seed selection: ${unique.join(', ')}`,
+        offenders: unique,
+      },
+    };
+  }
+
+  // Audit-passed=false is a flag for the founder, not a validation failure.
+  return { ok: true, value };
+}
