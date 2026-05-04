@@ -34,13 +34,18 @@ interface EvolutionQRResponse {
   count?: number;
 }
 
-async function fetchState(): Promise<EvolutionConnectionState> {
+function getEvolutionConfig(): { base: string; key: string; inst: string } {
   const base = process.env.EVOLUTION_API_BASE;
   const key = process.env.EVOLUTION_API_KEY;
   const inst = process.env.EVOLUTION_INSTANCE_NAME;
   if (!base || !key || !inst) {
     throw new Error('EVOLUTION_API_BASE / EVOLUTION_API_KEY / EVOLUTION_INSTANCE_NAME not set');
   }
+  return { base, key, inst };
+}
+
+async function fetchState(): Promise<EvolutionConnectionState> {
+  const { base, key, inst } = getEvolutionConfig();
   const r = await fetch(`${base}/instance/connectionState/${inst}`, {
     headers: { apikey: key },
     cache: 'no-store',
@@ -50,9 +55,7 @@ async function fetchState(): Promise<EvolutionConnectionState> {
 }
 
 async function fetchQR(): Promise<EvolutionQRResponse> {
-  const base = process.env.EVOLUTION_API_BASE;
-  const key = process.env.EVOLUTION_API_KEY;
-  const inst = process.env.EVOLUTION_INSTANCE_NAME;
+  const { base, key, inst } = getEvolutionConfig();
   const r = await fetch(`${base}/instance/connect/${inst}`, {
     headers: { apikey: key },
     cache: 'no-store',
