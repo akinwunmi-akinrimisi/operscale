@@ -47,6 +47,7 @@ Each archetype below documents:
 These archetypes use information the customer literally typed into their brief. Highest-trust source; lowest fabrication risk.
 
 ### 3.1 Pricing Breakdown
+<!-- slot: PRICING_BREAKDOWN -->
 
 **What it is.** Take the customer's stated price for their offering and decompose it into cost components.
 
@@ -67,6 +68,7 @@ These archetypes use information the customer literally typed into their brief. 
 **No-fabrication notes.** Use only what customer told us. If customer didn't break down costs in their brief, AI flags this archetype as needing customer input before activation.
 
 ### 3.2 Service Anatomy
+<!-- slot: SERVICE_ANATOMY -->
 
 **What it is.** Decompose the customer's service into its constituent parts. What does engagement actually involve?
 
@@ -87,6 +89,7 @@ These archetypes use information the customer literally typed into their brief. 
 **No-fabrication notes.** Steps come from customer's stated service. Don't invent stages.
 
 ### 3.3 Product Tour
+<!-- slot: PRODUCT_TOUR -->
 
 **What it is.** Walk through what the product is, what it contains, what it does. Closer to a feature-focus than a sales pitch.
 
@@ -107,6 +110,7 @@ These archetypes use information the customer literally typed into their brief. 
 **No-fabrication notes.** Components must be the customer's actual product, not generic versions.
 
 ### 3.4 Tier Comparison
+<!-- slot: TIER_COMPARISON -->
 
 **What it is.** Compare the customer's own pricing tiers, packages, or service levels. Help the audience self-select.
 
@@ -127,6 +131,7 @@ These archetypes use information the customer literally typed into their brief. 
 **No-fabrication notes.** Tier features come from customer's stated structure.
 
 ### 3.5 What You Get
+<!-- slot: WHAT_YOU_GET -->
 
 **What it is.** The complete deliverable list for the customer's offering. Concrete, line-item, "if you sign up tomorrow this is what arrives."
 
@@ -151,6 +156,7 @@ These archetypes use information the customer literally typed into their brief. 
 These archetypes use the customer's *methodology and judgement* — not their personal history. Strong fit for service businesses where the founder's expertise is the offering.
 
 ### 4.1 Insider Checklist
+<!-- slot: INSIDER_CHECKLIST -->
 
 **What it is.** A specific checklist the customer uses in their work, presented as a usable artifact.
 
@@ -171,6 +177,7 @@ These archetypes use the customer's *methodology and judgement* — not their pe
 **No-fabrication notes.** Checklist drawn from customer expertise. Don't generate generic checklists not tied to customer's stated approach.
 
 ### 4.2 Common Mistake
+<!-- slot: COMMON_MISTAKE -->
 
 **What it is.** Identify a mistake the customer has seen in their work — without claiming a specific personal story. Frame as observed pattern.
 
@@ -191,6 +198,7 @@ These archetypes use the customer's *methodology and judgement* — not their pe
 **No-fabrication notes.** Mistakes framed as patterns the customer has *observed*, not as anecdotes about specific named people. "Most beginners do X" ✓. "My client Sarah did X" ✗ (unless customer explicitly provided that anecdote with consent).
 
 ### 4.3 Pre-Decision Audit
+<!-- slot: PRE_DECISION_AUDIT -->
 
 **What it is.** A list of questions or checks the audience should perform before making a decision in the customer's domain.
 
@@ -211,6 +219,7 @@ These archetypes use the customer's *methodology and judgement* — not their pe
 **No-fabrication notes.** Questions must be substantive and drawn from real expertise.
 
 ### 4.4 Process Tour
+<!-- slot: PROCESS_TOUR -->
 
 **What it is.** Walk through how something is done, the customer's way. The focus is the *method*, not the *finished product*.
 
@@ -231,6 +240,7 @@ These archetypes use the customer's *methodology and judgement* — not their pe
 **No-fabrication notes.** Process drawn from customer's actual methodology. If customer didn't describe their process, AI flags this archetype as needing customer input.
 
 ### 4.5 Quality Tells
+<!-- slot: QUALITY_TELLS -->
 
 **What it is.** What separates good work from bad in the customer's category. The signs of competence the audience can spot themselves.
 
@@ -255,6 +265,7 @@ These archetypes use the customer's *methodology and judgement* — not their pe
 These archetypes use general public-domain knowledge of the customer's category. Useful when customer-specific material is thin and we want to ground content in shared reality.
 
 ### 5.1 Decoded Jargon
+<!-- slot: DECODED_JARGON -->
 
 **What it is.** Translate niche jargon into plain language with examples.
 
@@ -275,6 +286,7 @@ These archetypes use general public-domain knowledge of the customer's category.
 **No-fabrication notes.** Definitions must be accurate. AI flags any uncertainty. We don't make up term meanings.
 
 ### 5.2 Industry Pattern
+<!-- slot: INDUSTRY_PATTERN -->
 
 **What it is.** A pattern visible across the industry — how things tend to go, what's typical, what's unusual.
 
@@ -295,6 +307,7 @@ These archetypes use general public-domain knowledge of the customer's category.
 **No-fabrication notes.** Patterns must be defensible — flag anything speculative.
 
 ### 5.3 Category Myth
+<!-- slot: CATEGORY_MYTH -->
 
 **What it is.** A widely-believed claim in the niche that's actually wrong (or at least misleading).
 
@@ -315,6 +328,7 @@ These archetypes use general public-domain knowledge of the customer's category.
 **No-fabrication notes.** Both the myth and the truth must be defensible.
 
 ### 5.4 Market Reality
+<!-- slot: MARKET_REALITY -->
 
 **What it is.** A snapshot of the customer's market — pricing ranges, typical timelines, common conditions. Sets context.
 
@@ -335,6 +349,7 @@ These archetypes use general public-domain knowledge of the customer's category.
 **No-fabrication notes.** Numbers must be cited or verifiably typical. Flag uncertainty.
 
 ### 5.5 Regulatory Snapshot
+<!-- slot: REGULATORY_SNAPSHOT -->
 
 **What it is.** A current-state explanation of regulations or rules affecting the customer's audience.
 
@@ -359,6 +374,7 @@ These archetypes use general public-domain knowledge of the customer's category.
 These archetypes meet the audience where they're hurting. Problem-aware content.
 
 ### 6.1 Symptom Diagnosis
+<!-- slot: SYMPTOM_DIAGNOSIS -->
 
 **What it is.** Help the audience identify whether they have a specific problem they might not have named yet.
 
@@ -379,6 +395,7 @@ These archetypes meet the audience where they're hurting. Problem-aware content.
 **No-fabrication notes.** Symptoms must be observably real, not invented.
 
 ### 6.2 Cost of Inaction
+<!-- slot: COST_OF_INACTION -->
 
 **What it is.** Make the cost of not addressing a problem visible.
 
@@ -399,6 +416,7 @@ These archetypes meet the audience where they're hurting. Problem-aware content.
 **No-fabrication notes.** Numbers grounded in the customer's stated experience or industry data.
 
 ### 6.3 Hidden Trap
+<!-- slot: HIDDEN_TRAP -->
 
 **What it is.** Surface a non-obvious problem the audience might be walking into.
 
@@ -419,6 +437,7 @@ These archetypes meet the audience where they're hurting. Problem-aware content.
 **No-fabrication notes.** The trap must be a real, defensible risk.
 
 ### 6.4 Question Loop
+<!-- slot: QUESTION_LOOP -->
 
 **What it is.** Pose a question the audience has been asking themselves and answer it.
 
@@ -439,6 +458,7 @@ These archetypes meet the audience where they're hurting. Problem-aware content.
 **No-fabrication notes.** "I get this question" must be re-cast as "people ask" or "the question is" unless customer explicitly stated they get the question.
 
 ### 6.5 Decision Framework
+<!-- slot: DECISION_FRAMEWORK -->
 
 **What it is.** A structured way to make a decision in the customer's domain. Hand the audience a tool.
 
@@ -463,6 +483,7 @@ These archetypes meet the audience where they're hurting. Problem-aware content.
 These archetypes show the audience the outcome — what success looks like in the customer's world.
 
 ### 7.1 Outcome Showcase
+<!-- slot: OUTCOME_SHOWCASE -->
 
 **What it is.** Show the result the customer's offering produces. Concrete outcome, not vague promise.
 
@@ -483,6 +504,7 @@ These archetypes show the audience the outcome — what success looks like in th
 **No-fabrication notes.** Outcomes must be real and substantiated. Flag any hyperbolic transformation claims.
 
 ### 7.2 Day-in-the-Output
+<!-- slot: DAY_IN_THE_OUTPUT -->
 
 **What it is.** A typical day for someone using the customer's offering. Not a customer testimonial — a generalised use-case scenario.
 
@@ -503,6 +525,7 @@ These archetypes show the audience the outcome — what success looks like in th
 **No-fabrication notes.** Frame as generalised "what a typical X looks like" — not "Sarah's day". The avatar voice can plausibly say "if you're a busy professional, your day might look like this".
 
 ### 7.3 Quality Moment
+<!-- slot: QUALITY_MOMENT -->
 
 **What it is.** A specific moment of quality in the customer's product/service. The first cut into the cake. The fitting that lands. The line-of-code that finally works. Hyper-specific, sensory, brief.
 
@@ -523,6 +546,7 @@ These archetypes show the audience the outcome — what success looks like in th
 **No-fabrication notes.** Moments drawn from real product/service. T2V can render aspirational moments as long as they represent what the customer actually delivers.
 
 ### 7.4 Use-Case Spotlight
+<!-- slot: USE_CASE_SPOTLIGHT -->
 
 **What it is.** Highlight one specific use case for the customer's offering. Not all use cases — one, in depth.
 
@@ -543,6 +567,7 @@ These archetypes show the audience the outcome — what success looks like in th
 **No-fabrication notes.** Use case must be one the customer actually serves. Don't speculate.
 
 ### 7.5 Adjacent Possibility
+<!-- slot: ADJACENT_POSSIBILITY -->
 
 **What it is.** Open up the audience's thinking to a use of the offering they hadn't considered. Demonstrates the offering's range without overpromising.
 
