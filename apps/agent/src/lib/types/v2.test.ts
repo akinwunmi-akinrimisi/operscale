@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, expectTypeOf } from 'vitest';
 import {
   FRAMEWORK_SLOTS,
   ARCHETYPE_SLOTS,
@@ -60,5 +60,97 @@ describe('V2 canonical types', () => {
   it('FrameworkSlot type narrows to a member of FRAMEWORK_SLOTS', () => {
     const x: FrameworkSlot = 'DR_FORMULA';
     expect(FRAMEWORK_SLOTS).toContain(x);
+  });
+});
+
+import type {
+  PhotoBlock,
+  BriefAnalyzerInput,
+  PriorRunContext,
+  AnalysisEdit,
+  BuiltPrompt,
+} from './v2';
+
+describe('Phase 2 types', () => {
+  it('PhotoBlock has base64 + mediaType + role', () => {
+    const p: PhotoBlock = {
+      role: 'reference',
+      mediaType: 'image/jpeg',
+      base64: 'AAAA',
+    };
+    expectTypeOf(p.role).toEqualTypeOf<'reference' | 'logo'>();
+  });
+
+  it('BriefAnalyzerInput carries the seven form steps + meta', () => {
+    const b: BriefAnalyzerInput = {
+      brief_id: '00000000-0000-0000-0000-000000000000',
+      customer_id: '11111111-1111-1111-1111-111111111111',
+      submitted_at_iso: '2026-05-04T09:00:00Z',
+      submission_week_iso: '2026-W18',
+      order_index: 1,
+      tier: 'standard',
+      niche: 'fashion',
+      niche_label: 'Fashion e-commerce',
+      brand_name: 'Acme Ankara',
+      owner_name: 'Akinwunmi',
+      phone_e164: '+2348165799032',
+      email: 'owner@example.com',
+      one_line_description: 'Custom ankara dresses for Lagos professionals.',
+      offer_description: 'Bespoke ankara womenswear, three-week turnaround.',
+      price_point_band: 'NGN 80k–250k per piece',
+      primary_audience_description: 'Lagos women, 28–45, established professionals.',
+      audience_age_range: '28–45',
+      audience_location: 'Lagos, Abuja',
+      audience_belief: 'Custom takes too long and is unreliable.',
+      audience_belief_target: 'Three-week guaranteed turnaround on bespoke is real.',
+      logo_uploaded_yes_no: 'yes',
+      brand_colours: 'rust, ivory, navy',
+      instagram_handle: '@acmeankara',
+      photo_count: 3,
+      photo_consent_yes_no: 'yes',
+      stated_voice: 'crafted, direct, no-nonsense',
+      reference_posts_block: '',
+      customer_backstory_verbatim: '',
+      video_count: 14,
+      carousel_count: 7,
+    };
+    expectTypeOf(b.tier).toEqualTypeOf<'starter' | 'standard' | 'calendar'>();
+  });
+
+  it('PriorRunContext links prior run + edits + founder note', () => {
+    const p: PriorRunContext = {
+      prior_run_id: '22222222-2222-2222-2222-222222222222',
+      prior_run_index: 1,
+      mode: 'new_frameworks',
+      founder_note: 'The hooks were too generic — push for craft specifics.',
+      edits: [
+        {
+          field_path: 'calendar_plan[0].hook',
+          before: 'Five reasons our pieces last',
+          after: '14 hours of hand-finishing — this is what that looks like',
+        },
+      ],
+    };
+    expectTypeOf(p.mode).toEqualTypeOf<'same_frameworks' | 'new_frameworks'>();
+  });
+
+  it('AnalysisEdit has field_path / before / after', () => {
+    const e: AnalysisEdit = {
+      field_path: 'brand_voice.voice_phrases[0]',
+      before: 'timeless',
+      after: 'crafted',
+    };
+    expectTypeOf(e.field_path).toEqualTypeOf<string>();
+  });
+
+  it('BuiltPrompt holds system + Anthropic-shaped messages', () => {
+    const out: BuiltPrompt = {
+      system: 'system text',
+      messages: [
+        { role: 'user', content: [{ type: 'text', text: 'hi' }] },
+      ],
+    };
+    expectTypeOf(out.system).toEqualTypeOf<string>();
+    expectTypeOf(out.messages).toEqualTypeOf<import('./v2').PromptUserMessage[]>();
   });
 });

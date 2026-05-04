@@ -268,3 +268,100 @@ export interface SupersetOutput extends AiOutput {
   };
   estimated_brief_quality_score: number;             // 0..1 derived from corpus quality + flag count
 }
+
+// ─── Phase 2 types: prompt-builder + cassette test ──────────────────────────
+
+// Vision blocks for the Anthropic call. Worker fetches photo bytes per job
+// claim (design §6.1) and base64-encodes them in memory; prompt-builder is
+// pure and only reads.
+export interface PhotoBlock {
+  role: 'reference' | 'logo';
+  mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+  base64: string;
+}
+
+// The prompt-builder's input contract. Worker projects briefs.form_payload
+// JSONB into this shape (Phase 3); cassette tests pass a fixture directly.
+// Field names mirror ai-brief-analysis.md §3.2 Layer 2 substitution markers.
+export interface BriefAnalyzerInput {
+  brief_id: string;
+  customer_id: string;
+  submitted_at_iso: string;
+  submission_week_iso: string;
+  order_index: number;
+  tier: Tier;
+
+  niche: NicheSlug;
+  niche_label: string;
+
+  // Step 1
+  brand_name: string;
+  owner_name: string;
+  phone_e164: string;
+  email: string;
+
+  // Step 2
+  one_line_description: string;
+  offer_description: string;
+  price_point_band: string;
+
+  // Step 3
+  primary_audience_description: string;
+  audience_age_range: string;
+  audience_location: string;
+  audience_belief: string;
+  audience_belief_target: string;
+
+  // Step 4
+  logo_uploaded_yes_no: 'yes' | 'no';
+  brand_colours: string;
+  instagram_handle: string;
+
+  // Step 5
+  photo_count: number;
+  photo_consent_yes_no: 'yes' | 'no';
+
+  // Step 6
+  stated_voice: string;
+  reference_posts_block: string;            // pre-rendered text+URL bodies, may be empty
+  customer_backstory_verbatim: string;      // empty string when not provided
+
+  // Step 7 — sourced from TIER_COUNTS but echoed here for prompt fidelity
+  video_count: number;
+  carousel_count: number;
+}
+
+// Re-analysis context. Carries the founder's note + the diff of edits the
+// founder applied to the prior run. prompt-builder renders these into Layer 3.
+export interface AnalysisEdit {
+  field_path: string;   // e.g. "calendar_plan[3].hook"
+  before: string;       // value emitted by Claude in the prior run
+  after: string;        // value the founder substituted
+}
+
+export interface PriorRunContext {
+  prior_run_id: string;
+  prior_run_index: number;
+  mode: ReanalyzeMode;
+  founder_note: string;
+  edits: AnalysisEdit[];
+}
+
+// Anthropic-shaped output of buildPromptMessages.
+// We keep our own minimal mirror so tests don't pull SDK types into pure modules.
+export interface PromptTextBlock { type: 'text'; text: string; }
+export interface PromptImageBlock {
+  type: 'image';
+  source: { type: 'base64'; media_type: PhotoBlock['mediaType']; data: string };
+}
+export type PromptUserContentBlock = PromptTextBlock | PromptImageBlock;
+
+export interface PromptUserMessage {
+  role: 'user';
+  content: PromptUserContentBlock[];
+}
+
+export interface BuiltPrompt {
+  system: string;
+  messages: PromptUserMessage[];
+}
