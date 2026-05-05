@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { snapshotToEmailProps, TIER_DISPLAY } from './snapshot-to-email-props';
+import { TIER_PRICES_NGN } from './post-processor';
 import type { SupersetOutput } from './types/v2.js';
 
 const baseAi: SupersetOutput = {
@@ -58,7 +59,7 @@ describe('snapshotToEmailProps', () => {
       recommendedTier: TIER_DISPLAY.calendar.tierName,
       reasoning: 'Audience belief gap is wide; calendar tier gives 30 videos to drill.',
       priceDeltaNgn: 200_000,
-      recommendedTierPriceNgn: TIER_DISPLAY.calendar.priceNgn,
+      recommendedTierPriceNgn: TIER_PRICES_NGN.calendar,
     });
   });
 
@@ -93,7 +94,7 @@ describe('snapshotToEmailProps', () => {
   });
 
   it('maps starter tier counts and price', () => {
-    const props = snapshotToEmailProps({ ai_output: baseAi }, { ...baseOrder, tier: 'starter', amount_ngn: TIER_DISPLAY.starter.priceNgn }, baseCustomer, paymentLink);
+    const props = snapshotToEmailProps({ ai_output: baseAi }, { ...baseOrder, tier: 'starter', amount_ngn: TIER_PRICES_NGN.starter }, baseCustomer, paymentLink);
     expect(props.videoCount).toBe(7);
     expect(props.carouselCount).toBe(3);
     expect(props.tierName).toBe(TIER_DISPLAY.starter.tierName);

@@ -4,11 +4,12 @@
 
 import type { AiOutput, CorpusQuality, NicheSlug, SupersetOutput, Tier } from './types/v2.js';
 
-// docs/pricing-and-packages.md tier prices in NGN.
+// docs/pricing-and-packages.md tier prices in NGN — single source of truth.
+// Starter ₦150k / Standard ₦275k / Calendar ₦525k (last updated 2026-05-03).
 export const TIER_PRICES_NGN: Record<Tier, number> = {
-  starter: 80_000,
-  standard: 200_000,
-  calendar: 400_000,
+  starter: 150_000,
+  standard: 275_000,
+  calendar: 525_000,
 };
 
 const NICHE_LABELS: Record<NicheSlug, string> = {

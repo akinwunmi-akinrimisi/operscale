@@ -9,6 +9,7 @@
 // calendar_plan[0..2], visual_aesthetic, and brand_voice.
 
 import type { SupersetOutput, Tier } from './types/v2.js';
+import { TIER_PRICES_NGN } from './post-processor.js';
 
 export type BriefEmailProps = {
   firstName: string;
@@ -38,7 +39,6 @@ export type BriefEmailProps = {
 
 interface TierDisplay {
   tierName: string;
-  priceNgn: number;
   videoCount: number;
   carouselCount: number;
   ugcCount: number;
@@ -47,13 +47,10 @@ interface TierDisplay {
   deliveryWindow: string;
 }
 
-// Mirrors TIER_COUNTS in types/v2.ts and TIER_PRICES_NGN in post-processor.ts.
-// Co-located here so the email-prop layer has one source for human-readable
-// tier metadata. If a second consumer ever needs these strings, lift them.
+// Display strings only. Prices live in TIER_PRICES_NGN (post-processor.ts) — single source of truth.
 export const TIER_DISPLAY: Record<Tier, TierDisplay> = {
   starter: {
     tierName: 'Starter',
-    priceNgn: 150_000,
     videoCount: 7,
     carouselCount: 3,
     ugcCount: 4,
@@ -63,7 +60,6 @@ export const TIER_DISPLAY: Record<Tier, TierDisplay> = {
   },
   standard: {
     tierName: 'Standard',
-    priceNgn: 350_000,
     videoCount: 14,
     carouselCount: 7,
     ugcCount: 8,
@@ -73,7 +69,6 @@ export const TIER_DISPLAY: Record<Tier, TierDisplay> = {
   },
   calendar: {
     tierName: 'Calendar',
-    priceNgn: 750_000,
     videoCount: 30,
     carouselCount: 14,
     ugcCount: 16,
@@ -114,7 +109,6 @@ export function snapshotToEmailProps(
   const ai = run.ai_output;
   const tierD = TIER_DISPLAY[order.tier];
 
-  // Angles: first 3 calendar slots → marketing-shaped triple.
   const slots = ai.calendar_plan.slice(0, 3);
   const angles = slots.map((slot) => ({
     title: slot.topic,
@@ -122,7 +116,6 @@ export function snapshotToEmailProps(
     whyItFits: slot.core_beats[0] ?? slot.cta,
   }));
 
-  // ScriptSeed: deeper read of slot[0] for the email's "first video" preview.
   const seed = ai.calendar_plan[0]!;
   const scriptSeed = {
     topic: seed.topic,
@@ -130,7 +123,6 @@ export function snapshotToEmailProps(
     outline: seed.core_beats,
   };
 
-  // Visual style: concatenate physical aesthetic; describe caption tone from brand_voice.
   const va = ai.visual_aesthetic;
   const visualStyle = {
     recommendedCameraTreatment: `${va.lighting}; ${va.setting}; ${va.wardrobe_props}`,
@@ -141,14 +133,13 @@ export function snapshotToEmailProps(
     ? { recommendedAvatarTreatment: va.photo_quality_summary }
     : null;
 
-  // Upsell: only render block if we have both a flag AND a recommended tier.
   const ur = ai.upsell_recommendation;
   const upsell = ur.should_upsell && ur.recommended_tier
     ? {
         recommendedTier: TIER_DISPLAY[ur.recommended_tier].tierName,
         reasoning: ur.reasoning,
         priceDeltaNgn: ur.upsell_price_delta,
-        recommendedTierPriceNgn: TIER_DISPLAY[ur.recommended_tier].priceNgn,
+        recommendedTierPriceNgn: TIER_PRICES_NGN[ur.recommended_tier],
       }
     : null;
 
