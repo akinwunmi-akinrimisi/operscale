@@ -41,9 +41,9 @@ This is "observability before automation" per CLAUDE.md: log first, automate lat
 | `apps/agent/src/worker/process-job.test.ts` | Create | End-to-end processing tests with all deps mocked |
 | `apps/agent/test/integration/initial-fashion-tier-2.test.ts` | Modify | Extend to assert orchestrator's mocked Supabase calls (llm_calls insert, history fetch) |
 | `apps/agent/test/smoke/nightly.test.ts` | Create | L3 nightly smoke — calls real Anthropic, no cassette boundary, gated by `SMOKE=1` |
-| `apps/agent/Dockerfile` | Modify | Add `dist/worker.js` to the runner stage so the new compose CMD resolves |
-| `apps/agent/tsconfig.json` | Modify | If needed: emit a `dist/worker.js` build artefact (Next.js builds the Next app; worker is plain TS) |
-| `apps/agent/package.json` | Modify | Add `build:worker` script that compiles `src/worker/index.ts` to `dist/worker.js` |
+| `apps/agent/Dockerfile` | Modify | Add `dist/worker/index.js` to the runner stage so the new compose CMD resolves |
+| `apps/agent/tsconfig.json` | Modify | If needed: emit a `dist/worker/index.js` build artefact (Next.js builds the Next app; worker is plain TS) |
+| `apps/agent/package.json` | Modify | Add `build:worker` script that compiles `src/worker/index.ts` to `dist/worker/index.js` |
 | `.github/workflows/nightly-smoke.yml` | Create | Cron 02:00 UTC; runs `pnpm test:smoke`; opens issue on failure |
 | `docs/deployment.md` | Modify | Document the new `worker` compose service + `worker.env` setup |
 | `docs/security.md` | Modify | Update the 5-sync-points rotation procedure to include the worker container |
@@ -159,7 +159,7 @@ worker:
   container_name: operscale-calendar-worker
   image: operscale-calendar-agent:latest
   restart: unless-stopped
-  command: ["node", "apps/agent/dist/worker.js"]
+  command: ["node", "apps/agent/dist/worker/index.js"]
   env_file: /etc/operscale-calendar/worker.env
   networks:
     - supabase-internal
@@ -194,7 +194,7 @@ Right after the closing of the `agent:` block (before `networks:` at the bottom 
     container_name: operscale-calendar-worker
     image: operscale-calendar-agent:latest
     restart: unless-stopped
-    command: ["node", "apps/agent/dist/worker.js"]
+    command: ["node", "apps/agent/dist/worker/index.js"]
     env_file: /etc/operscale-calendar/worker.env
     networks:
       - supabase-internal
@@ -1961,7 +1961,7 @@ And create `apps/agent/tsconfig.worker.json`:
 }
 ```
 
-This keeps the Next.js build (which uses the main tsconfig) untouched while emitting a plain-Node `dist/worker.js` for the worker container's CMD.
+This keeps the Next.js build (which uses the main tsconfig) untouched while emitting a plain-Node `dist/worker/index.js` for the worker container's CMD.
 
 - [ ] **Step 2: Write the failing test**
 
@@ -2168,7 +2168,7 @@ export function startWorker(deps: WorkerDeps): WorkerHandle {
 // not when imported by tests.
 async function main() {
   const __dirname = new URL('.', import.meta.url).pathname;
-  const repoRoot = `${__dirname}../../../..`; // dist/worker.js → repo root
+  const repoRoot = `${__dirname}../../../..`; // dist/worker/index.js → repo root
   const catalog = await loadBankCatalog({
     nichesDir: `${repoRoot}/niche-briefs`,
     frameworksFile: `${repoRoot}/docs/specs/script-frameworks.md`,
@@ -2253,7 +2253,7 @@ service-role client + Anthropic client + BriefAnalyzer. Three timers:
 poll (5s default), sweep (60s, runs at boot too), heartbeat (30s).
 SIGTERM/SIGINT flip a shuttingDown flag and wait up to 30s for any
 in-flight job before exiting. tsconfig.worker.json emits a plain-Node
-dist/worker.js so the new compose CMD resolves.
+dist/worker/index.js so the new compose CMD resolves.
 
 claim/sweep/process-job are stubbed; Tasks 8, 9, 11 fill them in.
 
@@ -4166,12 +4166,12 @@ the workflow's first cron firing will exit 1 and open a noisy issue.
 
 ---
 
-## Task 15 — Dockerfile: emit `dist/worker.js` in the runner stage
+## Task 15 — Dockerfile: emit `dist/worker/index.js` in the runner stage
 
 **Files:**
 - Modify: `apps/agent/Dockerfile`
 
-The existing Dockerfile builds the Next.js standalone bundle for the agent container. The worker container reuses the same image with a different CMD (`node apps/agent/dist/worker.js`), which means the runner stage needs to:
+The existing Dockerfile builds the Next.js standalone bundle for the agent container. The worker container reuses the same image with a different CMD (`node apps/agent/dist/worker/index.js`), which means the runner stage needs to:
 1. Run `pnpm build:worker` in the builder stage (compiles `src/worker/**` + `src/lib/**` to `dist/`).
 2. Copy `dist/` into the runner stage.
 
@@ -4219,13 +4219,13 @@ The exact placement depends on the existing layout. It must be after the `WORKDI
 docker build -f apps/agent/Dockerfile -t operscale-calendar-agent:phase-3-test . 2>&1 | tail -30
 ```
 
-Expected: build succeeds. To confirm `dist/worker.js` exists in the image:
+Expected: build succeeds. To confirm `dist/worker/index.js` exists in the image:
 
 ```bash
-docker run --rm --entrypoint sh operscale-calendar-agent:phase-3-test -c 'ls apps/agent/dist | head'
+docker run --rm --entrypoint sh operscale-calendar-agent:phase-3-test -c 'ls apps/agent/dist/worker/'
 ```
 
-Expected output includes `worker.js` (the entrypoint that the new compose CMD references). If Docker is not in the local PATH, treat this step as Task-16 work (verified on the VPS).
+Expected output includes `index.js` (the entrypoint that the new compose CMD references). If Docker is not in the local PATH, treat this step as Task-16 work (verified on the VPS).
 
 - [ ] **Step 4: Verify nothing else regresses**
 
@@ -4241,12 +4241,12 @@ Expected: 191 passing, typecheck clean. Dockerfile change doesn't affect tests.
 ```bash
 git add apps/agent/Dockerfile
 git commit -m "$(cat <<'EOF'
-build(agent): Dockerfile emits dist/worker.js for the worker container
+build(agent): Dockerfile emits dist/worker/index.js for the worker container
 
 Builder stage now runs `pnpm build:worker` after `pnpm build`. Runner
 stage COPYs the dist/ output so the new worker compose service can
-resolve `node apps/agent/dist/worker.js` as its CMD. Same image for
-agent + worker; only the CMD differs.
+resolve `node apps/agent/dist/worker/index.js` as its CMD. Same image
+for agent + worker; only the CMD differs.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -4374,7 +4374,7 @@ c.close()
 
 Expected ls output: `-rw------- 1 docker docker ... worker.env`.
 
-- [ ] **Step 5: Rebuild the agent image (which now contains dist/worker.js)**
+- [ ] **Step 5: Rebuild the agent image (which now contains dist/worker/index.js)**
 
 ```bash
 PYTHONIOENCODING=utf-8 python3 -c "
@@ -4574,7 +4574,7 @@ Deliverables:
 - .github/workflows/nightly-smoke.yml + apps/agent/test/smoke/
   nightly.test.ts — L3 nightly smoke against the canonical fixture;
   opens issue on failure; ~$12/mo budget.
-- apps/agent/Dockerfile — emits dist/worker.js for the worker
+- apps/agent/Dockerfile — emits dist/worker/index.js for the worker
   container CMD.
 - VPS deploy: /etc/operscale-calendar/worker.env created (chmod 600),
   worker block appended to /srv/operscale-calendar/docker-compose.yml,

@@ -136,7 +136,7 @@ V2 PHASE 3 (orchestrator + worker): ⏸️ IN PROGRESS — 11 of 17 tasks shippe
         repo secret must be added in GitHub UI before first cron firing.
         Workflow exits 1 + opens a noisy issue on missing key — document
         this in the Task 14 commit body.
-    15. Dockerfile update — emit dist/worker.js in runner stage so the
+    15. Dockerfile update — emit dist/worker/index.js in runner stage so the
         compose service from Task 1 actually finds the binary. Verify
         node dist/worker/index.js boots and errors gracefully on missing
         env (already verified locally during Task 7 fix bundle, but the

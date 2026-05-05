@@ -24,6 +24,7 @@ COPY . .
 WORKDIR /repo/apps/agent
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
+RUN pnpm build:worker
 
 # ---- runner stage: minimal standalone image ------------------------------
 FROM node:20.11-alpine AS runner
@@ -40,6 +41,10 @@ COPY --from=builder --chown=nextjs:nodejs /repo/apps/agent/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /repo/apps/agent/.next/static ./apps/agent/.next/static
 # Agent is API-only — no apps/agent/public directory exists. The COPY line that
 # was here originally was copy-pasted from the web Dockerfile and broke the build.
+
+# Worker artefact (Phase 3): plain-Node output of `pnpm build:worker`.
+# Resolves to apps/agent/dist/worker/index.js — used by the worker compose service CMD.
+COPY --from=builder --chown=nextjs:nodejs /repo/apps/agent/dist ./apps/agent/dist
 
 USER nextjs
 EXPOSE 3002

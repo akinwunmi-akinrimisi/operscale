@@ -10,7 +10,7 @@ worker:
   container_name: operscale-calendar-worker
   image: operscale-calendar-agent:latest
   restart: unless-stopped
-  command: ["node", "apps/agent/dist/worker.js"]
+  command: ["node", "apps/agent/dist/worker/index.js"]
   env_file: /etc/operscale-calendar/worker.env
   networks:
     - supabase-internal

@@ -98,7 +98,7 @@ services:
     # NEXT_PUBLIC_*, ANTHROPIC_API_KEY (read-only routes), no SERVICE_ROLE
   worker:
     image: operscale-calendar-agent:latest
-    command: ["node", "apps/agent/dist/worker.js"]
+    command: ["node", "apps/agent/dist/worker/index.js"]
     env_file: /etc/operscale-calendar/worker.env
     # ANTHROPIC_API_KEY, SUPABASE_SERVICE_ROLE_KEY, no NEXT_PUBLIC_*
     deploy:
@@ -213,7 +213,7 @@ Eleven code units. Eight are pure-logic modules; three are entry points.
 | 6 | `apps/agent/src/lib/fabrication-audit.ts` | Pure | App-side regex sweep over `calendar_plan` strings. Forbidden phrases per `ai-brief-analysis.md` §8. | `auditFabrication(aiOutput, customerBackstory): Violation[]` |
 | 7 | `apps/agent/src/lib/post-processor.ts` | Pure | Derive `brief_summary` (1-2 sentences), `upsell_recommendation`, `estimated_brief_quality_score`. | `postProcess(aiOutput, niche, tier, flags): SupersetOutput` |
 | 8 | `apps/agent/src/lib/claude.ts` | IO orchestrator | The pipeline. Replaces stub. Factory pattern: `createBriefAnalyzer({client, supabase, catalog, logger})`. Steps: select → build → call (with retry) → validate → audit → merge → post-process → return. Writes `llm_calls` in `try/finally`. | `analyzeBrief(input): Promise<AnalyzeBriefResult>` |
-| 9 | `apps/agent/src/worker/index.ts` | IO entry point | Worker process. Bootstrap loads BankCatalog + Supabase service-role client + BriefAnalyzer. Loop claims 1 job via `FOR UPDATE SKIP LOCKED`, runs analyzer, writes results, updates job status. SIGTERM handler finishes current job, no new claim. Bootstrap-sweep reclaims stuck jobs. | `node apps/agent/dist/worker.js` |
+| 9 | `apps/agent/src/worker/index.ts` | IO entry point | Worker process. Bootstrap loads BankCatalog + Supabase service-role client + BriefAnalyzer. Loop claims 1 job via `FOR UPDATE SKIP LOCKED`, runs analyzer, writes results, updates job status. SIGTERM handler finishes current job, no new claim. Bootstrap-sweep reclaims stuck jobs. | `node apps/agent/dist/worker/index.js` |
 | 10 | `apps/agent/src/app/v1/brief/analyze/route.ts` | Thin HTTP | Replaces stub. POST `{brief_id, trigger_type?, founder_note?, prior_run_id?}`. Validate, compute idempotency_key, INSERT `ai_analysis_jobs`, return `202 {job_id, status: 'queued'}`. Doesn't call Claude. | `POST /v1/brief/analyze` |
 | 11 | `apps/agent/src/app/v1/brief/approve/route.ts` | Thin HTTP + transactional DB write | Extends current stub. Adds: read `analysis_runs.framework_seed.selected_pairs`, INSERT N `customer_framework_history` rows in same transaction as `orders.status='founder_approved'`. | `POST /v1/brief/approve` |
 
