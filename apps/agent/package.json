@@ -12,7 +12,8 @@
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:claude:live": "node scripts/run-live-tests.mjs"
+    "test:claude:live": "node scripts/run-live-tests.mjs",
+    "test:smoke": "node scripts/run-smoke-tests.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

@@ -1,0 +1,36 @@
+name: Nightly Claude smoke
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run smoke
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: pnpm --filter @operscale-calendar/agent test:smoke
+      - name: Open issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Nightly smoke failed — ${new Date().toISOString().slice(0, 10)}`,
+              body: `The L3 nightly Claude smoke failed.\n\nWorkflow run: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\nLikely causes:\n- Model drift on Claude Opus 4.7 (output schema or wording change)\n- Rate-limit or 5xx storm at 02:00 UTC\n- Spec change not reflected in the fixture\n\nNext step: read the run logs, decide whether to re-record cassettes (Phase 2 task pattern) or update the spec / orchestrator.`,
+              labels: ['nightly-smoke', 'priority/medium']
+            });
