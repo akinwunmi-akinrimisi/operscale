@@ -216,12 +216,17 @@ describe('snapshotToEmailProps', () => {
 
   it('uses cta as whyItFits fallback when core_beats is empty', () => {
     const ai = { ...baseAi, calendar_plan: [
-      { ...baseAi.calendar_plan[0], core_beats: [] },
+      { ...baseAi.calendar_plan[0]!, core_beats: [] as string[] },
       ...baseAi.calendar_plan.slice(1),
-    ] };
+    ] as typeof baseAi.calendar_plan };
     const props = snapshotToEmailProps({ ai_output: ai }, baseOrder, baseCustomer, paymentLink);
-    expect(props.angles[0].whyItFits).toBe(ai.calendar_plan[0].cta);
+    expect(props.angles[0]!.whyItFits).toBe(ai.calendar_plan[0]!.cta);
   });
+  // Plan-vs-code drift fix: tsconfig.base.json has noUncheckedIndexedAccess:true, so
+  // calendar_plan[0] returns CalendarSlot|undefined. Added non-null assertions (!),
+  // `as string[]` on core_beats:[], and `as typeof baseAi.calendar_plan` cast on the
+  // array so TypeScript accepts the spread as CalendarSlot[]. Vitest runtime is
+  // unaffected — only the type annotations changed.
 
   it('maps starter tier counts and price', () => {
     const props = snapshotToEmailProps({ ai_output: baseAi }, { ...baseOrder, tier: 'starter', amount_ngn: TIER_DISPLAY.starter.priceNgn }, baseCustomer, paymentLink);
