@@ -3,7 +3,10 @@
 // INSERT customer_framework_history rows for each selected_pair → flip
 // orders.status='founder_approved'.
 //
-// Paystack initialise + Resend brief-email send are Phase 4.5 (separate plan).
+// Phase 4.5 scope: after founder_approved, initialise Paystack transaction,
+// render BriefEmail, send via Resend, flip orders.status='brief_sent'.
+// Failure paths: paystack_init_failed → 502 (stays founder_approved);
+// brief_email_failed → 502 + status='brief_email_failed' (retryable).
 //
 // Spec: docs/specs/v2-pipeline-implementation-design.md §3.4 + §9.
 //
@@ -16,8 +19,14 @@
 
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import * as React from 'react';
 import { getSupabaseAdmin, writeActivityLog } from '@/lib/supabase-admin';
 import { verifyJwt } from '@/lib/auth/verify-jwt';
+import { initializeTransaction, paystackReference, PaystackInitError } from '@/lib/paystack';
+import { sendEmail, EmailSendError } from '@/lib/email';
+import { snapshotToEmailProps } from '@/lib/snapshot-to-email-props';
+import { BriefEmail } from '@operscale-calendar/web/emails/BriefEmail';
+import { render } from '@react-email/render';
 
 const BodySchema = z.object({ order_id: z.string().min(1) });
 
@@ -43,7 +52,7 @@ export async function POST(req: Request): Promise<Response> {
 
   const { data: order, error: orderErr } = await supabase
     .from('orders')
-    .select('id, brief_id, customer_id, status')
+    .select('id, brief_id, customer_id, status, tier, amount_ngn')
     .eq('id', parsed.order_id)
     .maybeSingle();
   if (orderErr || !order) {
@@ -59,7 +68,7 @@ export async function POST(req: Request): Promise<Response> {
   // Read the current analysis_runs row for this brief.
   const { data: run, error: runErr } = await supabase
     .from('analysis_runs')
-    .select('id, framework_seed')
+    .select('id, framework_seed, ai_output')
     .eq('brief_id', order.brief_id)
     .eq('is_current', true)
     .maybeSingle();
@@ -92,7 +101,6 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   // Flip order status to founder_approved (added in migration 0007).
-  // Phase 4.5 will subsequently send the brief email and flip to 'brief_sent'.
   await supabase
     .from('orders')
     .update({
@@ -117,8 +125,95 @@ export async function POST(req: Request): Promise<Response> {
     supabase,
   );
 
+  // ─── Phase 4.5: fetch customer ───────────────────────────────────────────
+  const { data: customer, error: custErr } = await supabase
+    .from('customers')
+    .select('full_name, email')
+    .eq('id', order.customer_id)
+    .maybeSingle();
+  if (custErr || !customer || !customer.email) {
+    return NextResponse.json({ error: 'customer_not_found_or_no_email' }, { status: 400 });
+  }
+
+  // ─── Phase 4.5: Paystack initialise ─────────────────────────────────────
+  const txRef = paystackReference(order.id);
+  let paystackResult: Awaited<ReturnType<typeof initializeTransaction>>;
+  try {
+    paystackResult = await initializeTransaction({
+      email: customer.email,
+      amountNgn: order.amount_ngn,
+      reference: txRef,
+      callbackUrl: `https://${process.env.NEXT_PUBLIC_BRAND_DOMAIN ?? 'operscale.cloud'}/payment/return?order_id=${order.id}`,
+      metadata: { order_id: order.id, customer_id: order.customer_id, brief_id: order.brief_id, tier: order.tier },
+    });
+  } catch (e) {
+    const detail = e instanceof PaystackInitError ? e.message : String(e);
+    await writeActivityLog(
+      { eventType: 'paystack_init_failed', actor: 'system', orderId: order.id, briefId: order.brief_id, payload: { error: detail } },
+      supabase,
+    );
+    return NextResponse.json({ error: 'paystack_init_failed', detail }, { status: 502 });
+  }
+
+  await supabase
+    .from('orders')
+    .update({
+      paystack_tx_ref: paystackResult.reference,
+      paystack_authorization: paystackResult,
+      payment_initiated_at: new Date().toISOString(),
+    })
+    .eq('id', order.id);
+
+  // ─── Phase 4.5: Render BriefEmail + send via Resend ─────────────────────
+  const props = snapshotToEmailProps(
+    { ai_output: (run as any).ai_output },
+    { id: order.id, tier: (order as any).tier, amount_ngn: order.amount_ngn, customer_id: order.customer_id, brief_id: order.brief_id },
+    { full_name: customer.full_name, email: customer.email },
+    paystackResult.authorizationUrl,
+  );
+  const subject = `Your ${props.brandName} calendar brief is ready — ${props.tierName}, ${props.videoCount} videos`;
+  const element = React.createElement(BriefEmail as any, props as any);
+  const html = await render(element as any);
+  const text = await render(element as any, { plainText: true });
+
+  let sent: Awaited<ReturnType<typeof sendEmail>>;
+  try {
+    sent = await sendEmail({
+      to: customer.email,
+      templateKey: 'brief-email',
+      subject,
+      html,
+      text,
+      customerId: order.customer_id,
+      briefId: order.brief_id,
+      orderId: order.id,
+    });
+  } catch (e) {
+    const detail = e instanceof EmailSendError ? e.message : String(e);
+    await supabase.from('orders').update({ status: 'brief_email_failed' }).eq('id', order.id);
+    await writeActivityLog(
+      { eventType: 'brief_email_send_failed', actor: 'system', orderId: order.id, briefId: order.brief_id, payload: { error: detail, tx_ref: paystackResult.reference } },
+      supabase,
+    );
+    return NextResponse.json({ error: 'email_send_failed', tx_ref: paystackResult.reference, detail }, { status: 502 });
+  }
+
+  await supabase
+    .from('orders')
+    .update({
+      status: 'brief_sent',
+      brief_email_sent_at: new Date().toISOString(),
+    })
+    .eq('id', order.id);
+
   return NextResponse.json(
-    { order_id: order.id, framework_history_rows_written: historyRows.length },
+    {
+      order_id: order.id,
+      framework_history_rows_written: historyRows.length,
+      paystack_tx_ref: paystackResult.reference,
+      brief_email_sent: true,
+      resend_message_id: sent.resendMessageId,
+    },
     { status: 200 },
   );
 }

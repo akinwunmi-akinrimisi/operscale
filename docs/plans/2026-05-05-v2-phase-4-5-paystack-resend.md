@@ -1429,10 +1429,14 @@ vi.mock('@react-email/render', () => ({
 In the existing `beforeEach`, widen `orderRow` to include the new columns:
 
 ```ts
+// Plan-vs-code drift fix: plan proposed new IDs 'brief-1'/'cust-1' but the
+// existing Phase 4 tests already use UUIDs. We kept the existing IDs and
+// only added the new fields (tier, amount_ngn). The 'resendMessageId = null'
+// variable was also dropped — the var declaration is unused.
 orderRow = {
   id: 'order-1',
-  brief_id: 'brief-1',
-  customer_id: 'cust-1',
+  brief_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  customer_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
   status: 'pending_founder_review',
   tier: 'standard',
   amount_ngn: 350_000,
@@ -1440,7 +1444,6 @@ orderRow = {
 // also reset Phase 4.5 mocks
 paystackInitMock = vi.fn().mockResolvedValue({ authorizationUrl: 'https://checkout.paystack.com/abc', accessCode: 'ac', reference: 'ops-cal-order-1-1714742400' });
 sendEmailMock = vi.fn().mockResolvedValue({ resendMessageId: 'msg-1' });
-resendMessageId = null;
 ```
 
 Add a `customers` table mock branch in the `from` mock so the route can fetch `email` + `full_name`:
@@ -1555,7 +1558,7 @@ describe('Phase 4.5 — Paystack init + Resend send', () => {
       amountNgn: 350_000,
       reference: 'ops-cal-order-1-1714742400',
       callbackUrl: expect.stringContaining('/payment/return?order_id=order-1'),
-      metadata: expect.objectContaining({ order_id: 'order-1', brief_id: 'brief-1' }),
+      metadata: expect.objectContaining({ order_id: 'order-1', brief_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }),
     }));
   });
 
@@ -1647,7 +1650,10 @@ After the existing first orders UPDATE (status='founder_approved'), insert this 
   }).eq('id', order.id);
 
   // ─── Phase 4.5: Render + Resend send ─────────────────────────────────
-  const props = snapshotToEmailProps({ ai_output: run.framework_seed === undefined ? (run as any).ai_output : (run as any).ai_output }, // run already loaded above; widen its select to include ai_output
+  // Plan-vs-code drift fix: the original plan had a dead conditional
+  // `run.framework_seed === undefined ? (run as any).ai_output : (run as any).ai_output`
+  // which always returned the same branch. Simplified to a direct cast.
+  const props = snapshotToEmailProps({ ai_output: (run as any).ai_output },
     { id: order.id, tier: order.tier as any, amount_ngn: order.amount_ngn, customer_id: order.customer_id, brief_id: order.brief_id },
     { full_name: customer.full_name, email: customer.email },
     paystackResult.authorizationUrl,
@@ -1701,18 +1707,28 @@ npm run typecheck
 
 Expected: all 14 tests pass (7 existing + 7 new); typecheck clean.
 
+> **Plan-vs-code drift (tsconfig paths):** `tsc --noEmit` on the agent pulls in
+> `../web/src/emails/BriefEmail.tsx` via the `@operscale-calendar/web/emails/*`
+> path alias. That file in turn imports `@operscale-calendar/agent/lib/...` and
+> `@react-email/render`, neither of which were mapped in the agent tsconfig.
+> Fix: add three entries to `apps/agent/tsconfig.json` `paths`:
+> - `"@operscale-calendar/agent/lib/*": ["./src/lib/*"]` (self-referencing alias so BriefEmail.tsx resolves its agent import)
+> - `"@operscale-calendar/web/emails/*": ["../web/src/emails/*"]`
+> - `"@react-email/render": ["../web/node_modules/@react-email/render/dist/node/index.d.mts"]`
+> This also means `apps/agent/tsconfig.json` is a touched file for this task.
+
 - [ ] **Step 5: Run full suite**
 
 ```bash
 npm test
 ```
 
-Expected: ~232 tests pass (212 from Phase 4 + ~20 new across snapshot-props/paystack/email/route/BriefEmail).
+Expected: 248 tests pass, 3 skipped (nightly smoke intentionally skipped), across 24 test files.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add apps/agent/src/app/v1/brief/approve/route.ts apps/agent/src/app/v1/brief/approve/route.test.ts
+git add apps/agent/src/app/v1/brief/approve/route.ts apps/agent/src/app/v1/brief/approve/route.test.ts apps/agent/tsconfig.json
 git commit -m "feat(agent): /v1/brief/approve calls Paystack initialise + sends brief email
 
 Phase 4.5 forward path. After Phase 4 history write + founder_approved
