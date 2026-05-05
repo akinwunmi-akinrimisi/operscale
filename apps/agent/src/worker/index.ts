@@ -17,20 +17,9 @@ import { createBriefAnalyzer, type BriefAnalyzer } from '../lib/claude.js';
 import { getSupabaseAdmin, writeActivityLog } from '../lib/supabase-admin.js';
 
 import { sweepStuckJobs as sweepStuckJobsImpl } from './sweep.js';
+import { claimNextJob as claimNextJobImpl, type ClaimedJob } from './claim.js';
 
-// Task 7 stubs — Tasks 9, 11 replace with real impls in their own files.
-type ClaimedJob = {
-  id: string;
-  brief_id: string;
-  trigger_type: 'initial' | 're_analyze_same_frameworks' | 're_analyze_new_frameworks';
-  founder_note: string | null;
-  prior_run_id: string | null;
-  attempt_count: number;
-  idempotency_key: string;
-  enqueued_at: string;
-  started_at: string;
-};
-const claimNextJobImpl = async (_sb: SupabaseClient): Promise<ClaimedJob | null> => null;
+// Task 11 stub — replaces with real impl in its own file.
 const processJob = async (_args: any): Promise<void> => {};
 
 export interface WorkerHandle {

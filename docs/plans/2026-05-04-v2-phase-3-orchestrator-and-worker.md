@@ -2638,7 +2638,12 @@ export async function claimNextJob(supabase: SupabaseClient): Promise<ClaimedJob
     .order('enqueued_at', { ascending: true })
     .limit(1)
     .maybeSingle();
-  if (selectErr || !queued) return null;
+  // Throw on error (no-shortcut discipline — surface DB failures rather than silently returning null).
+  // Return null only when the queue is genuinely empty.
+  if (selectErr) {
+    throw new Error(`claimNextJob: queue peek failed: ${selectErr.message}`);
+  }
+  if (!queued) return null;
 
   // Step 2: conditional UPDATE — only succeeds if status is still queued.
   const nowIso = new Date().toISOString();
@@ -2654,7 +2659,11 @@ export async function claimNextJob(supabase: SupabaseClient): Promise<ClaimedJob
     .select('id, brief_id, trigger_type, founder_note, prior_run_id, attempt_count, idempotency_key, enqueued_at, started_at')
     .maybeSingle();
 
-  if (updateErr || !updated) return null;
+  // Throw on error; return null only when race was lost (UPDATE matched 0 rows).
+  if (updateErr) {
+    throw new Error(`claimNextJob: claim update failed: ${updateErr.message}`);
+  }
+  if (!updated) return null;
   return updated as ClaimedJob;
 }
 ```
