@@ -56,7 +56,7 @@ Per the design doc §5, Phase 4.5 transitions `founder_approved → brief_sent` 
 | `apps/web/package.json` | Modify | Add `@react-email/components` + `@react-email/render` deps; add `exports./emails/*` field. |
 | `apps/agent/package.json` | Modify | Add `"@operscale-calendar/web": "workspace:*"` workspace dep. |
 | `apps/agent/src/app/v1/brief/approve/route.ts` | Modify | Extend post-Phase-4 handler with Paystack init + email render+send + status flips. |
-| `apps/agent/src/app/v1/brief/approve/route.test.ts` | Modify | Extend existing 7 tests with 7 new (per design §7.1). |
+| `apps/agent/src/app/v1/brief/approve/route.test.ts` | Modify | Extend existing 7 tests with 8 new (7 per design §7.1 + 1 customer-fetch-fail recovery added in code-review fix 2026-05-05). |
 | `docs/plans/2026-05-05-v2-phase-4-5-paystack-resend.md` | This file | The plan. |
 
 ---
@@ -1624,22 +1624,35 @@ After the existing first orders UPDATE (status='founder_approved'), insert this 
     .eq('id', order.customer_id)
     .maybeSingle();
   if (custErr || !customer || !customer.email) {
-    return NextResponse.json({ error: 'customer_not_found_or_no_email' }, { status: 400 });
+    // Code-review fix (2026-05-05): bare 400 left order stuck at founder_approved with no log.
+    // Now: flip to brief_email_failed + write customer_fetch_failed activity log + return 502.
+    await supabase.from('orders').update({ status: 'brief_email_failed' }).eq('id', order.id);
+    await writeActivityLog(
+      { eventType: 'customer_fetch_failed', actor: 'system', orderId: order.id, briefId: order.brief_id, payload: { error: custErr?.message ?? 'customer_or_email_missing' } },
+      supabase,
+    );
+    return NextResponse.json({ error: 'customer_not_found_or_no_email' }, { status: 502 });
   }
 
-  const txRef = paystackReference(order.id);
+  // Narrow Supabase's untyped Record<string,unknown> to known shapes once here.
+  // tier and amount_ngn are not inferred by supabase-js from the select string.
+  // orderTyped + runTyped used for all Phase 4.5 field access; eliminates as-any.
+  const orderTyped = order as { id: string; brief_id: string; customer_id: string; status: string; tier: import('@/lib/types/v2').Tier; amount_ngn: number };
+  const runTyped = run as { id: string; framework_seed: { selected_pairs: Array<{ framework: string; archetype: string }> }; ai_output: import('@/lib/types/v2').SupersetOutput };
+
+  const txRef = paystackReference(orderTyped.id);
   let paystackResult: Awaited<ReturnType<typeof initializeTransaction>>;
   try {
     paystackResult = await initializeTransaction({
       email: customer.email,
-      amountNgn: order.amount_ngn,
+      amountNgn: orderTyped.amount_ngn,
       reference: txRef,
-      callbackUrl: `https://${process.env.NEXT_PUBLIC_BRAND_DOMAIN ?? 'operscale.cloud'}/payment/return?order_id=${order.id}`,
-      metadata: { order_id: order.id, customer_id: order.customer_id, brief_id: order.brief_id, tier: order.tier },
+      callbackUrl: `https://${process.env.NEXT_PUBLIC_BRAND_DOMAIN ?? 'operscale.cloud'}/payment/return?order_id=${orderTyped.id}`,
+      metadata: { order_id: orderTyped.id, customer_id: orderTyped.customer_id, brief_id: orderTyped.brief_id, tier: orderTyped.tier },
     });
   } catch (e) {
     const detail = e instanceof PaystackInitError ? e.message : String(e);
-    await writeActivityLog({ eventType: 'paystack_init_failed', actor: 'system', orderId: order.id, briefId: order.brief_id, payload: { error: detail } }, supabase);
+    await writeActivityLog({ eventType: 'paystack_init_failed', actor: 'system', orderId: orderTyped.id, briefId: orderTyped.brief_id, payload: { error: detail } }, supabase);
     return NextResponse.json({ error: 'paystack_init_failed', detail }, { status: 502 });
   }
 
@@ -1647,14 +1660,12 @@ After the existing first orders UPDATE (status='founder_approved'), insert this 
     paystack_tx_ref: paystackResult.reference,
     paystack_authorization: paystackResult,
     payment_initiated_at: new Date().toISOString(),
-  }).eq('id', order.id);
+  }).eq('id', orderTyped.id);
 
   // ─── Phase 4.5: Render + Resend send ─────────────────────────────────
-  // Plan-vs-code drift fix: the original plan had a dead conditional
-  // `run.framework_seed === undefined ? (run as any).ai_output : (run as any).ai_output`
-  // which always returned the same branch. Simplified to a direct cast.
-  const props = snapshotToEmailProps({ ai_output: (run as any).ai_output },
-    { id: order.id, tier: order.tier as any, amount_ngn: order.amount_ngn, customer_id: order.customer_id, brief_id: order.brief_id },
+  // Code-review fix (2026-05-05): replaced as-any casts with typed narrowing above.
+  const props = snapshotToEmailProps({ ai_output: runTyped.ai_output },
+    { id: orderTyped.id, tier: orderTyped.tier, amount_ngn: orderTyped.amount_ngn, customer_id: orderTyped.customer_id, brief_id: orderTyped.brief_id },
     { full_name: customer.full_name, email: customer.email },
     paystackResult.authorizationUrl,
   );
@@ -1705,7 +1716,7 @@ npx vitest run src/app/v1/brief/approve/route.test.ts
 npm run typecheck
 ```
 
-Expected: all 14 tests pass (7 existing + 7 new); typecheck clean.
+Expected: all 15 tests pass (7 existing + 7 new + 1 customer-fetch-fail recovery); typecheck clean.
 
 > **Plan-vs-code drift (tsconfig paths):** `tsc --noEmit` on the agent pulls in
 > `../web/src/emails/BriefEmail.tsx` via the `@operscale-calendar/web/emails/*`
@@ -1723,7 +1734,7 @@ Expected: all 14 tests pass (7 existing + 7 new); typecheck clean.
 npm test
 ```
 
-Expected: 248 tests pass, 3 skipped (nightly smoke intentionally skipped), across 24 test files.
+Expected: 249 tests pass, 3 skipped (nightly smoke intentionally skipped), across 24 test files.
 
 - [ ] **Step 6: Commit**
 

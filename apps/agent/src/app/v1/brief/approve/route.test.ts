@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { POST } from './route';
 
 const FOUNDER_TOKEN = (() => {
@@ -11,6 +11,7 @@ let orderRow: any;
 let analysisRunRow: any;
 let frameworkHistoryInserts: any[];
 let orderUpdates: any[];
+let customerRow: any;
 
 // Phase 4.5 mocks
 let paystackInitMock: any;
@@ -74,7 +75,7 @@ vi.mock('@/lib/supabase-admin', () => ({
         return {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              maybeSingle: vi.fn().mockResolvedValue({ data: { full_name: 'Tola Adekunle', email: 'tola@example.com' }, error: null }),
+              maybeSingle: vi.fn().mockImplementation(() => Promise.resolve({ data: customerRow, error: null })),
             }),
           }),
         };
@@ -102,7 +103,7 @@ const baseAiOutput = {
   estimated_brief_quality_score: 0.82,
 };
 
-beforeEach(() => {
+beforeEach(async () => {
   orderRow = {
     id: 'order-1',
     brief_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -126,8 +127,17 @@ beforeEach(() => {
   };
   frameworkHistoryInserts = [];
   orderUpdates = [];
+  customerRow = { full_name: 'Tola Adekunle', email: 'tola@example.com' };
   paystackInitMock = vi.fn().mockResolvedValue({ authorizationUrl: 'https://checkout.paystack.com/abc', accessCode: 'ac', reference: 'ops-cal-order-1-1714742400' });
   sendEmailMock = vi.fn().mockResolvedValue({ resendMessageId: 'msg-1' });
+  vi.clearAllMocks();
+  // Re-initialise mocks after clearAllMocks (clear resets call counts but also
+  // wipes mockImplementation on module-level vi.fn()s — reinstate them).
+  paystackInitMock = vi.fn().mockResolvedValue({ authorizationUrl: 'https://checkout.paystack.com/abc', accessCode: 'ac', reference: 'ops-cal-order-1-1714742400' });
+  sendEmailMock = vi.fn().mockResolvedValue({ resendMessageId: 'msg-1' });
+  // Reinstate the render mock implementation (clearAllMocks strips it).
+  const { render } = await import('@react-email/render');
+  (render as unknown as Mock).mockResolvedValue('<html>brief</html>');
 });
 
 function makeRequest(body: any, token = FOUNDER_TOKEN): Request {
@@ -299,9 +309,24 @@ describe('POST /v1/brief/approve', () => {
       }));
     });
 
+    it('flips order to brief_email_failed when customer fetch fails after founder_approved', async () => {
+      customerRow = null;
+      const req = new Request('http://x/v1/brief/approve', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${FOUNDER_TOKEN}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ order_id: 'order-1' }),
+      });
+      const res = await POST(req);
+      expect(res.status).toBe(502);
+      const json = await res.json();
+      expect(json.error).toBe('customer_not_found_or_no_email');
+      // Verify order was flipped to brief_email_failed
+      const statusUpdates = orderUpdates.map((u: any) => u.row.status).filter(Boolean);
+      expect(statusUpdates).toContain('brief_email_failed');
+      expect(statusUpdates).not.toContain('brief_sent');
+    });
+
     it('passes paymentLink (authorization_url) into the rendered template', async () => {
-      const renderModule = await import('@react-email/render');
-      const renderSpy = renderModule.render as any;
       const req = new Request('http://x/v1/brief/approve', {
         method: 'POST',
         headers: { 'authorization': `Bearer ${FOUNDER_TOKEN}`, 'content-type': 'application/json' },

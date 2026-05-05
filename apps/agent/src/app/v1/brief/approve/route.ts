@@ -132,24 +132,52 @@ export async function POST(req: Request): Promise<Response> {
     .eq('id', order.customer_id)
     .maybeSingle();
   if (custErr || !customer || !customer.email) {
-    return NextResponse.json({ error: 'customer_not_found_or_no_email' }, { status: 400 });
+    await supabase.from('orders').update({ status: 'brief_email_failed' }).eq('id', order.id);
+    await writeActivityLog(
+      {
+        eventType: 'customer_fetch_failed',
+        actor: 'system',
+        orderId: order.id,
+        briefId: order.brief_id,
+        payload: { error: custErr?.message ?? 'customer_or_email_missing' },
+      },
+      supabase,
+    );
+    return NextResponse.json({ error: 'customer_not_found_or_no_email' }, { status: 502 });
   }
 
+  // ─── Phase 4.5: narrow Supabase's untyped Record<string,unknown> to known shapes ──
+  // supabase.from(...).select(...) returns Record<string,unknown> — tier and
+  // amount_ngn are not inferred. Cast once here; no as-any needed downstream.
+  const orderTyped = order as {
+    id: string;
+    brief_id: string;
+    customer_id: string;
+    status: string;
+    tier: import('@/lib/types/v2').Tier;
+    amount_ngn: number;
+  };
+  const runTyped = run as {
+    id: string;
+    framework_seed: { selected_pairs: Array<{ framework: string; archetype: string }> };
+    ai_output: import('@/lib/types/v2').SupersetOutput;
+  };
+
   // ─── Phase 4.5: Paystack initialise ─────────────────────────────────────
-  const txRef = paystackReference(order.id);
+  const txRef = paystackReference(orderTyped.id);
   let paystackResult: Awaited<ReturnType<typeof initializeTransaction>>;
   try {
     paystackResult = await initializeTransaction({
       email: customer.email,
-      amountNgn: order.amount_ngn,
+      amountNgn: orderTyped.amount_ngn,
       reference: txRef,
-      callbackUrl: `https://${process.env.NEXT_PUBLIC_BRAND_DOMAIN ?? 'operscale.cloud'}/payment/return?order_id=${order.id}`,
-      metadata: { order_id: order.id, customer_id: order.customer_id, brief_id: order.brief_id, tier: order.tier },
+      callbackUrl: `https://${process.env.NEXT_PUBLIC_BRAND_DOMAIN ?? 'operscale.cloud'}/payment/return?order_id=${orderTyped.id}`,
+      metadata: { order_id: orderTyped.id, customer_id: orderTyped.customer_id, brief_id: orderTyped.brief_id, tier: orderTyped.tier },
     });
   } catch (e) {
     const detail = e instanceof PaystackInitError ? e.message : String(e);
     await writeActivityLog(
-      { eventType: 'paystack_init_failed', actor: 'system', orderId: order.id, briefId: order.brief_id, payload: { error: detail } },
+      { eventType: 'paystack_init_failed', actor: 'system', orderId: orderTyped.id, briefId: orderTyped.brief_id, payload: { error: detail } },
       supabase,
     );
     return NextResponse.json({ error: 'paystack_init_failed', detail }, { status: 502 });
@@ -162,19 +190,19 @@ export async function POST(req: Request): Promise<Response> {
       paystack_authorization: paystackResult,
       payment_initiated_at: new Date().toISOString(),
     })
-    .eq('id', order.id);
+    .eq('id', orderTyped.id);
 
   // ─── Phase 4.5: Render BriefEmail + send via Resend ─────────────────────
   const props = snapshotToEmailProps(
-    { ai_output: (run as any).ai_output },
-    { id: order.id, tier: (order as any).tier, amount_ngn: order.amount_ngn, customer_id: order.customer_id, brief_id: order.brief_id },
+    { ai_output: runTyped.ai_output },
+    { id: orderTyped.id, tier: orderTyped.tier, amount_ngn: orderTyped.amount_ngn, customer_id: orderTyped.customer_id, brief_id: orderTyped.brief_id },
     { full_name: customer.full_name, email: customer.email },
     paystackResult.authorizationUrl,
   );
   const subject = `Your ${props.brandName} calendar brief is ready — ${props.tierName}, ${props.videoCount} videos`;
-  const element = React.createElement(BriefEmail as any, props as any);
-  const html = await render(element as any);
-  const text = await render(element as any, { plainText: true });
+  const element = React.createElement(BriefEmail, props);
+  const html = await render(element);
+  const text = await render(element, { plainText: true });
 
   let sent: Awaited<ReturnType<typeof sendEmail>>;
   try {
@@ -184,15 +212,15 @@ export async function POST(req: Request): Promise<Response> {
       subject,
       html,
       text,
-      customerId: order.customer_id,
-      briefId: order.brief_id,
-      orderId: order.id,
+      customerId: orderTyped.customer_id,
+      briefId: orderTyped.brief_id,
+      orderId: orderTyped.id,
     });
   } catch (e) {
     const detail = e instanceof EmailSendError ? e.message : String(e);
-    await supabase.from('orders').update({ status: 'brief_email_failed' }).eq('id', order.id);
+    await supabase.from('orders').update({ status: 'brief_email_failed' }).eq('id', orderTyped.id);
     await writeActivityLog(
-      { eventType: 'brief_email_send_failed', actor: 'system', orderId: order.id, briefId: order.brief_id, payload: { error: detail, tx_ref: paystackResult.reference } },
+      { eventType: 'brief_email_send_failed', actor: 'system', orderId: orderTyped.id, briefId: orderTyped.brief_id, payload: { error: detail, tx_ref: paystackResult.reference } },
       supabase,
     );
     return NextResponse.json({ error: 'email_send_failed', tx_ref: paystackResult.reference, detail }, { status: 502 });
@@ -204,11 +232,11 @@ export async function POST(req: Request): Promise<Response> {
       status: 'brief_sent',
       brief_email_sent_at: new Date().toISOString(),
     })
-    .eq('id', order.id);
+    .eq('id', orderTyped.id);
 
   return NextResponse.json(
     {
-      order_id: order.id,
+      order_id: orderTyped.id,
       framework_history_rows_written: historyRows.length,
       paystack_tx_ref: paystackResult.reference,
       brief_email_sent: true,
