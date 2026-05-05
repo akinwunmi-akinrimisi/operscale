@@ -2,7 +2,7 @@
 // brief_summary, upsell_recommendation, estimated_brief_quality_score.
 // Pure; deterministic given inputs.
 
-import type { AiOutput, CorpusQuality, NicheSlug, SupersetOutput, Tier } from './types/v2';
+import type { AiOutput, CorpusQuality, NicheSlug, SupersetOutput, Tier } from './types/v2.js';
 
 // docs/pricing-and-packages.md tier prices in NGN.
 export const TIER_PRICES_NGN: Record<Tier, number> = {

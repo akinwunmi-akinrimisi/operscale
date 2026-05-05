@@ -1,7 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
-import type { ArchetypeEntry, ArchetypeSlot, BankCatalog, FrameworkEntry, FrameworkSlot, NicheSlug, AffinityLevel } from './types/v2';
-import { FRAMEWORK_SLOTS, ARCHETYPE_SLOTS, NICHE_SLUGS } from './types/v2';
+import type { ArchetypeEntry, ArchetypeSlot, BankCatalog, FrameworkEntry, FrameworkSlot, NicheSlug, AffinityLevel } from './types/v2.js';
+import { FRAMEWORK_SLOTS, ARCHETYPE_SLOTS, NICHE_SLUGS } from './types/v2.js';
 
 export class NicheBriefMissingError extends Error {
   constructor(public readonly nicheSlug: string, cause?: unknown) {

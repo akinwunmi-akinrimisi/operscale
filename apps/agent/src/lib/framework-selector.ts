@@ -9,8 +9,8 @@ import type {
   SelectedPair,
   ReanalyzeMode,
   Tier,
-} from './types/v2';
-import { AFFINITY_SCORES, TIER_COUNTS } from './types/v2';
+} from './types/v2.js';
+import { AFFINITY_SCORES, TIER_COUNTS } from './types/v2.js';
 
 /**
  * Deterministic per-customer seed.

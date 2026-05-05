@@ -1931,6 +1931,8 @@ Heartbeat: every 30s, write an `activity_log` row with `event_type='worker_heart
 
 This task lands the bootstrap + SIGTERM + heartbeat in a runnable shape but defers the poll loop body and stuck-job sweep to Tasks 8-9.
 
+**NodeNext compliance note (load-bearing):** `tsconfig.worker.json` uses `module: NodeNext` / `moduleResolution: NodeNext` because the worker is built with TS emit (not the Next.js bundler) and run under Node ESM at runtime. Node ESM requires explicit `.js` extensions on every relative import — bare specifiers like `from './types/v2'` throw `ERR_MODULE_NOT_FOUND` at runtime even if TS compiles them fine under `bundler` resolution. Every file under `src/lib/` and `src/worker/` that gets compiled by `build:worker` MUST use `.js` extensions on relative imports. The Next.js build uses `bundler` resolution and ignores extensions on bare specifiers, so adding `.js` does not break it. Future task implementers: when introducing a new import in `src/lib/` or `src/worker/`, always add `.js`.
+
 - [ ] **Step 1: Add the build:worker npm script**
 
 In `apps/agent/package.json`, add to `scripts`:
@@ -2204,8 +2206,11 @@ async function main() {
   });
 }
 
-// Only run main() when the file is executed directly (not imported).
-const isMainModule = import.meta.url === `file://${process.argv[1]}`;
+// pathToFileURL produces the canonical file:// URL on both Linux and Windows,
+// avoiding the 4-slash bug (file:////app/...) that the hand-rolled regex produced
+// on Linux where process.argv[1] starts with a leading slash.
+import { pathToFileURL } from 'node:url';
+const isMainModule = import.meta.url === pathToFileURL(process.argv[1] ?? '').href;
 if (isMainModule) {
   main().catch((err) => {
     console.error('worker: fatal bootstrap error', err);

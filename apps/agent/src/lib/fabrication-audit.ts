@@ -3,7 +3,7 @@
 // Caller (Phase 3 orchestrator) merges these into
 // fabrication_audit.violations_found post-hoc.
 
-import type { AiOutput, Violation } from './types/v2';
+import type { AiOutput, Violation } from './types/v2.js';
 
 const FORBIDDEN_PATTERNS: Array<{ regex: RegExp; label: string }> = [
   { regex: /my (mum|grandmother|mother|grandma)/i, label: 'family heritage claim' },

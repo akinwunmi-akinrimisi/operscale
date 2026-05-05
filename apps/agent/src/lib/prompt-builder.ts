@@ -12,7 +12,7 @@ import type {
   PriorRunContext,
   PromptUserContentBlock,
   PromptUserMessage,
-} from './types/v2';
+} from './types/v2.js';
 
 // ─── Layer 1 — System framing (ai-brief-analysis.md §3.1) ───────────────────
 const LAYER_1 = `You are a senior content strategist at a Lagos-based SMB content agency. You have eight years

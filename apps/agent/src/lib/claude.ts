@@ -22,12 +22,12 @@ import {
   type SupersetOutput,
   type ValidationFailure,
   type Violation,
-} from './types/v2';
-import { selectFrameworksForBrief, type HistoryRow } from './framework-selector';
-import { buildPromptMessages } from './prompt-builder';
-import { validateAiOutput } from './output-validator';
-import { auditFabrication } from './fabrication-audit';
-import { postProcess } from './post-processor';
+} from './types/v2.js';
+import { selectFrameworksForBrief, type HistoryRow } from './framework-selector.js';
+import { buildPromptMessages } from './prompt-builder.js';
+import { validateAiOutput } from './output-validator.js';
+import { auditFabrication } from './fabrication-audit.js';
+import { postProcess } from './post-processor.js';
 
 export const CLAUDE_MODEL = 'claude-opus-4-7' as const;
 export const MAX_TOKENS = 16384;

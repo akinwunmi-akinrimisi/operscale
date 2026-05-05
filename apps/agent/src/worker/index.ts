@@ -9,6 +9,7 @@
 //   - Heartbeat to activity_log every heartbeatIntervalMs (30s in prod).
 //   - SIGTERM: finish current claim, then exit.
 
+import { pathToFileURL } from 'node:url';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import Anthropic from '@anthropic-ai/sdk';
 import { loadBankCatalog } from '../lib/bank-catalog.js';
@@ -136,11 +137,10 @@ async function main() {
   });
 }
 
-// Use argv[1] comparison that works on Windows too (strip leading slash before drive letter)
-const thisFile = import.meta.url.replace(/^file:\/\/\/([A-Za-z]:)/, 'file:///$1');
-const argvFile = `file:///${process.argv[1]?.replace(/\\/g, '/').replace(/^\/([A-Za-z]:)/, '$1') ?? ''}`;
-const isMainModule = import.meta.url === argvFile || thisFile === argvFile;
-
+// pathToFileURL produces the canonical file:// URL on both Linux and Windows,
+// avoiding the 4-slash bug (file:////app/...) that the hand-rolled regex produced
+// on Linux where process.argv[1] starts with a leading slash.
+const isMainModule = import.meta.url === pathToFileURL(process.argv[1] ?? '').href;
 if (isMainModule) {
   main().catch((err) => {
     console.error('worker: fatal bootstrap error', err);

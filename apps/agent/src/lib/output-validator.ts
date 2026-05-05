@@ -2,7 +2,7 @@
 // Pure: only depends on zod + the AiOutput type.
 
 import { z } from 'zod';
-import { FRAMEWORK_SLOTS, ARCHETYPE_SLOTS, type AiOutput } from './types/v2';
+import { FRAMEWORK_SLOTS, ARCHETYPE_SLOTS, type AiOutput } from './types/v2.js';
 
 const sentenceRhythm = z.enum(['short_punchy', 'mid_length', 'dense']);
 const corpusQuality = z.enum(['thick', 'thin', 'absent']);
@@ -86,7 +86,7 @@ import {
   type FrameworkSeedResult,
   type Tier,
   type ValidationFailure,
-} from './types/v2';
+} from './types/v2.js';
 
 export type ValidationResult =
   | { ok: true; value: AiOutput }
