@@ -2718,6 +2718,8 @@ The Supabase Storage REST has `download(path)` which returns a Blob. Convert to 
 
 The brand logo lives in a separate `customer-logos` bucket per design §3.1. If the brief has a logo, fetch it the same way and return separately as the `logo` PhotoBlock (role='logo').
 
+**Schema check result (2026-05-05):** `briefs.logo_storage_path` and `briefs.logo_mime_type` columns do NOT exist. The step-4 logo upload UI is a TODO comment. Decision: **path (a)** — logo fetching is skipped. `fetchBriefPhotos` always returns `logo: undefined`; the briefs table is not queried. The logo test (test 3) was dropped from photos.test.ts. When migration 0007 adds these columns and the step-4 UI ships, restore the briefs query and the logo test.
+
 - [ ] **Step 1: Write the failing tests**
 
 Create `apps/agent/src/worker/photos.test.ts`:
