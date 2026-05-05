@@ -24,6 +24,17 @@ const nextConfig = {
       bodySizeLimit: '10mb',
     },
   },
+
+  // Worker code in src/lib/ uses NodeNext .js extensions on relative imports
+  // (required at runtime for ESM Node 20). Webpack/turbopack don't resolve
+  // .js → .ts automatically, so without this map a `.js` extension on a
+  // sibling .ts file causes a "Module not found" error at next build.
+  webpack: (config) => {
+    config.resolve.extensionAlias = {
+      '.js': ['.ts', '.tsx', '.js'],
+    };
+    return config;
+  },
 };
 
 export default nextConfig;

@@ -107,7 +107,7 @@ export function snapshotToEmailProps(
   paymentLink: string,
 ): BriefEmailProps {
   const ai = run.ai_output;
-  const tierD = TIER_DISPLAY[order.tier];
+  const tierD = TIER_DISPLAY[order.tier]!;
 
   const slots = ai.calendar_plan.slice(0, 3);
   const angles = slots.map((slot) => ({

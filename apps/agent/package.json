@@ -21,6 +21,8 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
     "@operscale-calendar/web": "workspace:*",
+    "@react-email/components": "^0.0.31",
+    "@react-email/render": "^1.0.3",
     "@supabase/supabase-js": "^2.45.4",
     "next": "15.0.3",
     "pino": "^9.5.0",
