@@ -156,5 +156,11 @@ describe('sendEmail', () => {
     const result = await sendEmail({ ...baseInput, templateKey: 'payment-confirmation' });
     expect(result).toEqual({ resendMessageId: 'pc-msg-1' });
     expect(resendSpy).toHaveBeenCalledTimes(1);
+    expect(activityRows).toHaveLength(1);
+    expect(activityRows[0]).toMatchObject({
+      event_type: 'payment_confirmation_sent',
+      order_id: 'order-1',
+      payload: expect.objectContaining({ resend_message_id: 'pc-msg-1', template_key: 'payment-confirmation' }),
+    });
   });
 });
