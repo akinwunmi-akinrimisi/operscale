@@ -8,8 +8,8 @@
 // that are not first-class on AiOutput. We derive them here from
 // calendar_plan[0..2], visual_aesthetic, and brand_voice.
 
-import type { SupersetOutput, Tier } from '@/lib/types/v2';
-import { TIER_PRICES_NGN } from '@/lib/post-processor';
+import type { SupersetOutput, Tier } from './types/v2';
+import { TIER_PRICES_NGN } from './post-processor';
 
 export type BriefEmailProps = {
   firstName: string;
