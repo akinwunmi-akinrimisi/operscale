@@ -283,3 +283,141 @@ describe('createBriefAnalyzer (re-analysis)', () => {
     }
   });
 });
+
+describe('createBriefAnalyzer (retry policy)', () => {
+  it('retries on a 503 and succeeds on the second attempt', async () => {
+    const catalog = makeMinimalCatalog();
+    const supabase = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: [], error: null }) }),
+        insert: vi.fn().mockResolvedValue({ error: null }),
+      }),
+    };
+    let attempt = 0;
+    const client = {
+      messages: {
+        create: vi.fn().mockImplementation(async (req: any) => {
+          attempt++;
+          if (attempt === 1) {
+            const err: any = new Error('503 service unavailable');
+            err.status = 503;
+            throw err;
+          }
+          const layer3 = req.messages[1]?.content?.[0]?.text ?? '';
+          const fwMatches = [...layer3.matchAll(/### (DR_FORMULA|PAS|AIDA|PAIPS|VALUE_EQUATION)/g)].map((m) => m[1]);
+          const aMatches = [...layer3.matchAll(/### (PRICING_BREAKDOWN|SERVICE_ANATOMY|PRODUCT_TOUR|TIER_COMPARISON|WHAT_YOU_GET)/g)].map((m) => m[1]);
+          const seed = {
+            seed_hash: 'h',
+            seed_inputs: { customer_id: SAMPLE_BRIEF.customer_id, niche: 'fashion', order_index: 1, submission_week_iso: '2026-W18' },
+            selected_frameworks: [...new Set(fwMatches)],
+            selected_archetypes: [...new Set(aMatches)],
+            selected_pairs: [...new Set(fwMatches)].map((f, i) => ({ framework: f, archetype: [...new Set(aMatches)][i % aMatches.length], affinity: 9 })),
+            exhaustion_warning: false,
+            lru_fallback_used: false,
+          } as FrameworkSeedResult;
+          return makeFakeAnthropicResponse(seed, 10);
+        }),
+      },
+    };
+    const logger = { info: vi.fn(), error: vi.fn() };
+    const analyzer = createBriefAnalyzer({ client: client as any, supabase: supabase as any, catalog, logger });
+    const result = await analyzer.analyze({ brief: SAMPLE_BRIEF, photos: [], trigger_type: 'initial' });
+    expect(result.ok).toBe(true);
+    expect(client.messages.create).toHaveBeenCalledTimes(2);
+    if (result.ok) expect(result.telemetry.attempt_count).toBe(2);
+  });
+
+  it('returns reason=claude_5xx_max_retries after 5 consecutive 5xx errors', async () => {
+    const catalog = makeMinimalCatalog();
+    const supabase = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: [], error: null }) }),
+        insert: vi.fn().mockResolvedValue({ error: null }),
+      }),
+    };
+    const client = {
+      messages: {
+        create: vi.fn().mockImplementation(async () => {
+          const err: any = new Error('502 bad gateway');
+          err.status = 502;
+          throw err;
+        }),
+      },
+    };
+    const logger = { info: vi.fn(), error: vi.fn() };
+    const analyzer = createBriefAnalyzer({ client: client as any, supabase: supabase as any, catalog, logger });
+    const result = await analyzer.analyze({ brief: SAMPLE_BRIEF, photos: [], trigger_type: 'initial' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure.reason).toBe('claude_5xx_max_retries');
+    expect(client.messages.create).toHaveBeenCalledTimes(5);
+  }, 60_000);
+
+  it('returns reason=claude_4xx on a non-retryable 400 immediately (no retries)', async () => {
+    const catalog = makeMinimalCatalog();
+    const supabase = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: [], error: null }) }),
+        insert: vi.fn().mockResolvedValue({ error: null }),
+      }),
+    };
+    const client = {
+      messages: {
+        create: vi.fn().mockImplementation(async () => {
+          const err: any = new Error('400 invalid_request_error');
+          err.status = 400;
+          throw err;
+        }),
+      },
+    };
+    const logger = { info: vi.fn(), error: vi.fn() };
+    const analyzer = createBriefAnalyzer({ client: client as any, supabase: supabase as any, catalog, logger });
+    const result = await analyzer.analyze({ brief: SAMPLE_BRIEF, photos: [], trigger_type: 'initial' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure.reason).toBe('claude_4xx');
+    expect(client.messages.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries once on validation_failed with addendum, then accepts on second attempt', async () => {
+    const catalog = makeMinimalCatalog();
+    const supabase = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: [], error: null }) }),
+        insert: vi.fn().mockResolvedValue({ error: null }),
+      }),
+    };
+    let attempt = 0;
+    const observedLayer4Lengths: number[] = [];
+    const client = {
+      messages: {
+        create: vi.fn().mockImplementation(async (req: any) => {
+          attempt++;
+          observedLayer4Lengths.push(req.messages[2]?.content?.[0]?.text?.length ?? 0);
+          const layer3 = req.messages[1]?.content?.[0]?.text ?? '';
+          const fwMatches = [...layer3.matchAll(/### (DR_FORMULA|PAS|AIDA|PAIPS|VALUE_EQUATION)/g)].map((m) => m[1]);
+          const aMatches = [...layer3.matchAll(/### (PRICING_BREAKDOWN|SERVICE_ANATOMY|PRODUCT_TOUR|TIER_COMPARISON|WHAT_YOU_GET)/g)].map((m) => m[1]);
+          const seed = {
+            seed_hash: 'h',
+            seed_inputs: { customer_id: SAMPLE_BRIEF.customer_id, niche: 'fashion', order_index: 1, submission_week_iso: '2026-W18' },
+            selected_frameworks: [...new Set(fwMatches)],
+            selected_archetypes: [...new Set(aMatches)],
+            selected_pairs: [...new Set(fwMatches)].map((f, i) => ({ framework: f, archetype: [...new Set(aMatches)][i % aMatches.length], affinity: 9 })),
+            exhaustion_warning: false,
+            lru_fallback_used: false,
+          } as FrameworkSeedResult;
+          if (attempt === 1) {
+            return { content: [{ type: 'text', text: 'this is not json' }], usage: { input_tokens: 1000, output_tokens: 5 } };
+          }
+          return makeFakeAnthropicResponse(seed, 10);
+        }),
+      },
+    };
+    const logger = { info: vi.fn(), error: vi.fn() };
+    const analyzer = createBriefAnalyzer({ client: client as any, supabase: supabase as any, catalog, logger });
+    const result = await analyzer.analyze({ brief: SAMPLE_BRIEF, photos: [], trigger_type: 'initial' });
+    expect(result.ok).toBe(true);
+    expect(client.messages.create).toHaveBeenCalledTimes(2);
+    expect(observedLayer4Lengths[1]!).toBeGreaterThan(observedLayer4Lengths[0]!);
+    const secondLayer4 = client.messages.create.mock.calls[1][0].messages[2].content[0].text;
+    expect(secondLayer4).toMatch(/previous output was malformed|prior attempt failed validation/i);
+  });
+});

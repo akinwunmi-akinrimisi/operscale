@@ -83,6 +83,30 @@ function estimateCostUsd(inputTokens: number, outputTokens: number): number {
   return (inputTokens / 1_000_000) * COST_INPUT_PER_MTOK + (outputTokens / 1_000_000) * COST_OUTPUT_PER_MTOK;
 }
 
+const MAX_5XX_RETRIES = 5;
+const RETRY_BASE_MS = 500;
+const RETRY_MAX_MS = 8000;
+
+function backoffMs(attempt: number): number {
+  return Math.min(RETRY_BASE_MS * 2 ** (attempt - 1), RETRY_MAX_MS);
+}
+
+function isRetryable(err: unknown): boolean {
+  const status = (err as any)?.status;
+  if (typeof status !== 'number') return true;
+  if (status === 429) return true;
+  return status >= 500 && status < 600;
+}
+
+function isNonRetryable4xx(err: unknown): boolean {
+  const status = (err as any)?.status;
+  return typeof status === 'number' && status >= 400 && status < 500 && status !== 429;
+}
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function fetchHistoryFromSupabase(supabase: SupabaseClient, customer_id: string): Promise<HistoryRow[]> {
   const { data, error } = await supabase
     .from('customer_framework_history')
@@ -152,29 +176,76 @@ export function createBriefAnalyzer(deps: BriefAnalyzerDeps): BriefAnalyzer {
         throw err;
       }
 
-      const response = await deps.client.messages.create({
-        model: CLAUDE_MODEL,
-        max_tokens: MAX_TOKENS,
-        system: built.system,
-        messages: built.messages,
-      });
+      // 3-4. Anthropic call with retry on 5xx + one retry on validation_failed.
+      let response: any;
+      let attemptCount = 0;
+      let validationFailedAddendum: string | null = null;
 
-      const text = extractTextFromResponse(response);
-      const validation = validateAiOutput(text, seed, brief.tier);
-      if (!validation.ok) {
+      callLoop: for (let validationAttempt = 0; validationAttempt < 2; validationAttempt++) {
+        for (let i = 0; i < MAX_5XX_RETRIES; i++) {
+          attemptCount++;
+          const requestMessages = [...built.messages];
+          if (validationFailedAddendum) {
+            const layer4 = requestMessages[2];
+            if (layer4) {
+              const layer4Text = (layer4.content[0] as any).text + '\n\n' + validationFailedAddendum;
+              requestMessages[2] = { role: 'user', content: [{ type: 'text', text: layer4Text }] };
+            }
+          }
+          try {
+            response = await deps.client.messages.create({
+              model: CLAUDE_MODEL,
+              max_tokens: MAX_TOKENS,
+              system: built.system,
+              messages: requestMessages,
+            });
+            break;
+          } catch (err) {
+            if (isNonRetryable4xx(err)) {
+              return { ok: false, failure: { reason: 'claude_4xx', detail: (err as Error).message } };
+            }
+            if (i < MAX_5XX_RETRIES - 1 && isRetryable(err)) {
+              deps.logger.info('claude.analyze: retrying after error', { attempt: i + 1, status: (err as any)?.status });
+              await sleep(backoffMs(i + 1));
+              continue;
+            }
+            return { ok: false, failure: { reason: 'claude_5xx_max_retries', detail: (err as Error).message } };
+          }
+        }
+
+        const text = extractTextFromResponse(response);
+        const validation = validateAiOutput(text, seed, brief.tier);
+        if (validation.ok) {
+          (response as any)._validated = validation.value;
+          break callLoop;
+        }
+
+        if (validationAttempt === 0) {
+          validationFailedAddendum =
+            'IMPORTANT: your previous output was malformed — prior attempt failed validation with reason "' +
+            validation.failure.reason +
+            '" — detail: ' +
+            validation.failure.detail +
+            '. Re-emit the JSON correcting that issue. Do NOT explain the fix; emit only the JSON.';
+          deps.logger.info('claude.analyze: validation failed, retrying once with addendum', { reason: validation.failure.reason });
+          continue callLoop;
+        }
         return { ok: false, failure: { reason: validation.failure.reason, detail: validation.failure.detail } };
       }
 
-      const postHocViolations = auditFabrication(validation.value, brief.customer_backstory_verbatim);
+      const validatedAi: AiOutput | undefined = (response as any)._validated;
+      if (!validatedAi) {
+        return { ok: false, failure: { reason: 'schema_mismatch', detail: 'unexpected: no validated output after retry loop' } };
+      }
+
+      const postHocViolations = auditFabrication(validatedAi, brief.customer_backstory_verbatim);
 
       const mergedAi: AiOutput = {
-        ...validation.value,
+        ...validatedAi,
         fabrication_audit: {
-          ...validation.value.fabrication_audit,
-          violations_found: [...validation.value.fabrication_audit.violations_found, ...postHocViolations],
-          audit_passed:
-            validation.value.fabrication_audit.audit_passed &&
-            postHocViolations.length === 0,
+          ...validatedAi.fabrication_audit,
+          violations_found: [...validatedAi.fabrication_audit.violations_found, ...postHocViolations],
+          audit_passed: validatedAi.fabrication_audit.audit_passed && postHocViolations.length === 0,
         },
       };
 
@@ -192,7 +263,7 @@ export function createBriefAnalyzer(deps: BriefAnalyzerDeps): BriefAnalyzer {
         output_tokens: response.usage?.output_tokens ?? 0,
         cost_usd: estimateCostUsd(response.usage?.input_tokens ?? 0, response.usage?.output_tokens ?? 0),
         duration_ms: Date.now() - start,
-        attempt_count: 1,
+        attempt_count: attemptCount,
       };
 
       return { ok: true, superset, seed, postHocViolations, telemetry };
