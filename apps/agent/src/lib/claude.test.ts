@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { createBriefAnalyzer } from './claude';
 import type { BankCatalog, BriefAnalyzerInput, FrameworkSeedResult } from './types/v2';
 
@@ -151,6 +151,8 @@ describe('createBriefAnalyzer (skeleton)', () => {
       expect(result.superset.calendar_plan).toHaveLength(10);
       expect(result.telemetry.input_tokens).toBe(1000);
       expect(result.telemetry.output_tokens).toBe(500);
+      expect(result.superset.calendar_plan.every(s => typeof s.framework_slot === 'string' && s.framework_slot.length > 0)).toBe(true);
+      expect(result.superset.calendar_plan.every(s => typeof s.archetype_slot === 'string' && s.archetype_slot.length > 0)).toBe(true);
     }
   });
 

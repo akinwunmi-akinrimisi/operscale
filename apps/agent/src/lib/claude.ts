@@ -87,7 +87,10 @@ async function fetchHistoryFromSupabase(supabase: SupabaseClient, customer_id: s
     .from('customer_framework_history')
     .select('framework_slot, archetype_slot, last_used_at')
     .eq('customer_id', customer_id);
-  if (error || !data) return [];
+  if (error) {
+    throw new Error(`customer_framework_history fetch failed: ${error.message}`);
+  }
+  if (!data) return [];
   return data.map((row: any) => ({
     framework: row.framework_slot,
     archetype: row.archetype_slot,
