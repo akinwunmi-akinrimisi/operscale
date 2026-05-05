@@ -1,101 +1,77 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
 import { loadBankCatalog } from '@/lib/bank-catalog';
-import { selectFrameworksForBrief } from '@/lib/framework-selector';
-import { buildPromptMessages } from '@/lib/prompt-builder';
-import { validateAiOutput } from '@/lib/output-validator';
 import { auditFabrication } from '@/lib/fabrication-audit';
 import { postProcess } from '@/lib/post-processor';
+import { createBriefAnalyzer } from '@/lib/claude';
 import { createCassetteClient } from '../helpers/cassette-client';
 import { initialFashionTier2 } from '../fixtures/briefs/initial-fashion-tier-2';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, '../../../..');
 
 const cassettePath = path.resolve(__dirname, '../fixtures/cassettes/initial-fashion-tier-2.json');
 
 describe('L2 integration — initial / fashion / tier-standard', () => {
   let pipelineResult: ReturnType<typeof postProcess>;
-  let validateOk: boolean;
+  let pipelineSeed: any;
+  let pipelineTelemetry: any;
+  let supabaseInserts: any[];
 
   beforeAll(async () => {
-    // Phase 1 setup — load real catalog from repo paths.
-    const catalog = await loadBankCatalog({
-      nichesDir: path.join(REPO_ROOT, 'niche-briefs'),
-      frameworksFile: path.join(REPO_ROOT, 'docs/specs/script-frameworks.md'),
-      archetypesFile: path.join(REPO_ROOT, 'docs/specs/angle-archetypes.md'),
-    });
+    // Load real catalog — auto-detects repoRoot via pnpm-workspace.yaml ascent.
+    const catalog = await loadBankCatalog();
 
-    const seed = await selectFrameworksForBrief({
-      inputs: {
-        customer_id: initialFashionTier2.customer_id,
-        niche: initialFashionTier2.niche_slug,
-        order_index: initialFashionTier2.order_index,
-        submission_week_iso: initialFashionTier2.submission_week_iso,
-      },
-      tier: initialFashionTier2.tier,
-      catalog,
-      fetchHistory: async () => [],
-    });
-
-    const built = buildPromptMessages({
-      brief: initialFashionTier2,
-      seed,
-      catalog,
-      photos: [],
-    });
+    supabaseInserts = [];
+    const supabase: any = {
+      from: vi.fn((table: string) => {
+        if (table === 'customer_framework_history') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          };
+        }
+        return {
+          insert: vi.fn().mockImplementation(async (row: any) => {
+            supabaseInserts.push({ table, row });
+            return { error: null };
+          }),
+        };
+      }),
+    };
 
     // Cassette boundary: replay JSON in CI; record live with CLAUDE_LIVE=1.
     const realClient = process.env.CLAUDE_LIVE === '1'
-      ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+      ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
       : undefined;
     const cassetteClient = createCassetteClient({ cassettePath, realClient });
 
-    // NB: `temperature` is deprecated for Claude Opus 4.7 (the API rejects it
-    // with 400 invalid_request_error). The model uses its built-in default
-    // for output sampling. ai-brief-analysis.md §4 was authored against an
-    // earlier model that accepted temperature; spec is being updated in
-    // lockstep with this code change.
-    const response = await cassetteClient.messages.create({
-      model: 'claude-opus-4-7',
-      // 16384 covers tier-standard's 21-slot output with margin (the original
-      // 8192 truncated tier-standard mid-string at ~20k chars). Calendar tier
-      // (44 slots) may need 24576+; revisit when that cassette is recorded.
-      max_tokens: 16384,
-      system: built.system,
-      messages: built.messages,
+    const analyzer = createBriefAnalyzer({
+      client: cassetteClient as any,
+      supabase,
+      catalog,
+      logger: { info: () => {}, error: () => {} },
     });
 
-    // Phase 2 pipeline.
-    const text =
-      Array.isArray(response.content)
-        ? response.content
-            .filter((b: any) => b.type === 'text')
-            .map((b: any) => b.text)
-            .join('')
-        : '';
-    const validation = validateAiOutput(text, seed, initialFashionTier2.tier);
-    validateOk = validation.ok;
-    if (!validation.ok) {
-      // Surface for assertion clarity — test will fail below.
-      console.error('validation.failure =', validation.failure);
-      throw new Error(`validation failed: ${validation.failure.reason}`);
-    }
-    const postHocViolations = auditFabrication(validation.value, initialFashionTier2.customer_backstory_verbatim);
-    pipelineResult = postProcess({
-      aiOutput: validation.value,
-      niche: initialFashionTier2.niche_slug,
-      tier: initialFashionTier2.tier,
-      hasPhotos: initialFashionTier2.photo_count > 0,
-      reanalyzed: false,
-      postHocViolations: postHocViolations.length,
+    const result = await analyzer.analyze({
+      brief: initialFashionTier2,
+      photos: [],
+      trigger_type: 'initial',
     });
+    if (!result.ok) {
+      console.error('analyzer.failure =', result.failure);
+      throw new Error(`analyzer failed: ${result.failure.reason}`);
+    }
+    pipelineResult = result.superset;
+    pipelineSeed = result.seed;
+    pipelineTelemetry = result.telemetry;
   }, 200_000);
 
-  it('output passes validation', () => {
-    expect(validateOk).toBe(true);
+  it('orchestrator returned ok=true and a populated SupersetOutput', () => {
+    expect(pipelineResult).toBeDefined();
+    expect(pipelineResult.calendar_plan.length).toBeGreaterThan(0);
   });
 
   it('calendar_plan has the tier-standard slot count (14 + 7 = 21)', () => {
@@ -120,5 +96,26 @@ describe('L2 integration — initial / fashion / tier-standard', () => {
   it('the model output respects no-fabrication: backstory verbatim is empty so no fabricated origin lines', () => {
     const violations = auditFabrication(pipelineResult, initialFashionTier2.customer_backstory_verbatim);
     expect(violations).toEqual([]);
+  });
+
+  it('orchestrator inserted exactly one llm_calls row with brief_id + token counts', () => {
+    const llmInserts = supabaseInserts.filter((i: any) => i.table === 'llm_calls');
+    expect(llmInserts).toHaveLength(1);
+    expect(llmInserts[0].row.brief_id).toBe(initialFashionTier2.brief_id);
+    expect(llmInserts[0].row.model).toBe('claude-opus-4-7');
+    expect(llmInserts[0].row.input_tokens).toBeGreaterThan(0);
+    expect(llmInserts[0].row.output_tokens).toBeGreaterThan(0);
+    expect(llmInserts[0].row.cost_usd).toBeGreaterThan(0);
+    expect(llmInserts[0].row.http_status).toBe(200);
+  });
+
+  it('orchestrator telemetry matches the inserted llm_calls row', () => {
+    const llmRow = supabaseInserts.find((i: any) => i.table === 'llm_calls').row;
+    expect(pipelineTelemetry.input_tokens).toBe(llmRow.input_tokens);
+    expect(pipelineTelemetry.output_tokens).toBe(llmRow.output_tokens);
+  });
+
+  it('orchestrator queried customer_framework_history for the customer', () => {
+    expect(pipelineSeed.seed_inputs.customer_id).toBe(initialFashionTier2.customer_id);
   });
 });

@@ -3783,12 +3783,10 @@ Open `apps/agent/test/integration/initial-fashion-tier-2.test.ts`. Replace the b
 
 ```ts
   beforeAll(async () => {
-    // Phase 1 setup — load real catalog from repo paths.
-    const catalog = await loadBankCatalog({
-      nichesDir: path.join(REPO_ROOT, 'niche-briefs'),
-      frameworksFile: path.join(REPO_ROOT, 'docs/specs/script-frameworks.md'),
-      archetypesFile: path.join(REPO_ROOT, 'docs/specs/angle-archetypes.md'),
-    });
+    // Load real catalog — auto-detects repoRoot via pnpm-workspace.yaml ascent.
+    // Real signature: loadBankCatalog(opts?: { repoRoot?: string }) — NOT the old
+    // { nichesDir, frameworksFile, archetypesFile } form from the original plan draft.
+    const catalog = await loadBankCatalog();
 
     // Mocked Supabase tracking the calls the orchestrator makes.
     supabaseInserts = [];
