@@ -191,3 +191,139 @@ describe('processJob (initial trigger)', () => {
     expect(jobUpd[0].row.error_detail.reason).toBe('brief_row_missing');
   });
 });
+
+const SAMPLE_REANALYZE_JOB: ClaimedJob = {
+  ...SAMPLE_JOB,
+  id: 'job-reanalyze',
+  trigger_type: 're_analyze_new_frameworks',
+  founder_note: 'tighten the hooks',
+  prior_run_id: 'prior-run-id',
+};
+
+const PRIOR_RUN_ROW = {
+  id: 'prior-run-id',
+  brief_id: 'brief1',
+  run_index: 1,
+  is_current: true,
+  framework_seed: {
+    seed_hash: 'prior-h',
+    seed_inputs: { customer_id: 'cust1', niche: 'fashion', order_index: 1, submission_week_iso: '2026-W18' },
+    selected_frameworks: ['DR_FORMULA'],
+    selected_archetypes: ['PRICING_BREAKDOWN'],
+    selected_pairs: [{ framework: 'DR_FORMULA', archetype: 'PRICING_BREAKDOWN', affinity: 9 }],
+    exhaustion_warning: false,
+    lru_fallback_used: false,
+  },
+};
+
+function makeFakeSupabaseForReanalyze(briefRow: any, priorRunRow: any) {
+  const inserts: any[] = [];
+  const updates: any[] = [];
+  const supabase: any = {
+    from: vi.fn((table: string) => {
+      if (table === 'briefs') {
+        return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: briefRow, error: null }) }) }) };
+      }
+      if (table === 'brief_photos') {
+        return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: [], error: null }) }) };
+      }
+      if (table === 'analysis_runs') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              maybeSingle: vi.fn().mockResolvedValue({ data: priorRunRow, error: null }),
+            }),
+          }),
+          insert: vi.fn().mockImplementation((row: any) => {
+            inserts.push({ table, row });
+            return { select: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'new-run-id' }, error: null }) }) };
+          }),
+          update: vi.fn().mockImplementation((row: any) => ({
+            eq: vi.fn().mockImplementation(async (col: string, val: any) => {
+              updates.push({ table, row, where: { [col]: val } });
+              return { error: null };
+            }),
+          })),
+        };
+      }
+      if (table === 'analysis_edits') {
+        return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: [], error: null }) }) };
+      }
+      return {
+        insert: vi.fn().mockImplementation(async (row: any) => {
+          inserts.push({ table, row });
+          return { error: null };
+        }),
+        update: vi.fn().mockImplementation((row: any) => ({
+          eq: vi.fn().mockImplementation(async (col: string, val: any) => {
+            updates.push({ table, row, where: { [col]: val } });
+            return { error: null };
+          }),
+        })),
+      };
+    }),
+    storage: { from: vi.fn(() => ({ download: vi.fn() })) },
+    _inserts: () => inserts,
+    _updates: () => updates,
+  };
+  return supabase;
+}
+
+describe('processJob (re-analysis trigger)', () => {
+  it('re_analyze_new_frameworks: reads prior run, calls analyzer with priorSeed + prior context, writes run_index=prior+1', async () => {
+    const sb = makeFakeSupabaseForReanalyze(FAKE_BRIEF_ROW, PRIOR_RUN_ROW);
+    const analyzer = {
+      analyze: vi.fn().mockImplementation(async (input) => {
+        expect(input.trigger_type).toBe('re_analyze_new_frameworks');
+        expect(input.prior).toBeDefined();
+        expect(input.prior.prior_run_id).toBe('prior-run-id');
+        expect(input.prior.prior_run_index).toBe(1);
+        expect(input.prior.mode).toBe('new_frameworks');
+        expect(input.prior.founder_note).toBe('tighten the hooks');
+        expect(input.priorSeed).toBeDefined();
+        expect(input.priorSeed.seed_hash).toBe('prior-h');
+        expect(input.prior_run_index).toBe(2);
+        return makeSuccessAnalyzeResult();
+      }),
+    };
+    await processJob({ job: SAMPLE_REANALYZE_JOB, analyzer: analyzer as any, supabase: sb, logger: { info: vi.fn(), error: vi.fn() } });
+
+    const priorFlips = sb._updates().filter((u: any) => u.table === 'analysis_runs' && u.where.id === 'prior-run-id');
+    expect(priorFlips).toHaveLength(1);
+    expect(priorFlips[0].row.is_current).toBe(false);
+
+    const newRunInserts = sb._inserts().filter((i: any) => i.table === 'analysis_runs');
+    expect(newRunInserts).toHaveLength(1);
+    expect(newRunInserts[0].row.run_index).toBe(2);
+    expect(newRunInserts[0].row.trigger_type).toBe('re_analyze_with_note');
+    expect(newRunInserts[0].row.is_current).toBe(true);
+
+    const jobUpd = sb._updates().filter((u: any) => u.table === 'ai_analysis_jobs');
+    expect(jobUpd[0].row.status).toBe('completed');
+  });
+
+  it('re_analyze_same_frameworks: maps trigger_type and uses mode=same_frameworks', async () => {
+    const job = { ...SAMPLE_REANALYZE_JOB, trigger_type: 're_analyze_same_frameworks' as const };
+    const sb = makeFakeSupabaseForReanalyze(FAKE_BRIEF_ROW, PRIOR_RUN_ROW);
+    let observedInput: any = null;
+    const analyzer = {
+      analyze: vi.fn().mockImplementation(async (input) => {
+        observedInput = input;
+        return makeSuccessAnalyzeResult();
+      }),
+    };
+    await processJob({ job, analyzer: analyzer as any, supabase: sb, logger: { info: vi.fn(), error: vi.fn() } });
+    expect(observedInput.trigger_type).toBe('re_analyze_same_frameworks');
+    expect(observedInput.prior.mode).toBe('same_frameworks');
+  });
+
+  it('marks job failed with reason=prior_run_missing when prior_run_id row does not exist', async () => {
+    const sb = makeFakeSupabaseForReanalyze(FAKE_BRIEF_ROW, null);
+    const analyzer = { analyze: vi.fn() };
+    await processJob({ job: SAMPLE_REANALYZE_JOB, analyzer: analyzer as any, supabase: sb, logger: { info: vi.fn(), error: vi.fn() } });
+    expect(analyzer.analyze).not.toHaveBeenCalled();
+    const jobUpd = sb._updates().filter((u: any) => u.table === 'ai_analysis_jobs');
+    expect(jobUpd[0].row.status).toBe('failed');
+    expect(jobUpd[0].row.error_detail.reason).toBe('prior_run_missing');
+  });
+});

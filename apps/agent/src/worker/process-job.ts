@@ -1,7 +1,7 @@
 // apps/agent/src/worker/process-job.ts
 //
 // End-to-end processing of one claimed ai_analysis_jobs row.
-// design §6.1 (initial). Re-analysis (Task 12) lands later.
+// design §6.1 (initial) + §6.2 (re-analysis, Task 12).
 //
 // Schema adaptation (confirmed via 0001_init_schema.sql):
 //   - briefs has id, customer_id, submitted_at, tier_intent, form_payload (jsonb).
@@ -12,7 +12,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { type BriefAnalyzer, type AnalyzeResult, CLAUDE_MODEL } from '../lib/claude.js';
-import type { BriefAnalyzerInput, PhotoBlock } from '../lib/types/v2.js';
+import type { BriefAnalyzerInput, PhotoBlock, PriorRunContext, FrameworkSeedResult } from '../lib/types/v2.js';
 import { writeActivityLog } from '../lib/supabase-admin.js';
 import { fetchBriefPhotos } from './photos.js';
 import type { ClaimedJob } from './claim.js';
@@ -110,6 +110,43 @@ export async function processJob(args: ProcessJobArgs): Promise<void> {
   }
   const briefInput = projectBriefRowToAnalyzerInput(briefRow);
 
+  // 1b. Re-analysis: load the prior run + its edits to materialise prior + priorSeed.
+  let priorContext: PriorRunContext | undefined;
+  let priorSeed: FrameworkSeedResult | undefined;
+  let priorRunIndex: number | undefined;
+  if (job.trigger_type !== 'initial') {
+    if (!job.prior_run_id) {
+      await failJob(supabase, job.id, job.brief_id, 'prior_run_id_required', `trigger_type=${job.trigger_type} but no prior_run_id`, logger);
+      return;
+    }
+    const { data: priorRow, error: priorErr } = await supabase
+      .from('analysis_runs')
+      .select('id, run_index, framework_seed')
+      .eq('id', job.prior_run_id)
+      .maybeSingle();
+    if (priorErr || !priorRow) {
+      await failJob(supabase, job.id, job.brief_id, 'prior_run_missing', priorErr?.message ?? 'no row', logger);
+      return;
+    }
+    priorRunIndex = priorRow.run_index;
+    priorSeed = priorRow.framework_seed as FrameworkSeedResult;
+
+    // analysis_edits is a Phase-4 surface; for Phase 3 we read empty array gracefully.
+    const { data: edits } = await supabase
+      .from('analysis_edits')
+      .select('field_path, before, after')
+      .eq('analysis_run_id', job.prior_run_id);
+
+    const mode = job.trigger_type === 're_analyze_same_frameworks' ? 'same_frameworks' : 'new_frameworks';
+    priorContext = {
+      prior_run_id: priorRow.id,
+      prior_run_index: priorRow.run_index,
+      mode,
+      founder_note: job.founder_note ?? '',
+      edits: (edits ?? []).map((e: any) => ({ field_path: e.field_path, before: e.before, after: e.after })),
+    };
+  }
+
   // 2. Fetch photos.
   let photos: PhotoBlock[] = [];
   let logo: PhotoBlock | undefined;
@@ -129,7 +166,24 @@ export async function processJob(args: ProcessJobArgs): Promise<void> {
     return;
   }
 
-  // 3. Pre-analyze activity_log.
+  // 3. Pre-analyze activity_log — emit ai_reanalyze_requested first on re-analysis.
+  if (job.trigger_type !== 'initial') {
+    await writeActivityLog(
+      {
+        eventType: 'ai_reanalyze_requested',
+        actor: 'system',
+        briefId: job.brief_id,
+        payload: {
+          job_id: job.id,
+          mode: priorContext?.mode,
+          prior_run_id: job.prior_run_id,
+          founder_note: job.founder_note,
+        },
+      },
+      supabase,
+    );
+  }
+
   await writeActivityLog(
     {
       eventType: 'ai_analysis_started',
@@ -140,12 +194,15 @@ export async function processJob(args: ProcessJobArgs): Promise<void> {
     supabase,
   );
 
-  // 4. Analyze (Phase 3 supports trigger_type='initial' here; Task 12 adds re-analysis).
+  // 4. Analyze — pass trigger_type + prior context through to the orchestrator.
   const result: AnalyzeResult = await analyzer.analyze({
     brief: briefInput,
     photos,
     logo,
-    trigger_type: 'initial',
+    trigger_type: job.trigger_type,
+    prior: priorContext,
+    priorSeed,
+    prior_run_index: priorRunIndex !== undefined ? priorRunIndex + 1 : undefined,
   });
 
   if (!result.ok) {
@@ -153,12 +210,22 @@ export async function processJob(args: ProcessJobArgs): Promise<void> {
     return;
   }
 
-  // 5. INSERT analysis_runs.
+  // 5a. On re-analysis: flip prior run's is_current to false before inserting new row.
+  if (priorContext) {
+    await supabase
+      .from('analysis_runs')
+      .update({ is_current: false })
+      .eq('id', priorContext.prior_run_id);
+  }
+
+  // 5b. INSERT analysis_runs.
   // analysis_runs.model is required (0001 §3.5); analysis_runs.framework_seed added by 0005.
+  const newRunIndex = priorRunIndex !== undefined ? priorRunIndex + 1 : 1;
+  const runTriggerLabel = job.trigger_type === 'initial' ? 'initial' : 're_analyze_with_note';
   const runRow = {
     brief_id: job.brief_id,
-    run_index: 1,
-    trigger_type: 'initial',
+    run_index: newRunIndex,
+    trigger_type: runTriggerLabel,
     is_current: true,
     model: CLAUDE_MODEL,
     framework_seed: result.seed,
