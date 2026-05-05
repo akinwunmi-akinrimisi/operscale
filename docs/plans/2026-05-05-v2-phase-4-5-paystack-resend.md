@@ -888,13 +888,16 @@ describe('sendEmail', () => {
   });
 
   it('throws EmailSendError on Resend 4xx', async () => {
-    resendSpy.mockResolvedValueOnce({ data: null, error: { name: 'validation_error', message: 'Invalid email', statusCode: 400 } });
+    // Real Resend v4 ErrorResponse shape: {name, message} — no statusCode field.
+    // RESEND_STATUS_BY_ERROR_NAME maps 'validation_error' -> 403.
+    resendSpy.mockResolvedValueOnce({ data: null, error: { name: 'validation_error', message: 'Invalid email' } });
     await expect(sendEmail(baseInput)).rejects.toBeInstanceOf(EmailSendError);
   });
 
   it('retries on Resend 5xx and succeeds on second attempt', async () => {
+    // 'application_error' maps to 500 — retried.
     resendSpy
-      .mockResolvedValueOnce({ data: null, error: { name: 'application_error', message: 'upstream', statusCode: 503 } })
+      .mockResolvedValueOnce({ data: null, error: { name: 'application_error', message: 'upstream' } })
       .mockResolvedValueOnce({ data: { id: 'msg-2' }, error: null });
     const promise = sendEmail(baseInput);
     await vi.advanceTimersByTimeAsync(500);
@@ -904,7 +907,8 @@ describe('sendEmail', () => {
   });
 
   it('throws after 3 5xx retries', async () => {
-    resendSpy.mockResolvedValue({ data: null, error: { name: 'application_error', message: 'upstream', statusCode: 503 } });
+    // 'application_error' maps to 500 — retried until exhausted.
+    resendSpy.mockResolvedValue({ data: null, error: { name: 'application_error', message: 'upstream' } });
     // .catch() no-op suppresses the same Vitest unhandled-rejection warning
     // documented in Task 2. Pattern carried forward.
     const promise = sendEmail(baseInput);
@@ -1062,14 +1066,18 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
           { name: 'template', value: input.templateKey },
           ...(input.orderId ? [{ name: 'order_id', value: input.orderId }] : []),
         ],
-      } as any);
+      }); // `as any` removed — html+text satisfy RequireAtLeastOne<EmailRenderOptions>
     } catch (e) {
       lastErr = { status: 0, message: e instanceof Error ? e.message : 'network_error' };
       continue;
     }
     if (response.error) {
-      const status = (response.error as any).statusCode ?? 0;
-      const message = (response.error as any).message ?? 'unknown_resend_error';
+      // RESEND_ERROR_CODES_BY_KEY is NOT exported from resend's compiled JS
+      // bundles (type-only in index.d.ts). Use local RESEND_STATUS_BY_ERROR_NAME
+      // map (Record<string, number>) keyed by error.name to classify 4xx vs 5xx.
+      const name = response.error.name;
+      const status = RESEND_STATUS_BY_ERROR_NAME[name] ?? 0;
+      const message = response.error.message;
       if (status >= 400 && status < 500) {
         throw new EmailSendError({ status, message });
       }

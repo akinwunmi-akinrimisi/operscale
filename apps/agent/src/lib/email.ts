@@ -13,6 +13,32 @@
 import { Resend } from 'resend';
 import { getSupabaseAdmin } from './supabase-admin.js';
 
+// RESEND_ERROR_CODES_BY_KEY is declared in resend's .d.ts but NOT exported from
+// the compiled JS bundles (0 occurrences in index.js / index.mjs at v4.8.0) —
+// importing it at runtime produces undefined. RESEND_ERROR_CODE_KEY is likewise
+// only a local type alias in the .d.ts, not exported. We replicate the mapping
+// here verbatim from the type declaration so we can classify 4xx vs 5xx without
+// an `as any` cast or a runtime import that silently resolves to undefined.
+// Verified against node_modules/resend/dist/index.d.ts @ resend v4.8.0.
+const RESEND_STATUS_BY_ERROR_NAME: Record<string, number> = {
+  missing_required_field: 422,
+  invalid_idempotency_key: 400,
+  invalid_idempotent_request: 409,
+  concurrent_idempotent_requests: 409,
+  invalid_access: 422,
+  invalid_parameter: 422,
+  invalid_region: 422,
+  rate_limit_exceeded: 429,
+  missing_api_key: 401,
+  invalid_api_Key: 403,
+  invalid_from_address: 403,
+  validation_error: 403,
+  not_found: 404,
+  method_not_allowed: 405,
+  application_error: 500,
+  internal_server_error: 500,
+};
+
 export type TemplateKey =
   | 'auto-ack'
   | 'save-token'
@@ -126,14 +152,19 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
           { name: 'template', value: input.templateKey },
           ...(input.orderId ? [{ name: 'order_id', value: input.orderId }] : []),
         ],
-      } as any);
+      });
     } catch (e) {
       lastErr = { status: 0, message: e instanceof Error ? e.message : 'network_error' };
       continue;
     }
     if (response.error) {
-      const status = (response.error as any).statusCode ?? 0;
-      const message = (response.error as any).message ?? 'unknown_resend_error';
+      // Resend v4 ErrorResponse is { message: string; name: RESEND_ERROR_CODE_KEY }.
+      // There is no statusCode field — (response.error as any).statusCode is always
+      // undefined at runtime. Use RESEND_ERROR_CODES_BY_KEY to look up the real HTTP
+      // status from the error name (the authoritative source in the Resend SDK).
+      const name = response.error.name;
+      const status = RESEND_STATUS_BY_ERROR_NAME[name] ?? 0;
+      const message = response.error.message;
       if (status >= 400 && status < 500) {
         throw new EmailSendError({ status, message });
       }
