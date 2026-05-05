@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "noEmit": false,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "target": "ES2022",
+    "skipLibCheck": true,
+    "isolatedModules": false
+  },
+  "include": ["src/worker/**/*", "src/lib/**/*"],
+  "exclude": [
+    "**/*.test.ts",
+    "src/lib/__fixtures__/**",
+    "src/lib/__sanity__/**",
+    "src/lib/webhook-405.ts"
+  ]
+}
