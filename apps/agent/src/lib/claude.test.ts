@@ -472,8 +472,9 @@ describe('createBriefAnalyzer (llm_calls telemetry)', () => {
     expect(row.output_tokens).toBe(500);
     expect(row.cost_usd).toBeGreaterThan(0);
     expect(row.duration_ms).toBeGreaterThanOrEqual(0);
-    expect(row.http_status).toBe(200);
-    expect(row.error_detail).toBeNull();
+    expect(row.status).toBe('ok');
+    expect(row.error_message).toBeNull();
+    expect(row.purpose).toBe('brief_analysis');
   });
 
   it('inserts ONE llm_calls row per attempt — including failed 5xx attempts', async () => {
@@ -524,11 +525,11 @@ describe('createBriefAnalyzer (llm_calls telemetry)', () => {
 
     const llmCallInserts = inserts.filter((i) => i.table === 'llm_calls');
     expect(llmCallInserts).toHaveLength(3);
-    expect(llmCallInserts[0].row.http_status).toBe(503);
-    expect(llmCallInserts[1].row.http_status).toBe(503);
-    expect(llmCallInserts[2].row.http_status).toBe(200);
-    expect(llmCallInserts[0].row.error_detail).toBeTruthy();
-    expect(llmCallInserts[2].row.error_detail).toBeNull();
+    expect(llmCallInserts[0].row.status).toBe('retry');
+    expect(llmCallInserts[1].row.status).toBe('retry');
+    expect(llmCallInserts[2].row.status).toBe('ok');
+    expect(llmCallInserts[0].row.error_message).toBeTruthy();
+    expect(llmCallInserts[2].row.error_message).toBeNull();
   });
 
   it('does NOT throw if llm_calls insert fails (best-effort)', async () => {

@@ -97,9 +97,22 @@ async function main() {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set in worker env');
   const client = new Anthropic({ apiKey });
+  function serialiseArg(a: unknown): unknown {
+    if (a instanceof Error) {
+      return { name: a.name, message: a.message, stack: a.stack };
+    }
+    if (a && typeof a === 'object') {
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(a)) {
+        out[k] = v instanceof Error ? { name: v.name, message: v.message, stack: v.stack } : v;
+      }
+      return out;
+    }
+    return a;
+  }
   const logger = {
-    info: (...a: any[]) => console.log(JSON.stringify({ level: 'info', t: new Date().toISOString(), m: a })),
-    error: (...a: any[]) => console.error(JSON.stringify({ level: 'error', t: new Date().toISOString(), m: a })),
+    info: (...a: any[]) => console.log(JSON.stringify({ level: 'info', t: new Date().toISOString(), m: a.map(serialiseArg) })),
+    error: (...a: any[]) => console.error(JSON.stringify({ level: 'error', t: new Date().toISOString(), m: a.map(serialiseArg) })),
   };
   const analyzer = createBriefAnalyzer({ client, supabase, catalog, logger });
 

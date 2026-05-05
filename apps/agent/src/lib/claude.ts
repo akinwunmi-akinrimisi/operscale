@@ -116,11 +116,12 @@ async function writeLlmCall(
     output_tokens: number;
     cost_usd: number;
     duration_ms: number;
-    http_status: number;
-    error_detail: string | null;
+    status: 'ok' | 'retry' | 'failed';
+    error_message: string | null;
   },
 ): Promise<void> {
   const { error } = await supabase.from('llm_calls').insert({
+    purpose: 'brief_analysis',
     brief_id: args.brief_id,
     analysis_run_id: null,
     model: args.model,
@@ -128,8 +129,8 @@ async function writeLlmCall(
     output_tokens: args.output_tokens,
     cost_usd: args.cost_usd,
     duration_ms: args.duration_ms,
-    http_status: args.http_status,
-    error_detail: args.error_detail,
+    status: args.status,
+    error_message: args.error_message,
   });
   // Best-effort: design §4.3 invariant #9. Swallow but log to stderr so
   // failed cost-telemetry writes still surface in container logs.
@@ -142,7 +143,7 @@ async function writeLlmCall(
 async function fetchHistoryFromSupabase(supabase: SupabaseClient, customer_id: string): Promise<HistoryRow[]> {
   const { data, error } = await supabase
     .from('customer_framework_history')
-    .select('framework_slot, archetype_slot, last_used_at')
+    .select('framework_slot, archetype_slot, used_at')
     .eq('customer_id', customer_id);
   if (error) {
     throw new Error(`customer_framework_history fetch failed: ${error.message}`);
@@ -151,7 +152,7 @@ async function fetchHistoryFromSupabase(supabase: SupabaseClient, customer_id: s
   return data.map((row: any) => ({
     framework: row.framework_slot,
     archetype: row.archetype_slot,
-    last_used_at: row.last_used_at,
+    last_used_at: row.used_at,    // DB column is used_at, in-memory field stays last_used_at
   }));
 }
 
@@ -252,10 +253,10 @@ export function createBriefAnalyzer(deps: BriefAnalyzerDeps): BriefAnalyzer {
                 output_tokens: 0,
                 cost_usd: 0,
                 duration_ms: Date.now() - attemptStart,
-                http_status: attemptStatus,
-                error_detail: attemptError,
+                status: 'failed',
+                error_message: attemptError,
               });
-              deps.logger.error('claude.analyze: non-retryable 4xx', { status: (err as any)?.status, detail: (err as Error).message });
+              deps.logger.error('claude.analyze: non-retryable 4xx', { status: attemptStatus, detail: (err as Error).message });
               return { ok: false, failure: { reason: 'claude_4xx', detail: (err as Error).message } };
             }
             if (i < MAX_5XX_RETRIES - 1 && isRetryable(err)) {
@@ -267,8 +268,8 @@ export function createBriefAnalyzer(deps: BriefAnalyzerDeps): BriefAnalyzer {
                 output_tokens: 0,
                 cost_usd: 0,
                 duration_ms: Date.now() - attemptStart,
-                http_status: attemptStatus,
-                error_detail: attemptError,
+                status: 'retry',
+                error_message: attemptError,
               });
               await sleep(backoffMs(i + 1));
               continue;
@@ -280,8 +281,8 @@ export function createBriefAnalyzer(deps: BriefAnalyzerDeps): BriefAnalyzer {
               output_tokens: 0,
               cost_usd: 0,
               duration_ms: Date.now() - attemptStart,
-              http_status: attemptStatus,
-              error_detail: attemptError,
+              status: 'failed',
+              error_message: attemptError,
             });
             deps.logger.error('claude.analyze: 5xx max retries exhausted', { attempts: attemptCount, detail: (err as Error).message });
             return { ok: false, failure: { reason: 'claude_5xx_max_retries', detail: (err as Error).message } };
@@ -294,8 +295,8 @@ export function createBriefAnalyzer(deps: BriefAnalyzerDeps): BriefAnalyzer {
                 output_tokens: attemptOutputTok,
                 cost_usd: estimateCostUsd(attemptInputTok, attemptOutputTok),
                 duration_ms: Date.now() - attemptStart,
-                http_status: 200,
-                error_detail: null,
+                status: 'ok',
+                error_message: null,
               });
             }
           }

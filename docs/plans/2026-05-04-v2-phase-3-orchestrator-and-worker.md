@@ -838,7 +838,7 @@ function estimateCostUsd(inputTokens: number, outputTokens: number): number {
 async function fetchHistoryFromSupabase(supabase: SupabaseClient, customer_id: string): Promise<HistoryRow[]> {
   const { data, error } = await supabase
     .from('customer_framework_history')
-    .select('framework_slot, archetype_slot, last_used_at')
+    .select('framework_slot, archetype_slot, used_at')
     .eq('customer_id', customer_id);
   if (error) {
     throw new Error(`customer_framework_history fetch failed: ${error.message}`);
@@ -847,7 +847,7 @@ async function fetchHistoryFromSupabase(supabase: SupabaseClient, customer_id: s
   return data.map((row: any) => ({
     framework: row.framework_slot,
     archetype: row.archetype_slot,
-    last_used_at: row.last_used_at,
+    last_used_at: row.used_at,    // DB column is used_at, in-memory field stays last_used_at
   }));
 }
 
@@ -1587,7 +1587,9 @@ Each call attempt (including retries) writes a row. Schema fields per existing m
 - `id` (uuid, default gen_random_uuid()) — server-side
 - `brief_id` (uuid)
 - `analysis_run_id` (uuid, nullable until the run row is written by the worker)
-- `model`, `cost_usd`, `input_tokens`, `output_tokens`, `duration_ms`, `http_status`, `error_detail`
+- `purpose` (NOT NULL, always `'brief_analysis'`), `model`, `cost_usd`, `input_tokens`, `output_tokens`, `duration_ms`, `status` (NOT NULL: `'ok'|'retry'|'failed'`), `error_message` (nullable)
+
+> **SCHEMA NOTE (Task 16 drift):** The real VPS schema uses `purpose`, `status`, and `error_message` — NOT `http_status` and `error_detail`. Column names corrected in code + tests by the Task 16 schema-drift fix commit.
 
 For Phase 3 the orchestrator writes `analysis_run_id = null` because the worker creates the run row only after analyze() returns successfully. Phase 4 may add an UPDATE step; for now leaving it null is correct.
 
@@ -1646,8 +1648,9 @@ describe('createBriefAnalyzer (llm_calls telemetry)', () => {
     expect(row.output_tokens).toBe(500);
     expect(row.cost_usd).toBeGreaterThan(0);
     expect(row.duration_ms).toBeGreaterThanOrEqual(0);
-    expect(row.http_status).toBe(200);
-    expect(row.error_detail).toBeNull();
+    expect(row.status).toBe('ok');
+    expect(row.error_message).toBeNull();
+    expect(row.purpose).toBe('brief_analysis');
   });
 
   it('inserts ONE llm_calls row per attempt — including failed 5xx attempts', async () => {
@@ -1698,11 +1701,11 @@ describe('createBriefAnalyzer (llm_calls telemetry)', () => {
 
     const llmCallInserts = inserts.filter((i) => i.table === 'llm_calls');
     expect(llmCallInserts).toHaveLength(3);
-    expect(llmCallInserts[0].row.http_status).toBe(503);
-    expect(llmCallInserts[1].row.http_status).toBe(503);
-    expect(llmCallInserts[2].row.http_status).toBe(200);
-    expect(llmCallInserts[0].row.error_detail).toBeTruthy();
-    expect(llmCallInserts[2].row.error_detail).toBeNull();
+    expect(llmCallInserts[0].row.status).toBe('retry');
+    expect(llmCallInserts[1].row.status).toBe('retry');
+    expect(llmCallInserts[2].row.status).toBe('ok');
+    expect(llmCallInserts[0].row.error_message).toBeTruthy();
+    expect(llmCallInserts[2].row.error_message).toBeNull();
   });
 
   it('does NOT throw if llm_calls insert fails (best-effort)', async () => {
@@ -1766,11 +1769,12 @@ async function writeLlmCall(
     output_tokens: number;
     cost_usd: number;
     duration_ms: number;
-    http_status: number;
-    error_detail: string | null;
+    status: 'ok' | 'retry' | 'failed';
+    error_message: string | null;
   },
 ): Promise<void> {
   const { error } = await supabase.from('llm_calls').insert({
+    purpose: 'brief_analysis',
     brief_id: args.brief_id,
     analysis_run_id: null,            // Phase 4 may UPDATE after worker writes the run
     model: args.model,
@@ -1778,8 +1782,8 @@ async function writeLlmCall(
     output_tokens: args.output_tokens,
     cost_usd: args.cost_usd,
     duration_ms: args.duration_ms,
-    http_status: args.http_status,
-    error_detail: args.error_detail,
+    status: args.status,
+    error_message: args.error_message,
   });
   // Best-effort: design §4.3 invariant #9. Swallow but log to stderr so
   // failed cost-telemetry writes still surface in Loki/container logs.
@@ -1828,8 +1832,8 @@ async function writeLlmCall(
                 output_tokens: 0,
                 cost_usd: 0,
                 duration_ms: Date.now() - attemptStart,
-                http_status: attemptStatus,
-                error_detail: attemptError,
+                status: 'failed',
+                error_message: attemptError,
               });
               return { ok: false, failure: { reason: 'claude_4xx', detail: attemptError } };
             }
@@ -1842,8 +1846,8 @@ async function writeLlmCall(
                 output_tokens: 0,
                 cost_usd: 0,
                 duration_ms: Date.now() - attemptStart,
-                http_status: attemptStatus,
-                error_detail: attemptError,
+                status: 'retry',
+                error_message: attemptError,
               });
               await sleep(backoffMs(i + 1));
               continue;
@@ -1855,8 +1859,8 @@ async function writeLlmCall(
               output_tokens: 0,
               cost_usd: 0,
               duration_ms: Date.now() - attemptStart,
-              http_status: attemptStatus,
-              error_detail: attemptError,
+              status: 'failed',
+              error_message: attemptError,
             });
             return { ok: false, failure: { reason: 'claude_5xx_max_retries', detail: attemptError } };
           } finally {
@@ -1869,8 +1873,8 @@ async function writeLlmCall(
                 output_tokens: attemptOutputTok,
                 cost_usd: estimateCostUsd(attemptInputTok, attemptOutputTok),
                 duration_ms: Date.now() - attemptStart,
-                http_status: 200,
-                error_detail: null,
+                status: 'ok',
+                error_message: null,
               });
             }
           }
@@ -2178,9 +2182,22 @@ async function main() {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set in worker env');
   const client = new Anthropic({ apiKey });
+  function serialiseArg(a: unknown): unknown {
+    if (a instanceof Error) {
+      return { name: a.name, message: a.message, stack: a.stack };
+    }
+    if (a && typeof a === 'object') {
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(a)) {
+        out[k] = v instanceof Error ? { name: v.name, message: v.message, stack: v.stack } : v;
+      }
+      return out;
+    }
+    return a;
+  }
   const logger = {
-    info: (...a: any[]) => console.log(JSON.stringify({ level: 'info', t: new Date().toISOString(), m: a })),
-    error: (...a: any[]) => console.error(JSON.stringify({ level: 'error', t: new Date().toISOString(), m: a })),
+    info: (...a: any[]) => console.log(JSON.stringify({ level: 'info', t: new Date().toISOString(), m: a.map(serialiseArg) })),
+    error: (...a: any[]) => console.error(JSON.stringify({ level: 'error', t: new Date().toISOString(), m: a.map(serialiseArg) })),
   };
   const analyzer = createBriefAnalyzer({ client, supabase, catalog, logger });
 
@@ -3881,7 +3898,8 @@ Add these `it` blocks at the bottom of the describe:
     expect(llmInserts[0].row.input_tokens).toBeGreaterThan(0);
     expect(llmInserts[0].row.output_tokens).toBeGreaterThan(0);
     expect(llmInserts[0].row.cost_usd).toBeGreaterThan(0);
-    expect(llmInserts[0].row.http_status).toBe(200);
+    expect(llmInserts[0].row.status).toBe('ok');
+    expect(llmInserts[0].row.purpose).toBe('brief_analysis');
   });
 
   it('orchestrator telemetry matches the inserted llm_calls row', () => {

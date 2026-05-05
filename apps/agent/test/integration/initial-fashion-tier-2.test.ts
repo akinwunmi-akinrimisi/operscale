@@ -106,7 +106,8 @@ describe('L2 integration — initial / fashion / tier-standard', () => {
     expect(llmInserts[0].row.input_tokens).toBeGreaterThan(0);
     expect(llmInserts[0].row.output_tokens).toBeGreaterThan(0);
     expect(llmInserts[0].row.cost_usd).toBeGreaterThan(0);
-    expect(llmInserts[0].row.http_status).toBe(200);
+    expect(llmInserts[0].row.status).toBe('ok');
+    expect(llmInserts[0].row.purpose).toBe('brief_analysis');
   });
 
   it('orchestrator telemetry matches the inserted llm_calls row', () => {
