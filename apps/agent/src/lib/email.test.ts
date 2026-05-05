@@ -150,4 +150,11 @@ describe('sendEmail', () => {
     await expect(sendEmail({ ...baseInput, templateKey: 'auto-ack' })).rejects.toBeInstanceOf(EmailSendError);
     expect(resendSpy).not.toHaveBeenCalled();
   });
+
+  it('accepts templateKey="payment-confirmation" without throwing not_implemented_template', async () => {
+    resendSpy.mockResolvedValueOnce({ data: { id: 'pc-msg-1' }, error: null });
+    const result = await sendEmail({ ...baseInput, templateKey: 'payment-confirmation' });
+    expect(result).toEqual({ resendMessageId: 'pc-msg-1' });
+    expect(resendSpy).toHaveBeenCalledTimes(1);
+  });
 });

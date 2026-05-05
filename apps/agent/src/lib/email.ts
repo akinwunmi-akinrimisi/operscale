@@ -73,7 +73,7 @@ export class EmailSendError extends Error {
 
 const RETRY_DELAYS_MS = [500, 1000, 2000];
 
-const SUPPORTED_TEMPLATES: ReadonlyArray<TemplateKey> = ['brief-email'];
+const SUPPORTED_TEMPLATES: ReadonlyArray<TemplateKey> = ['brief-email', 'payment-confirmation'];
 
 async function checkIdempotencyCache(
   supabase: ReturnType<typeof getSupabaseAdmin>,
