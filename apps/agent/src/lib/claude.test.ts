@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createBriefAnalyzer } from './claude';
-import type { BankCatalog, BriefAnalyzerInput, FrameworkSeedResult } from './types/v2';
+import type { BankCatalog, BriefAnalyzerInput, FrameworkSeedResult, PriorRunContext } from './types/v2';
 
 const SAMPLE_BRIEF: BriefAnalyzerInput = {
   brief_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -182,6 +182,104 @@ describe('createBriefAnalyzer (skeleton)', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(['schema_mismatch', 'malformed_json', 'slot_count_mismatch', 'unauthorized_slot']).toContain(result.failure.reason);
+    }
+  });
+});
+
+describe('createBriefAnalyzer (re-analysis)', () => {
+  it('passes priorSeed through to selectFrameworksForBrief on same_frameworks trigger', async () => {
+    const catalog = makeMinimalCatalog();
+    const priorSeed: FrameworkSeedResult = {
+      seed_hash: 'prior',
+      seed_inputs: { customer_id: SAMPLE_BRIEF.customer_id, niche: 'fashion', order_index: 1, submission_week_iso: '2026-W18' },
+      selected_frameworks: ['VALUE_EQUATION', 'PAIPS', 'AIDA'],
+      selected_archetypes: ['WHAT_YOU_GET', 'TIER_COMPARISON', 'PRODUCT_TOUR'],
+      selected_pairs: [
+        { framework: 'VALUE_EQUATION', archetype: 'WHAT_YOU_GET', affinity: 9 },
+        { framework: 'PAIPS', archetype: 'TIER_COMPARISON', affinity: 9 },
+        { framework: 'AIDA', archetype: 'PRODUCT_TOUR', affinity: 9 },
+      ],
+      exhaustion_warning: false,
+      lru_fallback_used: false,
+    };
+    const supabase = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: [], error: null }) }),
+        insert: vi.fn().mockResolvedValue({ error: null }),
+      }),
+    };
+    let observedLayer3 = '';
+    const client = {
+      messages: {
+        create: vi.fn().mockImplementation(async (req: any) => {
+          observedLayer3 = req.messages[1]?.content?.[0]?.text ?? '';
+          return makeFakeAnthropicResponse(priorSeed, 10);
+        }),
+      },
+    };
+    const logger = { info: vi.fn(), error: vi.fn() };
+    const analyzer = createBriefAnalyzer({ client: client as any, supabase: supabase as any, catalog, logger });
+    const prior: PriorRunContext = {
+      prior_run_id: 'prior',
+      prior_run_index: 1,
+      mode: 'same_frameworks',
+      founder_note: 'tighten',
+      edits: [],
+    };
+    const result = await analyzer.analyze({
+      brief: SAMPLE_BRIEF,
+      photos: [],
+      trigger_type: 're_analyze_same_frameworks',
+      prior,
+      priorSeed,
+    });
+    expect(result.ok).toBe(true);
+    expect(observedLayer3).toContain('### VALUE_EQUATION');
+    expect(observedLayer3).toContain('### PAIPS');
+  });
+
+  it('returns ok=false reason=photo_missing when a photo has empty base64', async () => {
+    const catalog = makeMinimalCatalog();
+    const supabase = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: [], error: null }) }),
+        insert: vi.fn().mockResolvedValue({ error: null }),
+      }),
+    };
+    const client = { messages: { create: vi.fn() } };
+    const logger = { info: vi.fn(), error: vi.fn() };
+    const analyzer = createBriefAnalyzer({ client: client as any, supabase: supabase as any, catalog, logger });
+    const result = await analyzer.analyze({
+      brief: { ...SAMPLE_BRIEF, photo_count: 1 },
+      photos: [{ role: 'reference', mediaType: 'image/jpeg', base64: '   ' }],
+      trigger_type: 'initial',
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.reason).toBe('photo_missing');
+    }
+    expect(client.messages.create).not.toHaveBeenCalled();
+  });
+
+  it('returns ok=false reason=niche_brief_missing when catalog has no entry for the brief\'s niche', async () => {
+    const catalog: BankCatalog = { ...makeMinimalCatalog(), niches: {} as BankCatalog['niches'] };
+    const supabase = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: [], error: null }) }),
+        insert: vi.fn().mockResolvedValue({ error: null }),
+      }),
+    };
+    const client = { messages: { create: vi.fn() } };
+    const logger = { info: vi.fn(), error: vi.fn() };
+    const analyzer = createBriefAnalyzer({ client: client as any, supabase: supabase as any, catalog, logger });
+    const result = await analyzer.analyze({
+      brief: SAMPLE_BRIEF,
+      photos: [],
+      trigger_type: 'initial',
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.reason).toBe('niche_brief_missing');
     }
   });
 });

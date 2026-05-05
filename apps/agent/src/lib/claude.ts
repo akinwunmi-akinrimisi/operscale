@@ -46,6 +46,7 @@ export interface AnalyzeInput {
   trigger_type: 'initial' | 're_analyze_same_frameworks' | 're_analyze_new_frameworks';
   prior?: PriorRunContext;
   prior_run_index?: number;
+  priorSeed?: FrameworkSeedResult;
 }
 
 export interface AnalyzeTelemetry {
@@ -112,6 +113,13 @@ export function createBriefAnalyzer(deps: BriefAnalyzerDeps): BriefAnalyzer {
       const { brief, photos, logo, trigger_type, prior, prior_run_index } = input;
       const start = Date.now();
 
+      // Photo presence check (design §7 photo_missing failure).
+      for (const p of [...photos, ...(logo ? [logo] : [])]) {
+        if (!p.base64 || p.base64.trim().length === 0) {
+          return { ok: false, failure: { reason: 'photo_missing', detail: 'a photo block has empty base64' } };
+        }
+      }
+
       let mode: 'same_frameworks' | 'new_frameworks' | undefined;
       if (trigger_type === 're_analyze_same_frameworks') mode = 'same_frameworks';
       else if (trigger_type === 're_analyze_new_frameworks') mode = 'new_frameworks';
@@ -127,11 +135,22 @@ export function createBriefAnalyzer(deps: BriefAnalyzerDeps): BriefAnalyzer {
         catalog: deps.catalog,
         fetchHistory: (customer_id) => fetchHistoryFromSupabase(deps.supabase, customer_id),
         mode,
-        priorSeed: prior ? undefined : undefined,
+        priorSeed: input.priorSeed,
         runIndex: prior_run_index,
       });
 
-      const built = buildPromptMessages({ brief, seed, catalog: deps.catalog, photos, logo, prior });
+      let built;
+      try {
+        built = buildPromptMessages({ brief, seed, catalog: deps.catalog, photos, logo, prior });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/niche brief.*missing|niches\[/i.test(msg)) {
+          return { ok: false, failure: { reason: 'niche_brief_missing', detail: msg } };
+        }
+        // re-throw for any other unexpected build error — these are programmer bugs
+        // and should fail loud rather than silently mapping.
+        throw err;
+      }
 
       const response = await deps.client.messages.create({
         model: CLAUDE_MODEL,
