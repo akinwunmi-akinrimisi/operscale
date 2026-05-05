@@ -136,8 +136,10 @@ describe('PaystackChargeSuccessEvent type shape', () => {
     };
     expect(e.data.amount).toBe(27500000);
   });
+});
 
-  it('PaystackChargeFailureEvent compiles with minimal fields', () => {
+describe('PaystackChargeFailureEvent type shape', () => {
+  it('compiles with minimal fields', () => {
     const e: PaystackChargeFailureEvent = {
       event: 'charge.failure',
       data: { id: 999, reference: 'ops-cal-x', gateway_response: 'declined' },
