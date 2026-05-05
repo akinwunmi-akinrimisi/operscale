@@ -60,6 +60,15 @@ COPY --from=builder --chown=nextjs:nodejs /repo/apps/agent/dist ./apps/agent/dis
 COPY --from=builder --chown=nextjs:nodejs /repo/apps/agent/node_modules ./apps/agent/node_modules
 COPY --from=builder --chown=nextjs:nodejs /repo/node_modules/.pnpm ./node_modules/.pnpm
 
+# Bank-catalog spec files. loadBankCatalog auto-ascends from cwd looking for
+# pnpm-workspace.yaml as the repo-root marker, then reads niche briefs +
+# framework + archetype specs from there. The worker bootstraps with cwd=/app
+# so we layer these into /app/ at the same relative paths the dev tree uses.
+COPY --from=builder --chown=nextjs:nodejs /repo/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=builder --chown=nextjs:nodejs /repo/niche-briefs ./niche-briefs
+COPY --from=builder --chown=nextjs:nodejs /repo/docs/specs/script-frameworks.md ./docs/specs/script-frameworks.md
+COPY --from=builder --chown=nextjs:nodejs /repo/docs/specs/angle-archetypes.md ./docs/specs/angle-archetypes.md
+
 USER nextjs
 EXPOSE 3002
 ENTRYPOINT ["/sbin/tini", "--"]
