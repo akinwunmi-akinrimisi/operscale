@@ -179,6 +179,7 @@ export function createBriefAnalyzer(deps: BriefAnalyzerDeps): BriefAnalyzer {
       // 3-4. Anthropic call with retry on 5xx + one retry on validation_failed.
       let response: any;
       let attemptCount = 0;
+      let validatedAi: AiOutput | undefined;
       let validationFailedAddendum: string | null = null;
 
       callLoop: for (let validationAttempt = 0; validationAttempt < 2; validationAttempt++) {
@@ -202,6 +203,7 @@ export function createBriefAnalyzer(deps: BriefAnalyzerDeps): BriefAnalyzer {
             break;
           } catch (err) {
             if (isNonRetryable4xx(err)) {
+              deps.logger.error('claude.analyze: non-retryable 4xx', { status: (err as any)?.status, detail: (err as Error).message });
               return { ok: false, failure: { reason: 'claude_4xx', detail: (err as Error).message } };
             }
             if (i < MAX_5XX_RETRIES - 1 && isRetryable(err)) {
@@ -209,6 +211,7 @@ export function createBriefAnalyzer(deps: BriefAnalyzerDeps): BriefAnalyzer {
               await sleep(backoffMs(i + 1));
               continue;
             }
+            deps.logger.error('claude.analyze: 5xx max retries exhausted', { attempts: attemptCount, detail: (err as Error).message });
             return { ok: false, failure: { reason: 'claude_5xx_max_retries', detail: (err as Error).message } };
           }
         }
@@ -216,7 +219,7 @@ export function createBriefAnalyzer(deps: BriefAnalyzerDeps): BriefAnalyzer {
         const text = extractTextFromResponse(response);
         const validation = validateAiOutput(text, seed, brief.tier);
         if (validation.ok) {
-          (response as any)._validated = validation.value;
+          validatedAi = validation.value;
           break callLoop;
         }
 
@@ -230,10 +233,10 @@ export function createBriefAnalyzer(deps: BriefAnalyzerDeps): BriefAnalyzer {
           deps.logger.info('claude.analyze: validation failed, retrying once with addendum', { reason: validation.failure.reason });
           continue callLoop;
         }
+        deps.logger.error('claude.analyze: validation failed on second attempt', { reason: validation.failure.reason, detail: validation.failure.detail });
         return { ok: false, failure: { reason: validation.failure.reason, detail: validation.failure.detail } };
       }
 
-      const validatedAi: AiOutput | undefined = (response as any)._validated;
       if (!validatedAi) {
         return { ok: false, failure: { reason: 'schema_mismatch', detail: 'unexpected: no validated output after retry loop' } };
       }

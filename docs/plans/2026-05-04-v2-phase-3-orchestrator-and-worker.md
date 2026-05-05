@@ -1430,8 +1430,8 @@ async function sleep(ms: number): Promise<void> {
       // 3-4. Anthropic call with retry on 5xx + one retry on validation_failed.
       let response: any;
       let attemptCount = 0;
+      let validatedAi: AiOutput | undefined;
       let validationFailedAddendum: string | null = null;
-      let lastValidationFailure: ValidationFailure | null = null;
 
       callLoop: for (let validationAttempt = 0; validationAttempt < 2; validationAttempt++) {
         // Inner loop: 5xx retries.
@@ -1441,8 +1441,10 @@ async function sleep(ms: number): Promise<void> {
           // On the validation-retry pass, append the addendum to Layer 4.
           if (validationFailedAddendum) {
             const layer4 = requestMessages[2];
-            const layer4Text = (layer4.content[0] as any).text + '\n\n' + validationFailedAddendum;
-            requestMessages[2] = { role: 'user', content: [{ type: 'text', text: layer4Text }] };
+            if (layer4) {
+              const layer4Text = (layer4.content[0] as any).text + '\n\n' + validationFailedAddendum;
+              requestMessages[2] = { role: 'user', content: [{ type: 'text', text: layer4Text }] };
+            }
           }
           try {
             response = await deps.client.messages.create({
@@ -1454,6 +1456,7 @@ async function sleep(ms: number): Promise<void> {
             break; // success — fall through to validation
           } catch (err) {
             if (isNonRetryable4xx(err)) {
+              deps.logger.error('claude.analyze: non-retryable 4xx', { status: (err as any)?.status, detail: (err as Error).message });
               return { ok: false, failure: { reason: 'claude_4xx', detail: (err as Error).message } };
             }
             if (i < MAX_5XX_RETRIES - 1 && isRetryable(err)) {
@@ -1461,6 +1464,7 @@ async function sleep(ms: number): Promise<void> {
               await sleep(backoffMs(i + 1));
               continue;
             }
+            deps.logger.error('claude.analyze: 5xx max retries exhausted', { attempts: attemptCount, detail: (err as Error).message });
             return { ok: false, failure: { reason: 'claude_5xx_max_retries', detail: (err as Error).message } };
           }
         }
@@ -1469,21 +1473,15 @@ async function sleep(ms: number): Promise<void> {
         const text = extractTextFromResponse(response);
         const validation = validateAiOutput(text, seed, brief.tier);
         if (validation.ok) {
-          // Use the validated output below.
-          const merged: AiOutput = {
-            ...validation.value,
-            fabrication_audit: validation.value.fabrication_audit, // refine in step below
-          };
-          // Carry on to fabrication audit + post-process below; capture validation.value
-          (response as any)._validated = validation.value;
+          // Store the validated output in the outer-scope variable; break the outer loop.
+          validatedAi = validation.value;
           break callLoop;
         }
 
-        // Validation failed. Save reason; if first pass, prepare addendum and retry once.
-        lastValidationFailure = validation.failure;
+        // Validation failed. If first pass, prepare addendum and retry once.
         if (validationAttempt === 0) {
           validationFailedAddendum =
-            'IMPORTANT: your previous attempt failed validation with reason "' +
+            'IMPORTANT: your previous output was malformed — prior attempt failed validation with reason "' +
             validation.failure.reason +
             '" — detail: ' +
             validation.failure.detail +
@@ -1492,13 +1490,12 @@ async function sleep(ms: number): Promise<void> {
           continue callLoop;
         }
         // Second pass also failed — surface the failure.
+        deps.logger.error('claude.analyze: validation failed on second attempt', { reason: validation.failure.reason, detail: validation.failure.detail });
         return { ok: false, failure: { reason: validation.failure.reason, detail: validation.failure.detail } };
       }
 
-      // If we exited the loop without _validated, something went structurally wrong.
-      const validatedAi: AiOutput | undefined = (response as any)._validated;
+      // Safety net: if a future code path exits the loop without setting validatedAi, fail safe.
       if (!validatedAi) {
-        // Shouldn't happen, but fail safe rather than crash.
         return { ok: false, failure: { reason: 'schema_mismatch', detail: 'unexpected: no validated output after retry loop' } };
       }
 ```
