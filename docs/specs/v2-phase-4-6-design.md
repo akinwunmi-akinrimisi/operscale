@@ -45,7 +45,7 @@ When a customer completes payment on Paystack's hosted checkout (using the URL P
 - **Cloudflare DNS-only** for `api.operscale.cloud` (NOT proxied) so raw bytes survive. Documented in `paystack-integration.md` and `deployment.md`.
 - **Test mode keys only in 4.6** (`PAYSTACK_SECRET_KEY=sk_test_*`).
 - **Email template engine:** React Email + `@react-email/components` + `@react-email/render` (already deps in both `apps/agent` and `apps/web` from Phase 4.5).
-- **`production_ready_at` flip in 4.6:** column already on `orders`; one-line UPDATE. Phase 2 isn't built but the timestamp is the boundary marker for when it does.
+- **`production_ready_at` flip in 4.6:** column added by migration `0008_orders_production_ready_at.sql` (live smoke caught that the original `0001_init_schema.sql` defined `production_started_at` for Phase-2-begins but had no `production_ready_at` for Phase-1-handoff). One-line UPDATE in the route. Phase 2 isn't built but the timestamp is the boundary marker for when it does.
 
 ---
 

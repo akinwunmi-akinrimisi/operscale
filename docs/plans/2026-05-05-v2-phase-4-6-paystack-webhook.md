@@ -22,6 +22,9 @@
 - `apps/web/src/emails/PaymentConfirmation.tsx` headings ALL-CAPS in JSX source (Phase 4.5 lesson — `textTransform: 'uppercase'` is stripped by `render(..., {plainText: true})`).
 - VPS rebuild MUST use `C:\tmp\vps-rebuild.py` (already bakes in `git fetch + git reset --hard origin/main` and the typescript.ignoreBuildErrors override).
 
+**Decision Z' (schema gap caught by live smoke — migration 0008):**
+The original design assumed `orders.production_ready_at` already existed. It did not — `0001_init_schema.sql` defined `production_started_at` (Phase-2-begins) but no `production_ready_at` (Phase-1-handoff). The Phase 4.6 live smoke caught this on the first real `charge.success` payload: payments INSERT succeeded, but the orders UPDATE returned `Could not find the 'production_ready_at' column of 'orders' in the schema cache`, which the new error-throw path correctly surfaced as `webhook_handler_failed` + 500. Fix: `supabase/migrations/0008_orders_production_ready_at.sql` adds the column. Apply BEFORE running the live smoke (Task 6 Step 2 already includes a generic schema-up check, but the migration must run on staging+production explicitly). After the migration the same payload was replayed via a manually-signed POST (avoiding a second paid Paystack run); the order flipped to `paid` with both timestamps set, the payment-confirmation email landed, and zero leftovers after cleanup. The Paystack webhook URL also has to be configured manually in the Paystack dashboard — `paystack-integration.md` § Setup line 27 documents this; Phase 4.5 didn't exercise it because the handler returned 501.
+
 **Decision Y (PaystackChargeSuccessEvent type — what we model from Paystack's webhook payload):**
 
 ```ts
