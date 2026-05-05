@@ -1,93 +1,179 @@
 // apps/agent/src/lib/claude.ts
 //
-// Anthropic Claude Opus 4.7 brief analysis wrapper.
-// SOURCE OF TRUTH: docs/specs/ai-brief-analysis.md (the prompt itself is the spec).
+// V2 brief-analysis orchestrator. Composes Phase 1 (selector + catalog)
+// and Phase 2 (prompt-builder + output-validator + fabrication-audit +
+// post-processor) into a single analyze(input) method.
 //
-// CLAUDE.md file ownership: this file is owned by docs/specs/ai-brief-analysis.md.
-// Changes here without a corresponding spec update are forbidden.
+// SOURCE OF TRUTH: docs/specs/ai-brief-analysis.md (the prompt itself)
+// + docs/specs/v2-pipeline-implementation-design.md (the pipeline).
 //
-// Concurrency: cap at 5 in-flight (CLAUDE.md gotcha #8).
+// Pure-ish: takes injected client + supabase + catalog so it's unit-testable.
+// The IO it does: Anthropic call (via injected client) + customer history fetch
+// (via injected supabase) + llm_calls write (via injected supabase).
 
-import Anthropic from '@anthropic-ai/sdk';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import {
+  type AiOutput,
+  type BankCatalog,
+  type BriefAnalyzerInput,
+  type FrameworkSeedResult,
+  type PhotoBlock,
+  type PriorRunContext,
+  type SupersetOutput,
+  type ValidationFailure,
+  type Violation,
+} from './types/v2';
+import { selectFrameworksForBrief, type HistoryRow } from './framework-selector';
+import { buildPromptMessages } from './prompt-builder';
+import { validateAiOutput } from './output-validator';
+import { auditFabrication } from './fabrication-audit';
+import { postProcess } from './post-processor';
 
 export const CLAUDE_MODEL = 'claude-opus-4-7' as const;
-export const MAX_TOKENS = 4000;
-export const RETRY_ATTEMPTS = 5;
-export const CONCURRENT_CAP = 5;
+export const MAX_TOKENS = 16384;
 
-export interface AnalyzeBriefInput {
-  briefId: string;
-  formPayload: Record<string, unknown>;
-  niche: string;
-  nicheBrief: string;
-  photos: { mimeType: 'image/jpeg' | 'image/png'; base64: string }[];
-  founderNote?: string;
-  triggerType: 'initial' | 're_analyze_with_note';
+export type AnalyzeFailureReason =
+  | ValidationFailure['reason']
+  | 'photo_missing'
+  | 'claude_4xx'
+  | 'claude_5xx_max_retries'
+  | 'niche_brief_missing';
+
+export interface AnalyzeInput {
+  brief: BriefAnalyzerInput;
+  photos: PhotoBlock[];
+  logo?: PhotoBlock;
+  trigger_type: 'initial' | 're_analyze_same_frameworks' | 're_analyze_new_frameworks';
+  prior?: PriorRunContext;
+  prior_run_index?: number;
 }
 
-export interface AnalyzeBriefOutput {
-  brief_summary: string;
-  recommended_angles: { angle: string; hook: string; why_it_fits: string }[];
-  sample_script_seed: { video_1_topic: string; video_1_hook: string; video_1_outline: string[] };
-  brand_voice: {
-    tone_summary: string;
-    vocabulary_pattern: string;
-    sentence_rhythm: string;
-    emotional_register: string;
-    do_say: string[];
-    do_not_say: string[];
+export interface AnalyzeTelemetry {
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+  duration_ms: number;
+  attempt_count: number;
+}
+
+export type AnalyzeResult =
+  | { ok: true; superset: SupersetOutput; seed: FrameworkSeedResult; postHocViolations: Violation[]; telemetry: AnalyzeTelemetry }
+  | { ok: false; failure: { reason: AnalyzeFailureReason; detail: string } };
+
+export interface AnthropicLikeClient {
+  messages: { create: (req: any) => Promise<any> };
+}
+
+export interface BriefAnalyzerDeps {
+  client: AnthropicLikeClient;
+  supabase: SupabaseClient;
+  catalog: BankCatalog;
+  logger: { info: (...args: any[]) => void; error: (...args: any[]) => void };
+}
+
+export interface BriefAnalyzer {
+  analyze(input: AnalyzeInput): Promise<AnalyzeResult>;
+}
+
+const COST_INPUT_PER_MTOK = 15.0;
+const COST_OUTPUT_PER_MTOK = 75.0;
+
+function estimateCostUsd(inputTokens: number, outputTokens: number): number {
+  return (inputTokens / 1_000_000) * COST_INPUT_PER_MTOK + (outputTokens / 1_000_000) * COST_OUTPUT_PER_MTOK;
+}
+
+async function fetchHistoryFromSupabase(supabase: SupabaseClient, customer_id: string): Promise<HistoryRow[]> {
+  const { data, error } = await supabase
+    .from('customer_framework_history')
+    .select('framework_slot, archetype_slot, last_used_at')
+    .eq('customer_id', customer_id);
+  if (error || !data) return [];
+  return data.map((row: any) => ({
+    framework: row.framework_slot,
+    archetype: row.archetype_slot,
+    last_used_at: row.last_used_at,
+  }));
+}
+
+function extractTextFromResponse(response: any): string {
+  if (!Array.isArray(response?.content)) return '';
+  return response.content
+    .filter((b: any) => b.type === 'text')
+    .map((b: any) => b.text)
+    .join('');
+}
+
+export function createBriefAnalyzer(deps: BriefAnalyzerDeps): BriefAnalyzer {
+  return {
+    async analyze(input: AnalyzeInput): Promise<AnalyzeResult> {
+      const { brief, photos, logo, trigger_type, prior, prior_run_index } = input;
+      const start = Date.now();
+
+      let mode: 'same_frameworks' | 'new_frameworks' | undefined;
+      if (trigger_type === 're_analyze_same_frameworks') mode = 'same_frameworks';
+      else if (trigger_type === 're_analyze_new_frameworks') mode = 'new_frameworks';
+
+      const seed = await selectFrameworksForBrief({
+        inputs: {
+          customer_id: brief.customer_id,
+          niche: brief.niche_slug,
+          order_index: brief.order_index,
+          submission_week_iso: brief.submission_week_iso,
+        },
+        tier: brief.tier,
+        catalog: deps.catalog,
+        fetchHistory: (customer_id) => fetchHistoryFromSupabase(deps.supabase, customer_id),
+        mode,
+        priorSeed: prior ? undefined : undefined,
+        runIndex: prior_run_index,
+      });
+
+      const built = buildPromptMessages({ brief, seed, catalog: deps.catalog, photos, logo, prior });
+
+      const response = await deps.client.messages.create({
+        model: CLAUDE_MODEL,
+        max_tokens: MAX_TOKENS,
+        system: built.system,
+        messages: built.messages,
+      });
+
+      const text = extractTextFromResponse(response);
+      const validation = validateAiOutput(text, seed, brief.tier);
+      if (!validation.ok) {
+        return { ok: false, failure: { reason: validation.failure.reason, detail: validation.failure.detail } };
+      }
+
+      const postHocViolations = auditFabrication(validation.value, brief.customer_backstory_verbatim);
+
+      const mergedAi: AiOutput = {
+        ...validation.value,
+        fabrication_audit: {
+          ...validation.value.fabrication_audit,
+          violations_found: [...validation.value.fabrication_audit.violations_found, ...postHocViolations],
+          audit_passed:
+            validation.value.fabrication_audit.audit_passed &&
+            postHocViolations.length === 0,
+        },
+      };
+
+      const superset = postProcess({
+        aiOutput: mergedAi,
+        niche: brief.niche_slug,
+        tier: brief.tier,
+        hasPhotos: photos.length > 0,
+        reanalyzed: trigger_type !== 'initial',
+        postHocViolations: postHocViolations.length,
+      });
+
+      const telemetry: AnalyzeTelemetry = {
+        input_tokens: response.usage?.input_tokens ?? 0,
+        output_tokens: response.usage?.output_tokens ?? 0,
+        cost_usd: estimateCostUsd(response.usage?.input_tokens ?? 0, response.usage?.output_tokens ?? 0),
+        duration_ms: Date.now() - start,
+        attempt_count: 1,
+      };
+
+      return { ok: true, superset, seed, postHocViolations, telemetry };
+    },
   };
-  photo_aesthetic: {
-    face_quality_summary: string;
-    styling_observations: string;
-    setting_hints: string;
-    recommended_avatar_treatment: string;
-    flags: string[];
-  } | null;
-  visual_style: {
-    recommended_palette: string[];
-    recommended_palette_rationale: string;
-    recommended_typography: string;
-    recommended_camera_treatment: string;
-    recommended_caption_style: string;
-  };
-  upsell_recommendation: {
-    should_upsell: boolean;
-    recommended_tier: 'starter' | 'standard' | 'calendar' | null;
-    reasoning: string;
-    upsell_price_delta: number;
-  };
-  flags: { type: string; detail: string }[];
-  estimated_brief_quality_score: number;
-}
-
-export interface AnalyzeBriefResult {
-  output: AnalyzeBriefOutput;
-  inputTokens: number;
-  outputTokens: number;
-  costUsd: number;
-  durationMs: number;
-}
-
-export async function analyzeBrief(_input: AnalyzeBriefInput): Promise<AnalyzeBriefResult> {
-  // TODO(Operscale): implement per docs/specs/ai-brief-analysis.md
-  //   1. Build system prompt (~800 tokens) from spec template
-  //   2. Build user prompt (~1400 tokens) with form payload + niche brief
-  //   3. Attach photo blocks (~700 tokens each, max 3)
-  //   4. anthropic.messages.create({ model: CLAUDE_MODEL, max_tokens: MAX_TOKENS })
-  //   5. Validate output JSON against zod schema
-  //   6. Compute cost from token counts (Anthropic pricing in spec)
-  //   7. Retry up to 5x with exp backoff on 5xx; fail-soft to template on validation error
-  throw new Error('analyzeBrief not implemented — see docs/specs/ai-brief-analysis.md');
-}
-
-// Lazily-instantiated client. Do NOT export the instance directly; force callers
-// to go through analyzeBrief() so the concurrency cap and logging are uniform.
-let _client: Anthropic | null = null;
-export function getAnthropicClient(): Anthropic {
-  if (_client) return _client;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
-  _client = new Anthropic({ apiKey });
-  return _client;
 }
