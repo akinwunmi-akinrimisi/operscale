@@ -11,7 +11,7 @@
 // fixed customer email, etc.).
 
 import { Resend } from 'resend';
-import { getSupabaseAdmin } from './supabase-admin.js';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 // RESEND_ERROR_CODES_BY_KEY is declared in resend's .d.ts but NOT exported from
 // the compiled JS bundles (0 occurrences in index.js / index.mjs at v4.8.0) —

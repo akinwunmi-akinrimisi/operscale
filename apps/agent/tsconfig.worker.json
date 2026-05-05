@@ -15,6 +15,8 @@
     "**/*.test.ts",
     "src/lib/__fixtures__/**",
     "src/lib/__sanity__/**",
-    "src/lib/webhook-405.ts"
+    "src/lib/webhook-405.ts",
+    "src/lib/email.ts",
+    "src/lib/snapshot-to-email-props.ts"
   ]
 }
