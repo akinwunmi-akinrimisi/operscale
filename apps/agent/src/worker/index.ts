@@ -16,7 +16,9 @@ import { loadBankCatalog } from '../lib/bank-catalog.js';
 import { createBriefAnalyzer, type BriefAnalyzer } from '../lib/claude.js';
 import { getSupabaseAdmin, writeActivityLog } from '../lib/supabase-admin.js';
 
-// Task 7 stubs — Tasks 8, 9, 11 replace with real impls in their own files.
+import { sweepStuckJobs as sweepStuckJobsImpl } from './sweep.js';
+
+// Task 7 stubs — Tasks 9, 11 replace with real impls in their own files.
 type ClaimedJob = {
   id: string;
   brief_id: string;
@@ -29,7 +31,6 @@ type ClaimedJob = {
   started_at: string;
 };
 const claimNextJobImpl = async (_sb: SupabaseClient): Promise<ClaimedJob | null> => null;
-const sweepStuckJobsImpl = async (_sb: SupabaseClient): Promise<void> => {};
 const processJob = async (_args: any): Promise<void> => {};
 
 export interface WorkerHandle {

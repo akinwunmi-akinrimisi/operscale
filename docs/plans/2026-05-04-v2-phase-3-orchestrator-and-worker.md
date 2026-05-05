@@ -2389,7 +2389,7 @@ Create `apps/agent/src/worker/sweep.ts`:
 // after that they fail with reason='orphaned_by_restart'.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { writeActivityLog } from '@/lib/supabase-admin';
+import { writeActivityLog } from '../lib/supabase-admin.js';
 
 const STUCK_THRESHOLD_MS = 5 * 60 * 1000;
 const MAX_RECLAIM_ATTEMPTS = 3;
@@ -2402,23 +2402,27 @@ export async function sweepStuckJobs(supabase: SupabaseClient): Promise<void> {
     .eq('status', 'running')
     .lt('started_at', cutoff);
 
-  if (error || !stuck || stuck.length === 0) return;
+  if (error) {
+    throw new Error(`sweepStuckJobs: query failed: ${error.message}`);
+  }
+  if (!stuck || stuck.length === 0) return;
 
   for (const job of stuck) {
-    if ((job.attempt_count ?? 0) < MAX_RECLAIM_ATTEMPTS) {
+    const attemptCount = job.attempt_count ?? 0;
+    if (attemptCount < MAX_RECLAIM_ATTEMPTS) {
       await supabase
         .from('ai_analysis_jobs')
         .update({
           status: 'queued',
           started_at: null,
-          attempt_count: (job.attempt_count ?? 0) + 1,
+          attempt_count: attemptCount + 1,
         })
         .eq('id', job.id);
       await writeActivityLog(
         {
           eventType: 'ai_analysis_orphan_reclaimed',
           actor: 'system',
-          payload: { job_id: job.id, attempt_count: (job.attempt_count ?? 0) + 1 },
+          payload: { job_id: job.id, attempt_count: attemptCount + 1 },
         },
         supabase,
       );
