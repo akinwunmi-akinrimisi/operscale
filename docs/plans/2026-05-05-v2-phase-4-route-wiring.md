@@ -687,19 +687,19 @@ EOF
 
 Phase 4 scope: founder auth → read brief's `is_current` analysis_runs row → INSERT framework_history rows → flip order status. Paystack/Resend deferred to Phase 4.5.
 
-- [ ] **Step 1: Verify the customer_framework_history schema**
+- [x] **Step 1: Verify the customer_framework_history schema**
 
-Before writing the route, confirm the actual `customer_framework_history` columns and PRIMARY KEY. From Phase 3 Task 16's discovery the columns are: `customer_id, order_id, framework_slot, archetype_slot, used_at`. Read `supabase/migrations/0005_framework_seed_and_history.sql` to confirm the PRIMARY KEY is `(customer_id, order_id, framework_slot, archetype_slot)` and the `used_at` column has default `now()`.
+Schema check performed 2026-05-05 against migrations 0001 + 0005.
 
-If the migration's PRIMARY KEY differs from the assumption, adjust the INSERT below to match (e.g., add `ON CONFLICT DO NOTHING` if it's a composite PK that allows duplicate-INSERT noops).
+**Findings — two plan assumptions were wrong; both fixed in the same commit:**
 
-Also confirm:
-- `orders.status` enum/CHECK includes `'founder_approved'`.
-- `orders` has a `brief_id` column linking back to `briefs`.
+1. **`customer_framework_history` PK is `(customer_id, framework_slot, archetype_slot)`** — NOT `(customer_id, order_id, framework_slot, archetype_slot)` as stated in Decision C. `order_id` is a regular (non-PK) column. The INSERT shape in the route still includes `order_id` (correct), and no `ON CONFLICT` clause is needed for the happy path. The PK means a customer can only have one history row per (framework, archetype) pair across all orders — which is the intended non-duplication semantics.
 
-If the orders schema doesn't match these assumptions (per Phase 3 Task 11's `briefs.form_payload` discovery), adjust the route to match the real shape — and update this plan in the same commit per "plan keeps pace with code".
+2. **`orders.status` CHECK in migration 0001 does NOT include `'founder_approved'`** — the valid values were: `pending_founder_review`, `discarded`, `brief_sent`, `payment_initiated`, `paid`, `production`, `delivered`, `refunded`. Setting `status='founder_approved'` would fail the CHECK constraint at runtime. **Fix:** added migration `0007_orders_founder_approved_status.sql` which drops and re-adds the constraint with `'founder_approved'` and `'brief_email_failed'` included. The route's `APPROVABLE_STATUSES` constant uses `'brief_email_failed'` (singular, matching AGENT.md §244) — the plan body and test scaffold said `'briefs_email_failed'` (plural); corrected to singular in the route and test.
 
-- [ ] **Step 2: Write failing tests**
+`orders` does have `brief_id`, `founder_approved_at`, `founder_approved_by`, and `approved_analysis_run_id` columns — all confirmed in 0001. `analysis_runs` has `is_current boolean` with a partial unique index. No other shape changes needed.
+
+- [x] **Step 2: Write failing tests**
 
 Create `apps/agent/src/app/v1/brief/approve/route.test.ts`:
 
@@ -852,15 +852,15 @@ describe('POST /v1/brief/approve', () => {
 });
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 ```bash
 pnpm --filter @operscale-calendar/agent test src/app/v1/brief/approve/route.test.ts
 ```
 
-Expected: FAIL — current `POST` returns 501.
+Expected: FAIL — current `POST` returns 501. Confirmed: 7/7 failed.
 
-- [ ] **Step 4: Implement the route**
+- [x] **Step 4: Implement the route**
 
 Replace `apps/agent/src/app/v1/brief/approve/route.ts` with:
 
@@ -980,7 +980,7 @@ export async function POST(req: Request): Promise<Response> {
 }
 ```
 
-- [ ] **Step 5: Verify tests pass + typecheck**
+- [x] **Step 5: Verify tests pass + typecheck**
 
 ```bash
 pnpm --filter @operscale-calendar/agent test src/app/v1/brief/approve/route.test.ts
@@ -988,9 +988,9 @@ pnpm --filter @operscale-calendar/agent typecheck
 pnpm --filter @operscale-calendar/agent test
 ```
 
-Expected: 7 approve-route tests pass. Typecheck clean. Total suite ~212.
+Confirmed: 7/7 approve-route tests pass. Typecheck clean. Full suite: 212 passed, 3 skipped.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/agent/src/app/v1/brief/approve/route.ts apps/agent/src/app/v1/brief/approve/route.test.ts
