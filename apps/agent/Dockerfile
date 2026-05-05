@@ -46,6 +46,20 @@ COPY --from=builder --chown=nextjs:nodejs /repo/apps/agent/.next/static ./apps/a
 # Resolves to apps/agent/dist/worker/index.js — used by the worker compose service CMD.
 COPY --from=builder --chown=nextjs:nodejs /repo/apps/agent/dist ./apps/agent/dist
 
+# Worker runtime deps (Phase 3): the Next standalone bundle in /app/node_modules
+# only contains deps Next traced from .next/server/, which doesn't include the
+# worker's @anthropic-ai/sdk + @supabase/supabase-js imports.
+#
+# pnpm layout: workspace symlinks at apps/agent/node_modules/<pkg> point (via 4
+# levels of ../) to <repoRoot>/node_modules/.pnpm/<pkg-version>/node_modules/<pkg>.
+# In the runner image the same walk lands at /app/node_modules/.pnpm/, so we
+# layer the builder's .pnpm/ subdirectory alongside the standalone's curated
+# /app/node_modules/. The standalone doesn't use a .pnpm/ subdir, so this is
+# additive — the agent's runtime (CMD: apps/agent/server.js) keeps resolving
+# from the standalone's hoisted node_modules unchanged.
+COPY --from=builder --chown=nextjs:nodejs /repo/apps/agent/node_modules ./apps/agent/node_modules
+COPY --from=builder --chown=nextjs:nodejs /repo/node_modules/.pnpm ./node_modules/.pnpm
+
 USER nextjs
 EXPOSE 3002
 ENTRYPOINT ["/sbin/tini", "--"]
