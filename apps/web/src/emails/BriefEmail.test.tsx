@@ -25,7 +25,7 @@ const baseProps: BriefEmailProps = {
   upsell: null,
   paymentLink: 'https://checkout.paystack.com/abc',
   founderName: 'Akinwunmi',
-  brandName: 'Operscale',
+  brandName: 'Operscale', // fixture value only — not a locked-brand reference
 };
 
 describe('BriefEmail render', () => {
@@ -37,7 +37,7 @@ describe('BriefEmail render', () => {
       expect(html).toContain(angle.hook);
     }
     expect(html).toContain(baseProps.paymentLink);
-    expect(html).toContain(`${baseProps.tierName}`);
+    expect(html).toContain(baseProps.tierName);
   });
 
   it('omits the photos block when photoAesthetic is null', async () => {
