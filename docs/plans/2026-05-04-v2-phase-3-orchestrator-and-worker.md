@@ -2982,6 +2982,8 @@ For the simpler Phase-3 path, we accept this race (it's vanishingly rare on `rep
 
 The re-analysis flow (`re_analyze_*` triggers) lands in Task 12.
 
+**SCHEMA NOTE (added during Task 11 implementation, May 2026):** `briefs` does NOT have flat columns. Per `0001_init_schema.sql §3.2`, the metadata columns on a `briefs` row are `id, customer_id, submitted_at, tier_intent` and ALL step-form answers (niche_slug, brand_name, audience_*, video_count, carousel_count, etc.) live inside a single `form_payload jsonb` column. The projector reads `row.tier_intent` (NOT `row.tier`) and unpacks every other analyzer-input field from `row.form_payload.*`. Task 12 inherits this pattern. Also: `analysis_runs.model` is NOT NULL — the run-row INSERT must include `model: CLAUDE_MODEL`.
+
 - [ ] **Step 1: Write the failing tests**
 
 Create `apps/agent/src/worker/process-job.test.ts`:
