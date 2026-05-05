@@ -707,6 +707,7 @@ Create `apps/agent/src/app/v1/webhook/paystack/route.test.ts`:
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createHmac } from 'node:crypto';
 import { POST } from './route';
+import { EmailSendError } from '@/lib/email';
 
 const SECRET = 'sk_test_dummy';
 const ORIGINAL_SECRET = process.env.PAYSTACK_SECRET_KEY;
@@ -717,6 +718,7 @@ let customerRow: any;
 let activityLogs: any[];
 let ordersUpdates: any[];
 let paymentsInserts: any[];
+let paymentsInsertOverride: { error: { code?: string; message: string } } | null;
 let sendEmailMock: ReturnType<typeof vi.fn>;
 
 vi.mock('@/lib/supabase-admin', () => ({
@@ -731,6 +733,7 @@ vi.mock('@/lib/supabase-admin', () => ({
           }),
           insert: vi.fn().mockImplementation(async (row: any) => {
             paymentsInserts.push(row);
+            if (paymentsInsertOverride) return paymentsInsertOverride;
             return { error: null };
           }),
         };
@@ -814,6 +817,7 @@ beforeEach(() => {
   activityLogs = [];
   ordersUpdates = [];
   paymentsInserts = [];
+  paymentsInsertOverride = null;
   sendEmailMock = vi.fn().mockResolvedValue({ resendMessageId: 'pc-msg-1' });
 });
 
@@ -847,6 +851,7 @@ describe('POST /v1/webhook/paystack', () => {
     expect(res.status).toBe(200);
     expect(paymentsInserts).toHaveLength(1);
     expect(paymentsInserts[0]).toMatchObject({ order_id: 'order-1', paystack_event_id: '12345', event_type: 'charge.success', amount_ngn: 275_000 });
+    expect(ordersUpdates).toHaveLength(1);
     const finalOrderUpdate = ordersUpdates[ordersUpdates.length - 1];
     expect(finalOrderUpdate.row).toMatchObject({ status: 'paid' });
     expect(finalOrderUpdate.row.paid_at).toBeDefined();
@@ -859,7 +864,6 @@ describe('POST /v1/webhook/paystack', () => {
   });
 
   it('Resend failure does NOT throw or roll back; logs payment_confirmation_email_failed and returns 200', async () => {
-    const { EmailSendError } = await import('@/lib/email');
     sendEmailMock.mockRejectedValueOnce(new (EmailSendError as any)({ status: 422, message: 'Bad email' }));
     const rawBody = JSON.stringify(makeEvent());
     const res = await POST(makeReq(rawBody, sign(rawBody)));
@@ -886,6 +890,7 @@ describe('POST /v1/webhook/paystack', () => {
     expect(res.status).toBe(200);
     expect(activityLogs.find((e) => e.eventType === 'webhook_amount_mismatch')).toBeDefined();
     expect(paymentsInserts).toHaveLength(1);
+    expect(ordersUpdates).toHaveLength(1);
     const finalOrderUpdate = ordersUpdates[ordersUpdates.length - 1];
     expect(finalOrderUpdate.row.status).toBe('paid');
   });
@@ -922,6 +927,28 @@ describe('POST /v1/webhook/paystack', () => {
     const res = await POST(makeReq(rawBody, 'any-sig'));
     expect(res.status).toBe(500);
   });
+
+  it('returns 500 + logs webhook_handler_failed when payments INSERT fails (non-constraint)', async () => {
+    paymentsInsertOverride = { error: { code: '40001', message: 'serialization_failure' } };
+    const rawBody = JSON.stringify(makeEvent());
+    const res = await POST(makeReq(rawBody, sign(rawBody)));
+    expect(res.status).toBe(500);
+    expect(activityLogs.find((e) => e.eventType === 'webhook_handler_failed')).toBeDefined();
+    // No orders UPDATE because handler threw before reaching the UPDATE.
+    expect(ordersUpdates).toHaveLength(0);
+  });
+
+  it('returns 200 + idempotent skip on 23505 race (concurrent webhook for same event)', async () => {
+    paymentsInsertOverride = { error: { code: '23505', message: 'unique_violation on paystack_event_id' } };
+    const rawBody = JSON.stringify(makeEvent());
+    const res = await POST(makeReq(rawBody, sign(rawBody)));
+    expect(res.status).toBe(200);
+    expect(activityLogs.find((e) => e.eventType === 'webhook_idempotency_race_skipped')).toBeDefined();
+    // Concurrent worker already wrote the row + flipped orders; we must NOT
+    // re-attempt the UPDATE to avoid clobbering paid_at/production_ready_at.
+    expect(ordersUpdates).toHaveLength(0);
+    expect(sendEmailMock).not.toHaveBeenCalled();
+  });
 });
 ```
 
@@ -931,7 +958,7 @@ describe('POST /v1/webhook/paystack', () => {
 npx vitest run src/app/v1/webhook/paystack/route.test.ts
 ```
 
-Expected: 10 failures (current stub returns 501 for everything).
+Expected: 12 failures (current stub returns 501 for everything).
 
 - [ ] **Step 3: Implement the route**
 
@@ -976,7 +1003,8 @@ export async function POST(req: Request): Promise<Response> {
   const secret = process.env.PAYSTACK_SECRET_KEY;
 
   if (!secret) {
-    return NextResponse.json({ error: 'missing_secret' }, { status: 500 });
+    // Generic body — never echo internal config-error codes to an unauthenticated caller.
+    return NextResponse.json({ error: 'internal_error' }, { status: 500 });
   }
 
   if (!verifyWebhookSignature(rawBody, signature, secret)) {
@@ -1004,24 +1032,36 @@ export async function POST(req: Request): Promise<Response> {
 
   const supabase = getSupabaseAdmin();
 
-  switch (event?.event) {
-    case 'charge.success':
-      await handleChargeSuccess(event as PaystackChargeSuccessEvent, supabase);
-      break;
-    case 'charge.failure':
-      await handleChargeFailure(event as PaystackChargeFailureEvent, supabase);
-      break;
-    case 'transfer.success':
-      await writeActivityLog(
-        { eventType: 'webhook_transfer_success_skipped', actor: 'system', payload: { event_id: event.data?.id } },
-        supabase,
-      );
-      break;
-    default:
-      await writeActivityLog(
-        { eventType: 'webhook_unhandled_event', actor: 'system', payload: { event_type: event?.event } },
-        supabase,
-      );
+  try {
+    switch (event?.event) {
+      case 'charge.success':
+        await handleChargeSuccess(event as PaystackChargeSuccessEvent, supabase);
+        break;
+      case 'charge.failure':
+        await handleChargeFailure(event as PaystackChargeFailureEvent, supabase);
+        break;
+      case 'transfer.success':
+        await writeActivityLog(
+          { eventType: 'webhook_transfer_success_skipped', actor: 'system', payload: { event_id: event.data?.id } },
+          supabase,
+        );
+        break;
+      default:
+        await writeActivityLog(
+          { eventType: 'webhook_unhandled_event', actor: 'system', payload: { event_type: event?.event } },
+          supabase,
+        );
+    }
+  } catch (e) {
+    // Critical DB write failed (payments INSERT or orders UPDATE). Per design § 7,
+    // return 500 so Paystack retries (6× over 24h). The idempotency check on the
+    // retry will dedupe if the failed write actually succeeded behind the scenes.
+    const message = e instanceof Error ? e.message : String(e);
+    await writeActivityLog(
+      { eventType: 'webhook_handler_failed', actor: 'system', payload: { event_type: event?.event, error: message } },
+      supabase,
+    );
+    return NextResponse.json({ error: 'internal_error' }, { status: 500 });
   }
 
   return NextResponse.json({ received: true }, { status: 200 });
@@ -1070,19 +1110,37 @@ async function handleChargeSuccess(
     // Still process — record under-payment for founder reconciliation.
   }
 
-  await supabase.from('payments').insert({
+  const { error: insertErr } = await supabase.from('payments').insert({
     order_id: order.id,
     paystack_event_id: eventId,
     event_type: 'charge.success',
     amount_ngn: Math.round(event.data.amount / 100),
     raw_payload: event.data,
   });
+  if (insertErr) {
+    // 23505 = UNIQUE constraint violation on paystack_event_id — concurrent webhook
+    // for the same event already inserted. Idempotent skip; do NOT 500 to Paystack.
+    if ((insertErr as { code?: string }).code === '23505') {
+      await writeActivityLog(
+        { eventType: 'webhook_idempotency_race_skipped', actor: 'system', orderId: order.id, payload: { event_id: eventId, tx_ref: txRef } },
+        supabase,
+      );
+      return;
+    }
+    throw new Error(`payments_insert_failed: ${insertErr.message}`);
+  }
 
   const nowIso = new Date().toISOString();
-  await supabase
+  const { error: updateErr } = await supabase
     .from('orders')
     .update({ status: 'paid', paid_at: nowIso, production_ready_at: nowIso })
     .eq('id', order.id);
+  if (updateErr) {
+    // payments row is now committed, but orders status didn't flip. Surface 500
+    // so Paystack retries; idempotency on payments will skip the INSERT next time
+    // and re-attempt the UPDATE. Manual recovery via founder if retries exhaust.
+    throw new Error(`orders_update_failed: ${updateErr.message}`);
+  }
 
   await writeActivityLog(
     {
@@ -1141,6 +1199,8 @@ async function handleChargeFailure(
 ): Promise<void> {
   const txRef = event.data.reference;
   const eventId = String(event.data.id);
+  // Note: orderId intentionally NOT included — failure events don't trigger the
+  // orders SELECT. Recovery cron (Phase 4.6.2) joins by tx_ref to re-engage.
   await writeActivityLog(
     {
       eventType: 'payment_failed',
@@ -1159,7 +1219,7 @@ npx vitest run src/app/v1/webhook/paystack/route.test.ts
 npm run typecheck
 ```
 
-Expected: 10/10 tests pass; typecheck clean.
+Expected: 12/12 tests pass; typecheck clean.
 
 - [ ] **Step 5: Run full agent suite**
 
@@ -1167,7 +1227,7 @@ Expected: 10/10 tests pass; typecheck clean.
 npm test
 ```
 
-Expected: ~270 pass / 3 nightly skipped.
+Expected: ~272 pass / 3 nightly skipped.
 
 - [ ] **Step 6: Commit**
 

@@ -36,7 +36,8 @@ export async function POST(req: Request): Promise<Response> {
   const secret = process.env.PAYSTACK_SECRET_KEY;
 
   if (!secret) {
-    return NextResponse.json({ error: 'missing_secret' }, { status: 500 });
+    // Generic body — never echo internal config-error codes to an unauthenticated caller.
+    return NextResponse.json({ error: 'internal_error' }, { status: 500 });
   }
 
   if (!verifyWebhookSignature(rawBody, signature, secret)) {
@@ -64,24 +65,36 @@ export async function POST(req: Request): Promise<Response> {
 
   const supabase = getSupabaseAdmin();
 
-  switch (event?.event) {
-    case 'charge.success':
-      await handleChargeSuccess(event as PaystackChargeSuccessEvent, supabase);
-      break;
-    case 'charge.failure':
-      await handleChargeFailure(event as PaystackChargeFailureEvent, supabase);
-      break;
-    case 'transfer.success':
-      await writeActivityLog(
-        { eventType: 'webhook_transfer_success_skipped', actor: 'system', payload: { event_id: event.data?.id } },
-        supabase,
-      );
-      break;
-    default:
-      await writeActivityLog(
-        { eventType: 'webhook_unhandled_event', actor: 'system', payload: { event_type: event?.event } },
-        supabase,
-      );
+  try {
+    switch (event?.event) {
+      case 'charge.success':
+        await handleChargeSuccess(event as PaystackChargeSuccessEvent, supabase);
+        break;
+      case 'charge.failure':
+        await handleChargeFailure(event as PaystackChargeFailureEvent, supabase);
+        break;
+      case 'transfer.success':
+        await writeActivityLog(
+          { eventType: 'webhook_transfer_success_skipped', actor: 'system', payload: { event_id: event.data?.id } },
+          supabase,
+        );
+        break;
+      default:
+        await writeActivityLog(
+          { eventType: 'webhook_unhandled_event', actor: 'system', payload: { event_type: event?.event } },
+          supabase,
+        );
+    }
+  } catch (e) {
+    // Critical DB write failed (payments INSERT or orders UPDATE). Per design § 7,
+    // return 500 so Paystack retries (6× over 24h). The idempotency check on the
+    // retry will dedupe if the failed write actually succeeded behind the scenes.
+    const message = e instanceof Error ? e.message : String(e);
+    await writeActivityLog(
+      { eventType: 'webhook_handler_failed', actor: 'system', payload: { event_type: event?.event, error: message } },
+      supabase,
+    );
+    return NextResponse.json({ error: 'internal_error' }, { status: 500 });
   }
 
   return NextResponse.json({ received: true }, { status: 200 });
@@ -130,19 +143,37 @@ async function handleChargeSuccess(
     // Still process — record under-payment for founder reconciliation.
   }
 
-  await supabase.from('payments').insert({
+  const { error: insertErr } = await supabase.from('payments').insert({
     order_id: order.id,
     paystack_event_id: eventId,
     event_type: 'charge.success',
     amount_ngn: Math.round(event.data.amount / 100),
     raw_payload: event.data,
   });
+  if (insertErr) {
+    // 23505 = UNIQUE constraint violation on paystack_event_id — concurrent webhook
+    // for the same event already inserted. Idempotent skip; do NOT 500 to Paystack.
+    if ((insertErr as { code?: string }).code === '23505') {
+      await writeActivityLog(
+        { eventType: 'webhook_idempotency_race_skipped', actor: 'system', orderId: order.id, payload: { event_id: eventId, tx_ref: txRef } },
+        supabase,
+      );
+      return;
+    }
+    throw new Error(`payments_insert_failed: ${insertErr.message}`);
+  }
 
   const nowIso = new Date().toISOString();
-  await supabase
+  const { error: updateErr } = await supabase
     .from('orders')
     .update({ status: 'paid', paid_at: nowIso, production_ready_at: nowIso })
     .eq('id', order.id);
+  if (updateErr) {
+    // payments row is now committed, but orders status didn't flip. Surface 500
+    // so Paystack retries; idempotency on payments will skip the INSERT next time
+    // and re-attempt the UPDATE. Manual recovery via founder if retries exhaust.
+    throw new Error(`orders_update_failed: ${updateErr.message}`);
+  }
 
   await writeActivityLog(
     {
@@ -201,6 +232,8 @@ async function handleChargeFailure(
 ): Promise<void> {
   const txRef = event.data.reference;
   const eventId = String(event.data.id);
+  // Note: orderId intentionally NOT included — failure events don't trigger the
+  // orders SELECT. Recovery cron (Phase 4.6.2) joins by tx_ref to re-engage.
   await writeActivityLog(
     {
       eventType: 'payment_failed',
