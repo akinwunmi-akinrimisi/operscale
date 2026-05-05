@@ -905,7 +905,10 @@ describe('sendEmail', () => {
 
   it('throws after 3 5xx retries', async () => {
     resendSpy.mockResolvedValue({ data: null, error: { name: 'application_error', message: 'upstream', statusCode: 503 } });
+    // .catch() no-op suppresses the same Vitest unhandled-rejection warning
+    // documented in Task 2. Pattern carried forward.
     const promise = sendEmail(baseInput);
+    promise.catch(() => { /* handled below */ });
     await vi.advanceTimersByTimeAsync(500 + 1000 + 2000);
     await expect(promise).rejects.toBeInstanceOf(EmailSendError);
     expect(resendSpy).toHaveBeenCalledTimes(4);
