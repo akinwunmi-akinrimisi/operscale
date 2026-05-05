@@ -88,7 +88,6 @@ export async function initializeTransaction(
     channels: input.channels ?? DEFAULT_CHANNELS,
   };
 
-  // Retry loop: 4 attempts (initial + 3 retries) on 5xx or network error.
   let lastErr: { status: number; message: string } | null = null;
   for (let attempt = 0; attempt < 4; attempt++) {
     if (attempt > 0) {
@@ -115,6 +114,9 @@ export async function initializeTransaction(
       if (msg.toLowerCase().includes('duplicate transaction reference')) {
         const verify = await paystackGet<InitData>(`/transaction/verify/${input.reference}`, secret);
         if (verify.status >= 200 && verify.status < 300 && verify.envelope?.status === true && verify.envelope.data) {
+          // The /transaction/verify response may omit access_code (only the
+          // authorization_url is guaranteed). '' here is intentional — Phase
+          // 4.5 callers don't read accessCode (Paystack inline widget would).
           return {
             authorizationUrl: verify.envelope.data.authorization_url,
             accessCode: verify.envelope.data.access_code ?? '',
@@ -124,7 +126,6 @@ export async function initializeTransaction(
       }
       throw new PaystackInitError({ status, message: msg });
     }
-    // 5xx → retry
     lastErr = { status, message: envelope?.message ?? 'upstream_5xx' };
   }
   throw new PaystackInitError(lastErr ?? { status: 0, message: 'init_failed_no_response' });

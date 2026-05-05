@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { createHmac } from 'node:crypto';
 import { initializeTransaction, PaystackInitError, paystackReference, ngnToKobo, verifyWebhookSignature } from './paystack';
 
 const ORIGINAL_FETCH = global.fetch;
@@ -132,7 +133,7 @@ describe('verifyWebhookSignature', () => {
   const SECRET = 'sk_test_dummy';
   it('returns true on valid HMAC-SHA512', () => {
     const body = '{"event":"charge.success"}';
-    const sig = require('node:crypto').createHmac('sha512', SECRET).update(body).digest('hex');
+    const sig = createHmac('sha512', SECRET).update(body).digest('hex');
     expect(verifyWebhookSignature(body, sig, SECRET)).toBe(true);
   });
   it('returns false on mismatched HMAC', () => {
