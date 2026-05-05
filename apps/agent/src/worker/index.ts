@@ -18,9 +18,7 @@ import { getSupabaseAdmin, writeActivityLog } from '../lib/supabase-admin.js';
 
 import { sweepStuckJobs as sweepStuckJobsImpl } from './sweep.js';
 import { claimNextJob as claimNextJobImpl, type ClaimedJob } from './claim.js';
-
-// Task 11 stub — replaces with real impl in its own file.
-const processJob = async (_args: any): Promise<void> => {};
+import { processJob } from './process-job.js';
 
 export interface WorkerHandle {
   isRunning(): boolean;
