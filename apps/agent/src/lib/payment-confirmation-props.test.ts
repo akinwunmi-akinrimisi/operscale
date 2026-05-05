@@ -3,12 +3,23 @@ import { paymentConfirmationProps } from './payment-confirmation-props';
 import type { PaystackChargeSuccessEvent } from './paystack';
 
 const ORIGINAL_WA = process.env.NEXT_PUBLIC_FOUNDER_WHATSAPP;
+const ORIGINAL_NAME = process.env.NEXT_PUBLIC_FOUNDER_NAME;
+const ORIGINAL_BRAND = process.env.NEXT_PUBLIC_BRAND_NAME;
+
+function restoreEnv(key: string, original: string | undefined): void {
+  if (original === undefined) delete process.env[key];
+  else process.env[key] = original;
+}
 
 beforeEach(() => {
   process.env.NEXT_PUBLIC_FOUNDER_WHATSAPP = '+2348165799032';
+  delete process.env.NEXT_PUBLIC_FOUNDER_NAME;
+  delete process.env.NEXT_PUBLIC_BRAND_NAME;
 });
 afterEach(() => {
-  process.env.NEXT_PUBLIC_FOUNDER_WHATSAPP = ORIGINAL_WA;
+  restoreEnv('NEXT_PUBLIC_FOUNDER_WHATSAPP', ORIGINAL_WA);
+  restoreEnv('NEXT_PUBLIC_FOUNDER_NAME', ORIGINAL_NAME);
+  restoreEnv('NEXT_PUBLIC_BRAND_NAME', ORIGINAL_BRAND);
 });
 
 const baseEvent: PaystackChargeSuccessEvent = {
@@ -82,5 +93,13 @@ describe('paymentConfirmationProps', () => {
     const props = paymentConfirmationProps(baseEvent, baseOrder, baseCustomer);
     expect(props.founderWhatsappLink).toBe('https://wa.me/2348165799032');
     expect(props.founderWhatsappLink).not.toContain('+');
+  });
+
+  it('uses env-var overrides for founderName and brandName when set', () => {
+    process.env.NEXT_PUBLIC_FOUNDER_NAME = 'Femi';
+    process.env.NEXT_PUBLIC_BRAND_NAME = 'Acme';
+    const props = paymentConfirmationProps(baseEvent, baseOrder, baseCustomer);
+    expect(props.founderName).toBe('Femi');
+    expect(props.brandName).toBe('Acme');
   });
 });
