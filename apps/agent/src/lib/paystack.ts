@@ -170,3 +170,33 @@ export function ngnToKobo(ngn: number): number {
 }
 
 export const PAYSTACK = { API_BASE: PAYSTACK_API_BASE } as const;
+
+export interface PaystackChargeSuccessEvent {
+  event: 'charge.success';
+  data: {
+    id: number;
+    reference: string;
+    amount: number;
+    currency: 'NGN';
+    paid_at: string;
+    channel: 'card' | 'bank_transfer' | 'ussd' | 'qr' | 'mobile_money' | 'bank';
+    customer: { email: string };
+    metadata?: {
+      order_id?: string;
+      customer_id?: string;
+      brief_id?: string;
+      tier?: string;
+    };
+    [key: string]: unknown;
+  };
+}
+
+export interface PaystackChargeFailureEvent {
+  event: 'charge.failure';
+  data: {
+    id: number;
+    reference: string;
+    gateway_response?: string;
+    [key: string]: unknown;
+  };
+}

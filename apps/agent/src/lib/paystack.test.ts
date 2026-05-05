@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createHmac } from 'node:crypto';
 import { initializeTransaction, PaystackInitError, paystackReference, ngnToKobo, verifyWebhookSignature } from './paystack';
+import type { PaystackChargeSuccessEvent, PaystackChargeFailureEvent } from './paystack';
 
 const ORIGINAL_FETCH = global.fetch;
 const ORIGINAL_KEY = process.env.PAYSTACK_SECRET_KEY;
@@ -141,5 +142,32 @@ describe('verifyWebhookSignature', () => {
   });
   it('returns false on missing signature', () => {
     expect(verifyWebhookSignature('{}', null, SECRET)).toBe(false);
+  });
+});
+
+describe('PaystackChargeSuccessEvent type shape', () => {
+  it('compiles with the expected fields', () => {
+    const e: PaystackChargeSuccessEvent = {
+      event: 'charge.success',
+      data: {
+        id: 12345,
+        reference: 'ops-cal-abc-1714742400',
+        amount: 27500000,
+        currency: 'NGN',
+        paid_at: '2026-05-05T10:00:00Z',
+        channel: 'card',
+        customer: { email: 't@x.z' },
+        metadata: { order_id: 'order-1' },
+      },
+    };
+    expect(e.data.amount).toBe(27500000);
+  });
+
+  it('PaystackChargeFailureEvent compiles with minimal fields', () => {
+    const e: PaystackChargeFailureEvent = {
+      event: 'charge.failure',
+      data: { id: 999, reference: 'ops-cal-x', gateway_response: 'declined' },
+    };
+    expect(e.data.gateway_response).toBe('declined');
   });
 });
