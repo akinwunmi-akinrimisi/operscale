@@ -1124,12 +1124,14 @@ throw not_implemented_template. activity_log INSERT is best-effort
 ## Task 4 — `BriefEmail.tsx` React Email component
 
 **Files:**
-- Create: `apps/web/src/emails/BriefEmail.tsx`
+- Create: `apps/web/src/emails/BriefEmail.tsx` (replaced existing stub with new interface)
 - Create: `apps/web/src/emails/BriefEmail.test.tsx`
-- Modify: `apps/web/package.json`
+- Create: `apps/web/vitest.config.ts` (drift: apps/web had no vitest; added with @vitejs/plugin-react)
+- Modify: `apps/web/package.json` (drift: added vitest + @vitejs/plugin-react devDeps + test scripts)
+- Modify: `apps/web/tsconfig.json` (drift: added @operscale-calendar/agent/* paths entry for tsc)
 - Modify: `apps/agent/package.json`
 
-- [ ] **Step 1: Add deps + workspace wiring**
+- [x] **Step 1: Add deps + workspace wiring**
 
 Add to `apps/web/package.json`:
 
@@ -1234,7 +1236,9 @@ describe('BriefEmail render', () => {
 });
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 2: Write failing test**
+
+- [x] **Step 3: Run tests to verify they fail**
 
 ```bash
 npx vitest run apps/web/src/emails/BriefEmail.test.tsx
@@ -1242,7 +1246,7 @@ npx vitest run apps/web/src/emails/BriefEmail.test.tsx
 
 Expected: failures with "Cannot find module './BriefEmail'".
 
-- [ ] **Step 4: Implement `BriefEmail.tsx`**
+- [x] **Step 4: Implement `BriefEmail.tsx`**
 
 Create `apps/web/src/emails/BriefEmail.tsx`:
 
@@ -1357,7 +1361,7 @@ Note: the import path `@operscale-calendar/agent/lib/snapshot-to-email-props` re
 
 If circular workspace dependencies prove troublesome (web → agent for the type, agent → web for the component), the alternative is a tiny shared types-only package. For Phase 4.5 we keep it simple with mutual workspace deps.
 
-- [ ] **Step 5: Verify tests pass + typecheck**
+- [x] **Step 5: Verify tests pass + typecheck**
 
 ```bash
 npx vitest run apps/web/src/emails/BriefEmail.test.tsx
@@ -1366,9 +1370,12 @@ pnpm --filter @operscale-calendar/web typecheck   # if web has a typecheck scrip
 pnpm --filter @operscale-calendar/agent typecheck
 ```
 
-Expected: all pass.
+Expected: all pass. Actual: 6/6 pass; both typechecks clean.
+Drift: needed apps/web/tsconfig.json paths entry for @operscale-calendar/agent/* because
+moduleResolution:bundler under Next.js tsc does not walk package.json exports of sibling
+workspace packages. vitest resolve.alias handles the same mapping for the test runner.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/web/src/emails/BriefEmail.tsx apps/web/src/emails/BriefEmail.test.tsx apps/web/package.json apps/agent/package.json pnpm-lock.yaml
