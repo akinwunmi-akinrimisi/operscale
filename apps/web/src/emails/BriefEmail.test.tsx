@@ -69,4 +69,16 @@ describe('BriefEmail render', () => {
     expect(text).toContain(baseProps.briefSummary);
     expect(text).not.toContain('<');
   });
+
+  it('renders plain-text headings in ALL CAPS per email-templates.md', async () => {
+    const text = await render(<BriefEmail {...baseProps} />, { plainText: true });
+    expect(text).toContain('WHAT WE HEARD');
+    expect(text).toContain('3 ANGLES WE\'D OPEN THE CALENDAR WITH');
+    expect(text).toContain('A TASTE OF HOW THE FIRST VIDEO WOULD LAND');
+    expect(text).toContain('THE VISUAL DIRECTION WE HAVE IN MIND');
+    expect(text).toContain('YOUR PACKAGE');
+    expect(text).toContain('NEXT STEP');
+    // The upsell heading is intentionally hybrid case — only the upsell test (which
+    // passes upsell={...}) can verify the full string; this one omits.
+  });
 });

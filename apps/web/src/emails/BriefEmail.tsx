@@ -5,7 +5,10 @@ import type { BriefEmailProps } from '@operscale-calendar/agent/lib/snapshot-to-
 
 const body: React.CSSProperties = { backgroundColor: '#f5f4f0', fontFamily: 'system-ui, -apple-system, sans-serif', padding: '24px 0', color: '#1a1a1a' };
 const container: React.CSSProperties = { maxWidth: '560px', margin: '0 auto', backgroundColor: '#ffffff', padding: '32px', borderRadius: '4px' };
+// textTransform: 'uppercase' is a no-op for the 6 ALL-CAPS headings (uppercase-of-uppercase = uppercase)
+// but retained for styling clarity. The upsell heading overrides to 'none' to preserve hybrid case.
 const h2: React.CSSProperties = { fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#5a5a5a', marginTop: '24px', marginBottom: '8px' };
+const h2Upsell: React.CSSProperties = { ...h2, textTransform: 'none' };
 const p: React.CSSProperties = { fontSize: '16px', lineHeight: 1.55, marginBottom: '12px' };
 const small: React.CSSProperties = { fontSize: '13px', color: '#5a5a5a' };
 const buttonStyle: React.CSSProperties = { backgroundColor: '#1a1a1a', color: '#ffffff', padding: '14px 24px', borderRadius: '4px', textDecoration: 'none', display: 'inline-block', fontWeight: 600 };
@@ -24,10 +27,10 @@ export function BriefEmail(props: BriefEmailProps): JSX.Element {
           <Text style={p}>Hi {props.firstName},</Text>
           <Text style={p}>Here&apos;s your personalised content brief.</Text>
 
-          <Heading as="h2" style={h2}>What we heard</Heading>
+          <Heading as="h2" style={h2}>WHAT WE HEARD</Heading>
           <Text style={p}>{props.briefSummary}</Text>
 
-          <Heading as="h2" style={h2}>3 angles we&apos;d open the calendar with</Heading>
+          <Heading as="h2" style={h2}>3 ANGLES WE&apos;D OPEN THE CALENDAR WITH</Heading>
           {props.angles.map((angle, i) => (
             <Section key={i}>
               <Text style={{ ...p, fontWeight: 600 }}>{i + 1}. {angle.title}</Text>
@@ -36,7 +39,7 @@ export function BriefEmail(props: BriefEmailProps): JSX.Element {
             </Section>
           ))}
 
-          <Heading as="h2" style={h2}>A taste of how the first video would land</Heading>
+          <Heading as="h2" style={h2}>A TASTE OF HOW THE FIRST VIDEO WOULD LAND</Heading>
           <Text style={p}>Topic: {props.scriptSeed.topic}</Text>
           <Text style={p}>The first 1.5 seconds: &ldquo;{props.scriptSeed.openingHook}&rdquo;</Text>
           <Text style={p}>The 30-second arc:</Text>
@@ -44,14 +47,14 @@ export function BriefEmail(props: BriefEmailProps): JSX.Element {
             <Text key={i} style={p}>— {beat}</Text>
           ))}
 
-          <Heading as="h2" style={h2}>The visual direction we have in mind</Heading>
+          <Heading as="h2" style={h2}>THE VISUAL DIRECTION WE HAVE IN MIND</Heading>
           <Text style={p}>{props.visualStyle.recommendedCameraTreatment}</Text>
           <Text style={p}>Captions: {props.visualStyle.recommendedCaptionStyle}</Text>
           {props.photoAesthetic && (
             <Text style={p}>A note on your reference photos: {props.photoAesthetic.recommendedAvatarTreatment}</Text>
           )}
 
-          <Heading as="h2" style={h2}>Your package</Heading>
+          <Heading as="h2" style={h2}>YOUR PACKAGE</Heading>
           <Text style={p}>{props.tierName} — ₦{fmtNgn(props.priceNgn)}</Text>
           <Text style={p}>{props.videoCount} short-form videos ({props.ugcCount} with you on camera, {props.t2vCount} cinematic)</Text>
           <Text style={p}>{props.carouselCount} carousels ({props.carouselPages} image cards total)</Text>
@@ -59,7 +62,8 @@ export function BriefEmail(props: BriefEmailProps): JSX.Element {
 
           {props.upsell && (
             <Section>
-              <Heading as="h2" style={h2}>One thought — would the {props.upsell.recommendedTier} package be a better fit?</Heading>
+              {/* Intentionally hybrid case per email-templates.md spec — textTransform: 'none' preserves it */}
+              <Heading as="h2" style={h2Upsell}>ONE THOUGHT — would the {props.upsell.recommendedTier} package be a better fit?</Heading>
               <Text style={p}>{props.upsell.reasoning}</Text>
               <Text style={p}>That&apos;s an extra ₦{fmtNgn(props.upsell.priceDeltaNgn)}, totalling ₦{fmtNgn(props.upsell.recommendedTierPriceNgn)}. You can choose either tier on the payment page.</Text>
             </Section>
@@ -67,7 +71,7 @@ export function BriefEmail(props: BriefEmailProps): JSX.Element {
 
           <Hr />
 
-          <Heading as="h2" style={h2}>Next step</Heading>
+          <Heading as="h2" style={h2}>NEXT STEP</Heading>
           <Text style={p}>Pay securely via Paystack:</Text>
           <Section style={{ textAlign: 'center', margin: '24px 0' }}>
             <Button href={props.paymentLink} style={buttonStyle}>Pay now</Button>

@@ -1130,6 +1130,7 @@ throw not_implemented_template. activity_log INSERT is best-effort
 - Modify: `apps/web/package.json` (drift: added vitest + @vitejs/plugin-react devDeps + test scripts)
 - Modify: `apps/web/tsconfig.json` (drift: added @operscale-calendar/agent/* paths entry for tsc)
 - Modify: `apps/agent/package.json`
+- JSX string drift: JSX disallows raw `'` and `"` inside text content; HTML entities (`&apos;`, `&ldquo;`, `&rdquo;`) are used in source. `@react-email/render` decodes them at render time so the email body shows the literal characters.
 
 - [x] **Step 1: Add deps + workspace wiring**
 
