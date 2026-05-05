@@ -18,15 +18,23 @@ const baseProps: PaymentConfirmationProps = {
 };
 
 describe('PaymentConfirmation render', () => {
-  it('renders all 7 substantive variables in the HTML body', async () => {
+  it('renders all 8 substantive variables in the HTML body', async () => {
     const html = await render(<PaymentConfirmation {...baseProps} />);
     expect(html).toContain('Tola');
     expect(html).toContain('275,000'); // formatted NGN
     expect(html).toContain('card');
     expect(html).toContain('Standard');
     expect(html).toContain('14 videos');
+    expect(html).toContain('7 carousels');
     expect(html).toContain('7-10 business days');
     expect(html).toContain('https://wa.me/2348165799032');
+  });
+
+  it('renders paidAt in WAT (UTC+1) using ICU-free manual formatting', async () => {
+    // 2026-05-05T10:00:00Z UTC → 2026-05-05 11:00 WAT.
+    const html = await render(<PaymentConfirmation {...baseProps} />);
+    expect(html).toContain('5 May 2026');
+    expect(html).toContain('11:00 WAT');
   });
 
   it('renders ALL-CAPS heading "WHAT HAPPENS NEXT" in plain text', async () => {

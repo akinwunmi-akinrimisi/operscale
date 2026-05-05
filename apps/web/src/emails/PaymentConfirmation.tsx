@@ -11,7 +11,7 @@ import type { PaymentConfirmationProps } from '@operscale-calendar/agent/lib/pay
 
 const body: React.CSSProperties = { backgroundColor: '#f5f4f0', fontFamily: 'system-ui, -apple-system, sans-serif', padding: '24px 0', color: '#1a1a1a' };
 const container: React.CSSProperties = { maxWidth: '560px', margin: '0 auto', backgroundColor: '#ffffff', padding: '32px', borderRadius: '4px' };
-const h2: React.CSSProperties = { fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#5a5a5a', marginTop: '24px', marginBottom: '8px' };
+const h2: React.CSSProperties = { fontSize: '14px', letterSpacing: '0.06em', color: '#5a5a5a', marginTop: '24px', marginBottom: '8px' };
 const p: React.CSSProperties = { fontSize: '16px', lineHeight: 1.55, marginBottom: '12px' };
 const small: React.CSSProperties = { fontSize: '13px', color: '#5a5a5a' };
 
@@ -19,9 +19,23 @@ function fmtNgn(n: number): string {
   return new Intl.NumberFormat('en-NG').format(n);
 }
 
+// Format a UTC ISO timestamp into West Africa Time (UTC+1, no DST) without
+// relying on Intl/ICU locale data. The agent + web containers run on
+// node:20.11-alpine which ships small-icu — `toLocaleString('en-NG', {dateStyle,
+// timeStyle})` silently degrades to the C locale there. Manual formatting keeps
+// the output deterministic across hosts.
+const FMT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 function fmtPaidAt(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Lagos' });
+  const utcMs = new Date(iso).getTime();
+  if (!Number.isFinite(utcMs)) return iso;
+  const wat = new Date(utcMs + 60 * 60 * 1000); // WAT = UTC+1, no DST
+  const day = wat.getUTCDate();
+  const month = FMT_MONTHS[wat.getUTCMonth()];
+  const year = wat.getUTCFullYear();
+  const hh = String(wat.getUTCHours()).padStart(2, '0');
+  const mm = String(wat.getUTCMinutes()).padStart(2, '0');
+  return `${day} ${month} ${year}, ${hh}:${mm} WAT`;
 }
 
 export function PaymentConfirmation(props: PaymentConfirmationProps): JSX.Element {

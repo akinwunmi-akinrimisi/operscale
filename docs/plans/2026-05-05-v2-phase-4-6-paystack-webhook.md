@@ -478,15 +478,23 @@ const baseProps: PaymentConfirmationProps = {
 };
 
 describe('PaymentConfirmation render', () => {
-  it('renders all 7 substantive variables in the HTML body', async () => {
+  it('renders all 8 substantive variables in the HTML body', async () => {
     const html = await render(<PaymentConfirmation {...baseProps} />);
     expect(html).toContain('Tola');
     expect(html).toContain('275,000'); // formatted NGN
     expect(html).toContain('card');
     expect(html).toContain('Standard');
     expect(html).toContain('14 videos');
+    expect(html).toContain('7 carousels');
     expect(html).toContain('7-10 business days');
     expect(html).toContain('https://wa.me/2348165799032');
+  });
+
+  it('renders paidAt in WAT (UTC+1) using ICU-free manual formatting', async () => {
+    // 2026-05-05T10:00:00Z UTC → 2026-05-05 11:00 WAT.
+    const html = await render(<PaymentConfirmation {...baseProps} />);
+    expect(html).toContain('5 May 2026');
+    expect(html).toContain('11:00 WAT');
   });
 
   it('renders ALL-CAPS heading "WHAT HAPPENS NEXT" in plain text', async () => {
@@ -516,7 +524,7 @@ cd apps/web
 npx vitest run src/emails/PaymentConfirmation.test.tsx
 ```
 
-Expected: 4 failures with "Cannot find module './PaymentConfirmation'".
+Expected: 5 failures with "Cannot find module './PaymentConfirmation'".
 
 - [ ] **Step 3: Implement `PaymentConfirmation.tsx`**
 
@@ -536,7 +544,7 @@ import type { PaymentConfirmationProps } from '@operscale-calendar/agent/lib/pay
 
 const body: React.CSSProperties = { backgroundColor: '#f5f4f0', fontFamily: 'system-ui, -apple-system, sans-serif', padding: '24px 0', color: '#1a1a1a' };
 const container: React.CSSProperties = { maxWidth: '560px', margin: '0 auto', backgroundColor: '#ffffff', padding: '32px', borderRadius: '4px' };
-const h2: React.CSSProperties = { fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#5a5a5a', marginTop: '24px', marginBottom: '8px' };
+const h2: React.CSSProperties = { fontSize: '14px', letterSpacing: '0.06em', color: '#5a5a5a', marginTop: '24px', marginBottom: '8px' };
 const p: React.CSSProperties = { fontSize: '16px', lineHeight: 1.55, marginBottom: '12px' };
 const small: React.CSSProperties = { fontSize: '13px', color: '#5a5a5a' };
 
@@ -544,9 +552,23 @@ function fmtNgn(n: number): string {
   return new Intl.NumberFormat('en-NG').format(n);
 }
 
+// Format a UTC ISO timestamp into West Africa Time (UTC+1, no DST) without
+// relying on Intl/ICU locale data. The agent + web containers run on
+// node:20.11-alpine which ships small-icu — `toLocaleString('en-NG', {dateStyle,
+// timeStyle})` silently degrades to the C locale there. Manual formatting keeps
+// the output deterministic across hosts.
+const FMT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 function fmtPaidAt(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Lagos' });
+  const utcMs = new Date(iso).getTime();
+  if (!Number.isFinite(utcMs)) return iso;
+  const wat = new Date(utcMs + 60 * 60 * 1000); // WAT = UTC+1, no DST
+  const day = wat.getUTCDate();
+  const month = FMT_MONTHS[wat.getUTCMonth()];
+  const year = wat.getUTCFullYear();
+  const hh = String(wat.getUTCHours()).padStart(2, '0');
+  const mm = String(wat.getUTCMinutes()).padStart(2, '0');
+  return `${day} ${month} ${year}, ${hh}:${mm} WAT`;
 }
 
 export function PaymentConfirmation(props: PaymentConfirmationProps): JSX.Element {
@@ -595,7 +617,7 @@ cd apps/web
 npx vitest run src/emails/PaymentConfirmation.test.tsx
 ```
 
-Expected: 4/4 pass.
+Expected: 5/5 pass.
 
 - [ ] **Step 5: Commit**
 
