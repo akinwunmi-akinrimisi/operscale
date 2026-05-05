@@ -1031,13 +1031,13 @@ The Phase 3 worker is already deployed. Phase 4 just adds two routes that talk t
 
 The smoke uses the same fixture customer + brief from Phase 3 Task 16's smoke (Tola Studios, brief_id `aaaaaaaa-…`). Reuses the form_payload jsonb shape verified in Phase 3.
 
-- [ ] **Step 1: Push all Phase 4 commits**
+- [x] **Step 1: Push all Phase 4 commits**
 
 ```bash
 git push origin main
 ```
 
-- [ ] **Step 2: Pull on VPS + rebuild agent image**
+- [x] **Step 2: Pull on VPS + rebuild agent image**
 
 The agent image needs to rebuild because the route changed. Worker is unaffected (no rebuild needed) but the agent container's running image is stale.
 
@@ -1065,7 +1065,10 @@ c.close()
 
 Expected: agent rebuilds (~30-60s), comes up clean. Verify `curl https://api.operscale.cloud/v1/health` still returns 200.
 
-- [ ] **Step 3: Run end-to-end smoke**
+- [x] **Step 3: Run end-to-end smoke**
+
+Smoke script lives at `C:\tmp\phase4-smoke.py` (NOT committed — outputs noisy IDs).
+Run via `python C:\tmp\phase4-smoke.py` with `PYTHONIOENCODING=utf-8`.
 
 The Phase 3 Task 16 smoke INSERT-ed the customer + brief directly into Postgres. Phase 4's smoke goes through the route instead. Use the same customer + brief.
 
@@ -1082,11 +1085,20 @@ Use a Python paramiko script that:
 
 The full script is long; the implementer adapts Phase 3 Task 16's structure. KEY EXTRA: needs a `orders` row INSERT and a service-role JWT for the analyze call.
 
-- [ ] **Step 4: Cleanup test data**
+**Smoke result (2026-05-05):**
+- POST /v1/brief/analyze → 202 `{job_id, status:"queued", idempotency_key}` (~70ms)
+- Worker claimed job within 15s; analysis completed in ~140s (queued → running → completed)
+- analysis_runs row written: `run_index=1, is_current=true, framework_seed.selected_pairs n=7`
+- POST /v1/brief/approve → 200 `{framework_history_rows_written: 7}` (founder JWT minted with `JWT_SECRET`)
+- customer_framework_history: 7 rows written, exact match to selected_pairs
+- orders: status='founder_approved', founder_approved_at + approved_analysis_run_id both set
+- Cleanup: 0 leftovers across (customers, briefs, orders, analysis_runs, ai_analysis_jobs, customer_framework_history)
 
-Mirror Phase 3 Task 16's DELETE block, plus DELETE the customer_framework_history rows and the orders row.
+- [x] **Step 4: Cleanup test data**
 
-- [ ] **Step 5: Document the smoke in commit body**
+Cleanup is the last step of `phase4-smoke.py`; verified 0 leftovers post-run.
+
+- [x] **Step 5: Document the smoke in commit body**
 
 Don't commit smoke output (it has noisy timestamps and may have token IDs). Just summarise in the close-out commit.
 
@@ -1098,28 +1110,19 @@ Don't commit smoke output (it has noisy timestamps and may have token IDs). Just
 - Modify: `prompt.md` (next session)
 - Modify: project_state.md memory
 
-- [ ] **Step 1: Run full verification**
+- [x] **Step 1: Run full verification**
 
-```bash
-pnpm --filter @operscale-calendar/agent test
-pnpm --filter @operscale-calendar/agent typecheck
-pnpm --filter @operscale-calendar/agent build:worker
-docker build -f apps/agent/Dockerfile -t test-build . 2>&1 | tail -5
-```
+Verified 2026-05-05: vitest 212/212 pass (3 nightly skipped), `tsc --noEmit` clean, `tsc -p tsconfig.worker.json` (build:worker) clean. Local docker build skipped — Docker not on Windows host; the VPS rebuild during Step 2 of Task 5 is the definitive Dockerfile check (rebuild succeeded; container Up; routes live).
 
-Expected: all pass; suite ~212; typecheck + build clean.
+- [x] **Step 2: Push everything (if not already pushed per Task 5 Step 1)**
 
-- [ ] **Step 2: Push everything (if not already pushed per Task 5 Step 1)**
+Phase 4 implementation commits already on origin/main from earlier in the session (175f8f3 → 6bb4bc0). Close-out commit pushed at end of Task 6.
 
-```bash
-git push origin main
-```
+- [x] **Step 3: Update memory project_state.md**
 
-- [ ] **Step 3: Update memory project_state.md**
+Appended "V2 Phase 4 — ✅ COMPLETE 2026-05-05" section with commit range and Phase 4.5 carry-forwards.
 
-Append a "V2 Phase 4 — ✅ COMPLETE" section listing the commit range, what shipped, and what remains for Phase 4.5 (Paystack + Resend on approve).
-
-- [ ] **Step 4: Rewrite prompt.md as Phase 4.5 handoff**
+- [x] **Step 4: Rewrite prompt.md as Phase 4.5 handoff**
 
 Same pattern as the Phase 3 → Phase 4 handoff. Commit + push.
 

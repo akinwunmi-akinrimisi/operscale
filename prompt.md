@@ -1,4 +1,4 @@
-# Continuation prompt — Operscale Calendar V2 Phase 3 (Tasks 12–17)
+# Continuation prompt — Operscale Calendar V2 Phase 4.5 (Paystack + Resend on approve)
 
 Paste the **system context** + **first message** into a fresh Claude Code session. Memory auto-loads from `C:\Users\DELL\.claude\projects\C--Users-DELL-Documents-Antigravity-operscale-calender\memory\MEMORY.md`.
 
@@ -20,18 +20,24 @@ NON-NEGOTIABLE: NO API KEYS OR SECRETS COMMITTED OR PUSHED, EVER.
 - Pre-commit hook blocks .env files + secret-shaped strings + files >5MB.
 - The master .env is at the PARENT dir (one level above the repo):
   C:\Users\DELL\Documents\Antigravity\operscale-calender\.env
-  It contains the SSH password for the VPS, ANTHROPIC_API_KEY, Paystack test
-  keys, Resend, Evolution, and the server_password used for paramiko SSH.
+  Contains: server_password (paramiko SSH), ANTHROPIC_API_KEY, Paystack
+  test keys (PAYSTACK_SECRET_KEY=sk_test_..., PAYSTACK_PUBLIC_KEY=pk_test_...),
+  RESEND_API_KEY + RESEND_SENDER, JWT_SECRET (HS256 founder JWT mint),
+  SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY, EVOLUTION_*.
 - When code/scripts need keys, they READ from process.env (loaded from the
   master .env at the parent dir at runtime, never bundled). Never inline,
   never echo, never log.
 
 Memory at C:\Users\DELL\.claude\projects\C--Users-DELL-Documents-Antigravity-operscale-calender\memory\
-contains: user profile, current project state (with Phase 3 Tasks 1-11
-shipped + Tasks 12-17 still pending — read project_state.md first), infra
-connection points, collaboration style, no-shortcut discipline, minute-cadence
-progress preference, and the "plan keeps pace with code" feedback pattern.
-Read MEMORY.md first.
+contains: user profile, current project state (V2 Phases 1-4 ✅ COMPLETE
+2026-05-05; next is Phase 4.5), infra connection points (VPS, Supabase,
+Evolution, container names + working SSH/psql patterns), collaboration
+style (execute over discuss), no-shortcut discipline (never disable/mock/
+fallback — verify with real calls), progress cadence (minute-by-minute
+updates on long-running work; Monitor filter covers failure signatures
+not just success), and "plan keeps pace with code" (fix plan file in the
+same commit as the code when reviews catch bugs that originated in the
+plan). Read MEMORY.md first.
 
 For any SSH/paramiko operation, use Python paramiko with PYTHONIOENCODING=utf-8.
 Container postgres user is 'postgres'; ALTER DATABASE-level commands need
@@ -51,32 +57,31 @@ Working pattern from prior sessions:
 - Minute-cadence updates on long-running work, ALWAYS — failure
   signatures must be in any monitor filter, not just success.
 
-Phase 3 plan file: docs/plans/2026-05-04-v2-phase-3-orchestrator-and-worker.md
-Decisions baked into the plan:
-  A — VPS deploy via paramiko, narrated commands, stop points before
-      destructive steps. /srv/operscale-calendar/docker-compose.yml lives
-      ON the VPS not in the repo.
-  B — DB tests stay mocked. Real DB exercised by Task 16 manual smoke +
-      Task 14 nightly cron + Phase 4 routes.
-
 CRITICAL build-discipline carry-forwards from prior sessions:
-  - All relative imports inside apps/agent/src/lib/ and apps/agent/src/worker/
-    that the build:worker (tsc NodeNext emit) compiles MUST include explicit
-    .js extensions. The @/ path alias does NOT survive tsc emit. Use
-    relative paths like '../lib/supabase-admin.js'. Existing lib files were
-    fixed during Task 7's CRITICAL bundle (commit c37adc7).
-  - tsconfig.worker.json uses module: NodeNext / moduleResolution: NodeNext
-    — do NOT switch to bundler/ESNext, runtime requires NodeNext.
-  - Worker's main() detection uses pathToFileURL(process.argv[1]).href — do
-    NOT replace with hand-rolled URL strings (Linux slash-counting bug).
-  - briefs table uses form_payload jsonb (NOT flat columns). The Task 11
-    projector reads row.tier_intent + row.form_payload.* — Task 12 inherits
-    this pattern.
-  - analysis_runs.model is NOT NULL — every INSERT must include
-    model: CLAUDE_MODEL.
-  - briefs.logo_storage_path / logo_mime_type columns do NOT exist; logo
-    fetch is currently skipped (path a). When migration 0007 adds those
-    columns, restore the briefs query in fetchBriefPhotos.
+- All relative imports inside apps/agent/src/lib/ and apps/agent/src/worker/
+  that the build:worker (tsc NodeNext emit) compiles MUST include explicit
+  .js extensions. The @/ path alias does NOT survive tsc emit. Use
+  relative paths like '../lib/supabase-admin.js'. Routes (next build) can
+  use the @/ alias — only worker code is restricted.
+- tsconfig.worker.json uses module: NodeNext / moduleResolution: NodeNext
+  — do NOT switch to bundler/ESNext, runtime requires NodeNext.
+- briefs schema is form_payload jsonb (NOT flat columns). Reads project
+  via row.tier_intent + row.form_payload.* (see process-job's
+  projectBriefRowToAnalyzerInput).
+- analysis_runs.model is NOT NULL — every INSERT must include
+  model: CLAUDE_MODEL.
+- writeLlmCall and writeActivityLog are best-effort (swallow + stderr
+  log; never throw on telemetry failure) — preserve in any new helper.
+
+PHASE 4 IS LIVE (2026-05-05):
+- /v1/brief/analyze → 202 + {job_id, status, idempotency_key}. Worker
+  picks up the job, analyzes via real Claude, writes analysis_runs.
+- /v1/brief/approve → 200 + {framework_history_rows_written}. Writes N
+  customer_framework_history rows + flips orders.status to 'founder_approved'.
+- Migration 0007 added 'founder_approved' + 'brief_email_failed' to the
+  orders.status CHECK constraint.
+- Smoke verified end-to-end: 7 pairs analyzed, 7 history rows, order
+  founder_approved, zero leftovers after cleanup. Cost ~$0.86 per run.
 ```
 
 ---
@@ -89,64 +94,53 @@ all 200 with Let's Encrypt R13 certs). Brand locked Operscale.
 
 V2 PHASE 1 (selection + bank catalog + 0006 migration): ✅ SHIPPED 2026-05-04
 V2 PHASE 2 (4 pure-logic modules + first L2 cassette test): ✅ SHIPPED 2026-05-04
-V2 PHASE 3 (orchestrator + worker): ⏸️ IN PROGRESS — 11 of 17 tasks shipped.
+V2 PHASE 3 (orchestrator + worker container LIVE): ✅ COMPLETE 2026-05-05
+V2 PHASE 4 (route wiring — analyze + approve): ✅ COMPLETE 2026-05-05
 
-  Pushed range this session: 82fda0b..e11bd2f. Suite at 183/183 passing
-  tests, typecheck clean, build:worker clean. All commits on main, all
-  pushed to origin/main.
+  Phase 4 commits range: 175f8f3 → 6bb4bc0 + close-out commit.
+  Suite at 212/212 passing tests, typecheck + build:worker clean. All
+  commits on main, all pushed to origin/main.
 
-  ✅ Task 3 — orchestrator skeleton (createBriefAnalyzer factory)
-     [82fda0b + review fix 223e091]
-  ✅ Task 4 — re-analysis branches + photo + niche guards [7953e21]
-  ✅ Task 5 — retry policy (5x exp backoff + 1x validation retry)
-     [e81e4fe + review fix da2d160]
-  ✅ Task 6 — llm_calls telemetry try/finally per attempt [0e6af0c]
-  ✅ Task 7 — worker entrypoint + tsconfig.worker.json + 3 timers
-     [7ca44df + CRITICAL fix c37adc7 (.js extensions across 7 lib files
-     + pathToFileURL + NodeNext)]
-  ✅ Task 8 — stuck-job sweep [7010b34]
-  ✅ Task 9 — claim loop (race-safe two-step UPDATE) [ddaba9f]
-  ✅ Task 10 — photo fetch (logo skipped — schema columns missing) [a88fd5e]
-  ✅ Task 11 — process-job INITIAL trigger [e11bd2f]
+  ✅ Task 1 — verify-jwt helper (header parser, no sig check) [175f8f3]
+  ✅ Task 2 — idempotency-key helper [037285f]
+  ✅ Task 3 — /v1/brief/analyze cutover from 501 stub [1766be9]
+  ✅ Task 4 — /v1/brief/approve framework-history + status flip [6bb4bc0]
+     + migration 0007_orders_founder_approved_status.sql
+  ✅ Task 5 — live staging smoke (7 pairs, 7 history rows, zero leftovers)
+  ✅ Task 6 — close-out (plan + memory + prompt.md updated)
 
   Plan-vs-code drifts caught and fixed in lockstep this session:
-   - History-fetch swallow → throw on error (no-shortcut, Task 3 fix bundle).
-   - _validated mutation stash → proper validatedAi var (Task 5 fix bundle).
-   - Terminal-failure logger.error calls (Task 5 fix bundle).
-   - Worker NodeNext/.js-extension/pathToFileURL CRITICAL (Task 7 fix bundle).
-   - Sweep + claim throw-on-error (Tasks 8 + 9, plan in sync).
-   - Logo schema decision (path a) recorded in plan + code (Task 10).
-   - briefs form_payload + tier_intent + analysis_runs.model schema note
-     (Task 11, plan SCHEMA NOTE added).
+   - customer_framework_history PK is (customer_id, framework_slot, archetype_slot),
+     NOT (customer_id, order_id, framework_slot, archetype_slot) per Decision C.
+     Plan Step 1 of Task 4 corrected; route INSERT shape unchanged.
+   - orders.status CHECK in 0001 lacked 'founder_approved' / 'brief_email_failed';
+     migration 0007 added them. Forward-only.
+   - APPROVABLE_STATUSES uses singular 'brief_email_failed' (AGENT.md §244),
+     not 'briefs_email_failed' (plan typo).
 
-  ❌ Tasks 12-17 — STILL TO DO. Per the plan:
-    12. process-job RE-ANALYSIS trigger flow — re-uses the form_payload
-        projector + photo fetch + analyzer.analyze pattern from Task 11.
-        UPDATE prior analysis_runs WHERE brief_id=X AND is_current=true
-        SET is_current=false. INSERT new run with run_index=prior+1,
-        trigger_type=re_analyze_*, is_current=true. Then UPDATE
-        ai_analysis_jobs status=completed + resulting_run_id. Tests cover
-        both same_frameworks (priorSeed reuse) and new_frameworks (priorSeed
-        exclusion) branches.
-    13. L2 cassette test extension — assert the orchestrator's mocked
-        Supabase calls (llm_calls insert + customer_framework_history
-        select). Modify test/integration/initial-fashion-tier-2.test.ts.
-    14. L3 nightly smoke — .github/workflows/nightly-smoke.yml +
-        test/smoke/nightly.test.ts. **Manual prereq**: ANTHROPIC_API_KEY
-        repo secret must be added in GitHub UI before first cron firing.
-        Workflow exits 1 + opens a noisy issue on missing key — document
-        this in the Task 14 commit body.
-    15. Dockerfile update — emit dist/worker/index.js in runner stage so the
-        compose service from Task 1 actually finds the binary. Verify
-        node dist/worker/index.js boots and errors gracefully on missing
-        env (already verified locally during Task 7 fix bundle, but the
-        Docker image stage may need adjusting).
-    16. VPS staging deploy via paramiko — SCP compose snippet, append
-        to /srv/operscale-calendar/docker-compose.yml, create
-        /etc/operscale-calendar/worker.env (chmod 600), rebuild image,
-        compose up worker, INSERT a test job, verify analysis_runs row.
-        Master .env at parent dir provides server_password.
-    17. Close-out — full tests/typecheck/lint/docker, push, memory.
+  ❌ Phase 4.5 — STILL TO DO. Carry-forwards:
+    - Paystack /v1/payment/initialize integration on approve. Currently
+      /approve stops at status='founder_approved', no payment URL is
+      generated. Phase 4.5 must: (a) call Paystack /transaction/initialize
+      with NGN amount + customer email + metadata{order_id, brief_id},
+      (b) store paystack_tx_ref on the order, (c) email the customer the
+      brief + payment link via Resend, (d) flip status to 'brief_sent'
+      (or 'brief_email_failed' on Resend error).
+    - Resend brief email render + send. Email template TBD — likely
+      apps/agent/src/lib/email-templates/brief-approved.tsx using React
+      Email (Resend's recommended pattern). Brand placeholders <brand-name>
+      no longer needed (brand locked Operscale).
+    - Paystack webhook handler — /v1/webhook/paystack route (separate from
+      Phase 4 scope). HMAC-SHA512 signature verification on raw body.
+      Idempotency on paystack_event_id (already a unique column on
+      payments table per 0001).
+    - Realtime CRM "pipeline health" panel data wiring (post-Resend, the
+      founder needs to see send status update live via Supabase Realtime).
+    - Worker container scaling (replicas > 1). Currently 1 replica;
+      two-step UPDATE claim is YAGNI for replicas=1. FOR UPDATE SKIP
+      LOCKED RPC migration would be needed at replicas≥2.
+    - LISTEN/NOTIFY upgrade to push-based queue pickup (currently 5s
+      poll interval).
 ```
 
 ---
@@ -154,59 +148,72 @@ V2 PHASE 3 (orchestrator + worker): ⏸️ IN PROGRESS — 11 of 17 tasks shippe
 ## First message (paste after the system context)
 
 ```
-Resume V2 Phase 3 execution from Task 12.
+Begin V2 Phase 4.5 with brainstorming.
 
-Read MEMORY.md and the latest "V2 Phase 3 — IN PROGRESS, paused after
-Task 11 of 17 — 2026-05-05" section in project_state.md to confirm
-Tasks 1-11 are already shipped at commits b06fa83..e11bd2f on origin/main.
+Read MEMORY.md and the latest "V2 Phase 4 — ✅ COMPLETE 2026-05-05" section
+in project_state.md to confirm Phase 4 routes are live and what carry-forwards
+exist for Phase 4.5.
 
-Then read docs/plans/2026-05-04-v2-phase-3-orchestrator-and-worker.md
-from "## Task 12" onwards. The plan has full TDD code blocks for every
-task. Note Task 11's SCHEMA NOTE near its top — Task 12 inherits the
-form_payload + tier_intent + model: CLAUDE_MODEL pattern from Task 11.
-
-Sanity-check before starting Task 12:
-1. `git log --oneline 0e6af0c..HEAD` — should show 6 commits ending with
-   e11bd2f (Tasks 7-fix + 8 + 9 + 10 + 11 + plan-update for Task 11).
+Sanity-check before starting Phase 4.5:
+1. `git log --oneline 175f8f3..HEAD` — should show ~5 commits ending with
+   the Task 6 close-out (whatever it ended up being titled).
 2. `git status --short` — should be clean.
-3. `pnpm --filter @operscale-calendar/agent test` — should be 183/183.
-4. `pnpm --filter @operscale-calendar/agent typecheck` — clean.
-5. `pnpm --filter @operscale-calendar/agent build:worker` — clean.
-6. `node apps/agent/dist/worker/index.js` — should error with
-   "SUPABASE_URL not set" (env guard; NOT ERR_MODULE_NOT_FOUND).
+3. `npm --prefix apps/agent test` — should be 212/212 passing (3 nightly
+   skipped).
+4. `npm --prefix apps/agent run typecheck` — clean.
+5. `npm --prefix apps/agent run build:worker` — clean.
+6. POST a bogus body to https://api.operscale.cloud/v1/brief/analyze with
+   no Authorization header → should get 401, NOT 501. Same for /approve.
 
 If any sanity check fails, STOP and report — do not proceed.
 
-Then execute Tasks 12-17 in order via subagent-driven-development:
-- Each task: implementer subagent → spec reviewer → code-quality reviewer
-  → fix loop. Inline reviews acceptable for small mechanical tasks (12 is
-  medium, 13/15 small, 14 medium, 16 LARGE).
-- For Task 12: form_payload pattern carries from Task 11.
-  apps/agent/src/worker/process-job.ts already exists — modify to add
-  re-analysis branches inside processJob. The trigger_type is already
-  on ClaimedJob; switch on it to choose initial vs re-analysis flow.
-- For Task 14: ANTHROPIC_API_KEY repo secret is a manual GitHub UI step
-  the user does — document prominently in commit body.
-- For Task 16: VPS deploy — narrate every paramiko command, ALWAYS back
-  up before editing docker-compose.yml on the VPS, never echo secret
-  values, INSERT test job + verify analysis_runs row + DELETE test rows
-  before declaring success.
-- "Plan keeps pace with code" — fix the plan file in the same commit
-  as the code fix when reviews catch plan-level bugs.
-- Push to origin/main every 2-3 tasks instead of waiting for Task 17.
-- Minute-cadence status updates between every dispatch.
+Then run brainstorming for Phase 4.5 to settle these decision points
+BEFORE writing the plan:
+- A — Email template engine: React Email (Resend native) vs MJML vs raw
+  HTML strings. React Email is the obvious default; the question is
+  whether to add @react-email/components as a dep.
+- B — Paystack callback strategy: webhook-only vs callback URL + webhook
+  fallback. Webhook-only is simpler; callback URL adds UX (browser
+  redirect on success) but doubles the integration points.
+- C — Failure ordering inside /approve: Paystack initialize first then
+  Resend send, OR Resend first then Paystack. Decision affects rollback:
+  if Paystack succeeds and Resend fails, the customer gets a payment
+  link but no brief — bad. So Resend first, Paystack second. But what
+  if the order is to be marked as paystack_init_failed, do we send the
+  email anyway?
+- D — Synchronous vs queued email: Send Resend email synchronously inside
+  /approve, OR enqueue an email_jobs row that a worker processes (mirrors
+  ai_analysis_jobs pattern). Synchronous is simpler for Phase 4.5; queue
+  is a future-proofing call.
+- E — Schema additions: New columns on orders for paystack_tx_ref (already
+  there + unique), paystack_authorization (already there). Probably nothing
+  net-new. Confirm by re-reading 0001 + 0007.
+- F — Webhook handler timing: Phase 4.5 vs Phase 4.6 (separate plan).
+  Webhook is what flips status from 'payment_initiated' → 'paid' on
+  successful charge. If Phase 4.5 ships /approve without a webhook, the
+  CRM has no way to see paid status. Recommend: include webhook in 4.5.
+
+After brainstorming, write a Phase 4.5 plan (writing-plans skill) at
+docs/plans/2026-05-XX-v2-phase-4-5-paystack-resend.md, then execute task
+by task via subagent-driven-development.
 
 CARRY-FORWARD discipline (DO NOT VIOLATE):
-- All new relative imports in apps/agent/src/lib/ and apps/agent/src/worker/
-  must include .js extensions. Run `pnpm build:worker` after every task
+- All NEW relative imports in apps/agent/src/lib/ and apps/agent/src/worker/
+  must include .js extensions. Routes under apps/agent/src/app/ can use
+  @/ — Next.js handles that. Run `npm run build:worker` after every task
   to confirm runtime compatibility.
 - briefs schema is form_payload jsonb (NOT flat). Use row.tier_intent +
-  row.form_payload.* — see Task 11's projectBriefRowToAnalyzerInput.
-- analysis_runs.model is NOT NULL — INSERT must include model:CLAUDE_MODEL.
+  row.form_payload.* — see worker/process-job's projectBriefRowToAnalyzerInput.
+- analysis_runs.model is NOT NULL — every INSERT includes model:CLAUDE_MODEL.
 - writeLlmCall and writeActivityLog use stderr console.error on swallowed
-  errors (Task 2 + Task 6 pattern) — preserve in any new helper.
-- Logger.error on terminal failure paths (Task 5 review fix pattern) —
-  preserve in any new failure return.
+  errors — preserve in any new telemetry helper.
+- Logger.error on terminal failure paths (Task 5 review fix pattern from
+  Phase 3) — preserve in any new failure return.
+- verifyJwt does NOT verify signature — that's deliberate. Real auth
+  happens at the Supabase service-role layer downstream. Don't add
+  signature checks unless an adversary model emerges that requires it.
+- Paystack webhook signature is HMAC-SHA512 on the RAW body (not parsed).
+  Next.js route handlers must read req.text() not req.json() before HMAC.
 
 NEVER:
 - Commit or push any .env file or secret-shaped string.
@@ -216,9 +223,11 @@ NEVER:
 - Echo or log any secret value during paramiko sessions.
 - Switch tsconfig.worker.json away from NodeNext.
 - Use the @/ path alias in worker code.
+- Hit Paystack live mode — test mode keys are in the master .env
+  (PAYSTACK_SECRET_KEY=sk_test_..., PAYSTACK_PUBLIC_KEY=pk_test_...).
 
-When stopping (context limit, user pause, or after Task 17), update
-memory's project_state.md with the shipped commit range and rewrite
+When stopping (context limit, user pause, or after Phase 4.5 ships),
+update memory's project_state.md with the shipped commit range and rewrite
 prompt.md for the next session — same pattern as this handoff.
 ```
 
@@ -231,26 +240,29 @@ prompt.md for the next session — same pattern as this handoff.
 curl -sI https://api.operscale.cloud/v1/health
 curl -sI https://operscale.cloud/
 
-# Local test + typecheck + worker build
-pnpm --filter @operscale-calendar/agent test
-pnpm --filter @operscale-calendar/agent typecheck
-pnpm --filter @operscale-calendar/agent build:worker
-node apps/agent/dist/worker/index.js   # should error on env, NOT ERR_MODULE_NOT_FOUND
+# Verify Phase 4 routes are live (should return 401 not 501)
+curl -X POST https://api.operscale.cloud/v1/brief/analyze \
+  -H 'content-type: application/json' -d '{}'
+
+# Local test + typecheck + worker build (run from apps/agent)
+npm test
+npm run typecheck
+npm run build:worker
+
+# Re-run the Phase 4 staging smoke (paramiko + python urllib)
+PYTHONIOENCODING=utf-8 python C:\tmp\phase4-smoke.py
 
 # Re-record the L2 cassette (only if a Phase 2 module changes)
-pnpm --filter @operscale-calendar/agent test:claude:live initial-fashion-tier-2
+npm run --prefix apps/agent test:claude:live initial-fashion-tier-2
 
-# This session's commits
-git log --oneline e266c7e..HEAD
-
-# Verify 0006 migration on staging Supabase (uses paramiko + .env password)
+# Tail the agent + worker on VPS (paramiko)
 PYTHONIOENCODING=utf-8 python -c "
 import paramiko
 with open(r'c:\Users\DELL\Documents\Antigravity\operscale-calender\.env', encoding='utf-8') as f:
     pw = next(l.split('=', 1)[1].strip() for l in f if l.startswith('server_password='))
 c = paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 c.connect('srv1297445.hstgr.cloud', 22, 'root', pw, timeout=20, allow_agent=False, look_for_keys=False)
-_, out, _ = c.exec_command(\"docker exec supabase-db-1 psql -U postgres -d postgres -c '\\\d ai_analysis_jobs'\", timeout=30)
+_, out, _ = c.exec_command('docker logs --tail=50 operscale-calendar-agent 2>&1 | tail -50', timeout=30)
 print(out.read().decode())
 c.close()
 "
@@ -282,3 +294,5 @@ git status --short
 - DON'T run ALTER DATABASE as 'postgres' user — switch to 'supabase_admin'.
 - DON'T re-record the L2 cassette unless a Phase 2 module's behaviour actually changed (cassette stability is the test's value).
 - DON'T pause mid-task without committing — every commit on main is a recovery point.
+- DON'T hit Paystack live mode in any Phase 4.5 work — test keys only.
+- DON'T parse the Paystack webhook body before HMAC verification — HMAC is on the raw bytes.
