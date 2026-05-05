@@ -115,7 +115,7 @@ type WebhookResponse =
 **Files:**
 - Modify: `apps/agent/src/lib/paystack.ts` (append types)
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 Create or extend `apps/agent/src/lib/paystack.test.ts` with:
 
@@ -152,7 +152,7 @@ describe('PaystackChargeFailureEvent type shape', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 cd apps/agent
@@ -161,7 +161,7 @@ npx vitest run src/lib/paystack.test.ts
 
 Expected: 2 new failures with "Module 'paystack' has no exported member 'PaystackChargeSuccessEvent'" (existing 13 paystack tests still pass).
 
-- [ ] **Step 3: Append type exports to `paystack.ts`**
+- [x] **Step 3: Append type exports to `paystack.ts`**
 
 Append at the end of `apps/agent/src/lib/paystack.ts`:
 
@@ -197,7 +197,7 @@ export interface PaystackChargeFailureEvent {
 }
 ```
 
-- [ ] **Step 4: Verify tests pass + typecheck**
+- [x] **Step 4: Verify tests pass + typecheck**
 
 ```bash
 npx vitest run src/lib/paystack.test.ts
@@ -206,7 +206,7 @@ npm run typecheck
 
 Expected: 15/15 tests pass (13 existing + 2 new); typecheck clean.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/agent/src/lib/paystack.ts apps/agent/src/lib/paystack.test.ts
@@ -222,7 +222,7 @@ git commit -m "feat(agent): paystack — public event types for webhook handler"
 - Create: `apps/agent/src/lib/payment-confirmation-props.test.ts`
 - Modify: `apps/agent/tsconfig.worker.json` (add to exclude — Phase 4.5 carry-forward)
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `apps/agent/src/lib/payment-confirmation-props.test.ts`:
 
@@ -334,7 +334,7 @@ describe('paymentConfirmationProps', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 npx vitest run src/lib/payment-confirmation-props.test.ts
@@ -342,7 +342,7 @@ npx vitest run src/lib/payment-confirmation-props.test.ts
 
 Expected: 8 failures with "Cannot find module './payment-confirmation-props'".
 
-- [ ] **Step 3: Implement the mapper**
+- [x] **Step 3: Implement the mapper**
 
 Create `apps/agent/src/lib/payment-confirmation-props.ts`:
 
@@ -409,7 +409,7 @@ export function paymentConfirmationProps(
 }
 ```
 
-- [ ] **Step 4: Exclude from `tsconfig.worker.json`**
+- [x] **Step 4: Exclude from `tsconfig.worker.json`**
 
 Modify `apps/agent/tsconfig.worker.json` `exclude` array — append `"src/lib/payment-confirmation-props.ts"`:
 
@@ -425,7 +425,7 @@ Modify `apps/agent/tsconfig.worker.json` `exclude` array — append `"src/lib/pa
 ]
 ```
 
-- [ ] **Step 5: Verify tests pass + typecheck + build:worker**
+- [x] **Step 5: Verify tests pass + typecheck + build:worker**
 
 ```bash
 npx vitest run src/lib/payment-confirmation-props.test.ts
@@ -435,7 +435,7 @@ npm run build:worker
 
 Expected: 8/8 tests pass; typecheck clean; build:worker clean (no errors despite the new lib file using bundler-style imports — it's excluded from worker tsc).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/agent/src/lib/payment-confirmation-props.ts apps/agent/src/lib/payment-confirmation-props.test.ts apps/agent/tsconfig.worker.json
@@ -456,7 +456,7 @@ convention."
 - Create: `apps/web/src/emails/PaymentConfirmation.tsx`
 - Create: `apps/web/src/emails/PaymentConfirmation.test.tsx`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 Create `apps/web/src/emails/PaymentConfirmation.test.tsx`:
 
@@ -520,7 +520,7 @@ describe('PaymentConfirmation render', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 cd apps/web
@@ -529,7 +529,7 @@ npx vitest run src/emails/PaymentConfirmation.test.tsx
 
 Expected: 5 failures with "Cannot find module './PaymentConfirmation'".
 
-- [ ] **Step 3: Implement `PaymentConfirmation.tsx`**
+- [x] **Step 3: Implement `PaymentConfirmation.tsx`**
 
 Create `apps/web/src/emails/PaymentConfirmation.tsx`:
 
@@ -613,7 +613,7 @@ export function PaymentConfirmation(props: PaymentConfirmationProps): JSX.Elemen
 export default PaymentConfirmation;
 ```
 
-- [ ] **Step 4: Verify tests pass**
+- [x] **Step 4: Verify tests pass**
 
 ```bash
 cd apps/web
@@ -622,7 +622,7 @@ npx vitest run src/emails/PaymentConfirmation.test.tsx
 
 Expected: 5/5 pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/web/src/emails/PaymentConfirmation.tsx apps/web/src/emails/PaymentConfirmation.test.tsx
@@ -642,7 +642,7 @@ ALL-CAPS heading per Phase 4.5 plain-text-render lesson. Renders
 - Modify: `apps/agent/src/lib/email.ts`
 - Modify: `apps/agent/src/lib/email.test.ts`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 Append to `apps/agent/src/lib/email.test.ts` (inside the existing `describe('sendEmail', ...)` block):
 
@@ -661,7 +661,7 @@ Append to `apps/agent/src/lib/email.test.ts` (inside the existing `describe('sen
   });
 ```
 
-- [ ] **Step 2: Run tests to verify it fails**
+- [x] **Step 2: Run tests to verify it fails**
 
 ```bash
 cd apps/agent
@@ -670,7 +670,7 @@ npx vitest run src/lib/email.test.ts
 
 Expected: 1 new failure ("EmailSendError: not_implemented_template: payment-confirmation"); existing 6 pass.
 
-- [ ] **Step 3: Add `'payment-confirmation'` to `SUPPORTED_TEMPLATES`**
+- [x] **Step 3: Add `'payment-confirmation'` to `SUPPORTED_TEMPLATES`**
 
 Modify `apps/agent/src/lib/email.ts`:
 
@@ -678,7 +678,7 @@ Modify `apps/agent/src/lib/email.ts`:
 const SUPPORTED_TEMPLATES: ReadonlyArray<TemplateKey> = ['brief-email', 'payment-confirmation'];
 ```
 
-- [ ] **Step 4: Verify tests pass + typecheck**
+- [x] **Step 4: Verify tests pass + typecheck**
 
 ```bash
 npx vitest run src/lib/email.test.ts
@@ -687,7 +687,7 @@ npm run typecheck
 
 Expected: 7/7 tests pass; typecheck clean.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/agent/src/lib/email.ts apps/agent/src/lib/email.test.ts
@@ -702,7 +702,7 @@ git commit -m "feat(agent): email — allow templateKey='payment-confirmation' f
 - Rewrite: `apps/agent/src/app/v1/webhook/paystack/route.ts`
 - Create: `apps/agent/src/app/v1/webhook/paystack/route.test.ts`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `apps/agent/src/app/v1/webhook/paystack/route.test.ts`:
 
@@ -955,7 +955,7 @@ describe('POST /v1/webhook/paystack', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 npx vitest run src/app/v1/webhook/paystack/route.test.ts
@@ -963,7 +963,7 @@ npx vitest run src/app/v1/webhook/paystack/route.test.ts
 
 Expected: 12 failures (current stub returns 501 for everything).
 
-- [ ] **Step 3: Implement the route**
+- [x] **Step 3: Implement the route**
 
 Replace the entire body of `apps/agent/src/app/v1/webhook/paystack/route.ts`:
 
@@ -1215,7 +1215,7 @@ async function handleChargeFailure(
 }
 ```
 
-- [ ] **Step 4: Verify tests pass + typecheck**
+- [x] **Step 4: Verify tests pass + typecheck**
 
 ```bash
 npx vitest run src/app/v1/webhook/paystack/route.test.ts
@@ -1224,7 +1224,7 @@ npm run typecheck
 
 Expected: 12/12 tests pass; typecheck clean.
 
-- [ ] **Step 5: Run full agent suite**
+- [x] **Step 5: Run full agent suite**
 
 ```bash
 npm test
@@ -1232,7 +1232,7 @@ npm test
 
 Expected: ~272 pass / 3 nightly skipped.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/agent/src/app/v1/webhook/paystack/route.ts apps/agent/src/app/v1/webhook/paystack/route.test.ts
@@ -1269,13 +1269,13 @@ Failure responses:
 **Files:**
 - Create: `C:\tmp\phase4-6-smoke.py` (NOT committed; mirrors `C:\tmp\phase4-5-smoke.py`)
 
-- [ ] **Step 1: Push Tasks 1-5 to origin/main**
+- [x] **Step 1: Push Tasks 1-5 to origin/main**
 
 ```bash
 git push origin main
 ```
 
-- [ ] **Step 2: Pull on VPS + rebuild agent + web images**
+- [x] **Step 2: Pull on VPS + rebuild agent + web images**
 
 ```bash
 PYTHONIOENCODING=utf-8 python C:\tmp\vps-rebuild.py
@@ -1285,7 +1285,7 @@ Expected: agent + web rebuilt cleanly (~3 min). After rebuild:
 - `curl https://api.operscale.cloud/v1/health` returns 200.
 - `curl -X POST https://api.operscale.cloud/v1/webhook/paystack` returns 401 (was 501; live now).
 
-- [ ] **Step 3: Write smoke script**
+- [x] **Step 3: Write smoke script**
 
 Create `C:\tmp\phase4-6-smoke.py`. Start by copying `C:\tmp\phase4-5-smoke.py` and modify the post-`/approve` flow:
 
@@ -1350,7 +1350,7 @@ print(f"  • MANUAL CONFIRMATION: check {CUSTOMER_EMAIL} inbox for payment-conf
 print("=" * 60)
 ```
 
-- [ ] **Step 4: Run smoke**
+- [x] **Step 4: Run smoke**
 
 ```bash
 PYTHONIOENCODING=utf-8 python C:\tmp\phase4-6-smoke.py
@@ -1364,7 +1364,7 @@ Manual steps required:
 
 Expected: `PHASE 4.6 SMOKE: PASS`. All Phase 4.6 assertions green; founder inbox receives the email.
 
-- [ ] **Step 5: Document the smoke in commit body**
+- [x] **Step 5: Document the smoke in commit body**
 
 Don't commit smoke output. Capture key details (paystack_event_id, payment_confirmation Resend id, the assertions that passed) for the close-out commit.
 
@@ -1377,7 +1377,7 @@ Don't commit smoke output. Capture key details (paystack_event_id, payment_confi
 - Modify: `prompt.md` (rewrite as Phase 5 / CRM handoff)
 - Modify: memory `project_state.md`
 
-- [ ] **Step 1: Run full verification**
+- [x] **Step 1: Run full verification**
 
 ```bash
 cd apps/agent
@@ -1388,7 +1388,7 @@ npm run build:worker
 
 Expected: ~270 tests pass / 3 nightly skipped; typecheck + build:worker clean.
 
-- [ ] **Step 2: Push everything**
+- [x] **Step 2: Push everything**
 
 ```bash
 git push origin main
@@ -1396,7 +1396,7 @@ git push origin main
 
 (All Phase 4.6 implementation commits already pushed in Task 6 Step 1.)
 
-- [ ] **Step 3: Update memory project_state.md**
+- [x] **Step 3: Update memory project_state.md**
 
 Append `## V2 Phase 4.6 — ✅ COMPLETE 2026-05-XX` with:
 - Commit range
@@ -1404,11 +1404,11 @@ Append `## V2 Phase 4.6 — ✅ COMPLETE 2026-05-XX` with:
 - Smoke results (manual browser payment with test card, webhook fired in <60s, all assertions green)
 - Phase 5 (CRM) carry-forwards: founder review interface, magic-link auth, edit-field/discard/approve actions, pending-review list with AI snapshot.
 
-- [ ] **Step 4: Rewrite prompt.md as Phase 5 / CRM handoff**
+- [x] **Step 4: Rewrite prompt.md as Phase 5 / CRM handoff**
 
 Same pattern as the Phase 4.5 → 4.6 handoff. Catch-up section reflects Phases 1, 2, 3, 4, 4.5, 4.6 complete; first-message guides brainstorming for Phase 5 (Founder CRM). Decisions to surface: magic-link flow vs alternative, list-view filter set, edit-field UX, AI-snapshot edit history rendering.
 
-- [ ] **Step 5: Commit close-out**
+- [x] **Step 5: Commit close-out**
 
 ```bash
 git add docs/plans/2026-05-05-v2-phase-4-6-paystack-webhook.md prompt.md
