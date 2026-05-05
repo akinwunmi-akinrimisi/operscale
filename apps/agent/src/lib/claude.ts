@@ -107,6 +107,38 @@ async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function writeLlmCall(
+  supabase: SupabaseClient,
+  args: {
+    brief_id: string;
+    model: string;
+    input_tokens: number;
+    output_tokens: number;
+    cost_usd: number;
+    duration_ms: number;
+    http_status: number;
+    error_detail: string | null;
+  },
+): Promise<void> {
+  const { error } = await supabase.from('llm_calls').insert({
+    brief_id: args.brief_id,
+    analysis_run_id: null,
+    model: args.model,
+    input_tokens: args.input_tokens,
+    output_tokens: args.output_tokens,
+    cost_usd: args.cost_usd,
+    duration_ms: args.duration_ms,
+    http_status: args.http_status,
+    error_detail: args.error_detail,
+  });
+  // Best-effort: design §4.3 invariant #9. Swallow but log to stderr so
+  // failed cost-telemetry writes still surface in container logs.
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error('[claude] llm_calls insert failed (best-effort):', error.message ?? error);
+  }
+}
+
 async function fetchHistoryFromSupabase(supabase: SupabaseClient, customer_id: string): Promise<HistoryRow[]> {
   const { data, error } = await supabase
     .from('customer_framework_history')
@@ -185,6 +217,11 @@ export function createBriefAnalyzer(deps: BriefAnalyzerDeps): BriefAnalyzer {
       callLoop: for (let validationAttempt = 0; validationAttempt < 2; validationAttempt++) {
         for (let i = 0; i < MAX_5XX_RETRIES; i++) {
           attemptCount++;
+          const attemptStart = Date.now();
+          let attemptStatus = 0;
+          let attemptError: string | null = null;
+          let attemptInputTok = 0;
+          let attemptOutputTok = 0;
           const requestMessages = [...built.messages];
           if (validationFailedAddendum) {
             const layer4 = requestMessages[2];
@@ -200,19 +237,67 @@ export function createBriefAnalyzer(deps: BriefAnalyzerDeps): BriefAnalyzer {
               system: built.system,
               messages: requestMessages,
             });
+            attemptStatus = 200;
+            attemptInputTok = response.usage?.input_tokens ?? 0;
+            attemptOutputTok = response.usage?.output_tokens ?? 0;
             break;
           } catch (err) {
+            attemptStatus = (err as any)?.status ?? 0;
+            attemptError = err instanceof Error ? err.message : String(err);
             if (isNonRetryable4xx(err)) {
+              await writeLlmCall(deps.supabase, {
+                brief_id: brief.brief_id,
+                model: CLAUDE_MODEL,
+                input_tokens: 0,
+                output_tokens: 0,
+                cost_usd: 0,
+                duration_ms: Date.now() - attemptStart,
+                http_status: attemptStatus,
+                error_detail: attemptError,
+              });
               deps.logger.error('claude.analyze: non-retryable 4xx', { status: (err as any)?.status, detail: (err as Error).message });
               return { ok: false, failure: { reason: 'claude_4xx', detail: (err as Error).message } };
             }
             if (i < MAX_5XX_RETRIES - 1 && isRetryable(err)) {
-              deps.logger.info('claude.analyze: retrying after error', { attempt: i + 1, status: (err as any)?.status });
+              deps.logger.info('claude.analyze: retrying after error', { attempt: i + 1, status: attemptStatus });
+              await writeLlmCall(deps.supabase, {
+                brief_id: brief.brief_id,
+                model: CLAUDE_MODEL,
+                input_tokens: 0,
+                output_tokens: 0,
+                cost_usd: 0,
+                duration_ms: Date.now() - attemptStart,
+                http_status: attemptStatus,
+                error_detail: attemptError,
+              });
               await sleep(backoffMs(i + 1));
               continue;
             }
+            await writeLlmCall(deps.supabase, {
+              brief_id: brief.brief_id,
+              model: CLAUDE_MODEL,
+              input_tokens: 0,
+              output_tokens: 0,
+              cost_usd: 0,
+              duration_ms: Date.now() - attemptStart,
+              http_status: attemptStatus,
+              error_detail: attemptError,
+            });
             deps.logger.error('claude.analyze: 5xx max retries exhausted', { attempts: attemptCount, detail: (err as Error).message });
             return { ok: false, failure: { reason: 'claude_5xx_max_retries', detail: (err as Error).message } };
+          } finally {
+            if (attemptStatus === 200) {
+              await writeLlmCall(deps.supabase, {
+                brief_id: brief.brief_id,
+                model: CLAUDE_MODEL,
+                input_tokens: attemptInputTok,
+                output_tokens: attemptOutputTok,
+                cost_usd: estimateCostUsd(attemptInputTok, attemptOutputTok),
+                duration_ms: Date.now() - attemptStart,
+                http_status: 200,
+                error_detail: null,
+              });
+            }
           }
         }
 
