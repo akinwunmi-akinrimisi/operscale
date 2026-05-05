@@ -608,6 +608,18 @@ describe('verifyWebhookSignature', () => {
 });
 ```
 
+<!-- Plan-vs-code drift fix (Task 2, shipped 2026-05-05):
+  The two tests that call vi.advanceTimersByTimeAsync() to drive the retry loop
+  ("throws after 3 5xx retries" and "throws on network error after retries") caused
+  Vitest to report "unhandled rejection" errors and exit with code 1, even though
+  all 13 assertions passed. Root cause: when advanceTimersByTimeAsync fires the
+  retry setTimeout callbacks the promise rejects before the `await expect().rejects`
+  line executes, and Vitest treats the in-flight rejection as unhandled.
+  Fix applied to paystack.test.ts: attach a no-op `.catch(() => {})` to the promise
+  immediately after creation to suppress the warning, then keep `await expect(promise)
+  .rejects.toBeInstanceOf(PaystackInitError)` for the actual assertion. The test
+  semantics are identical; only the unhandled-rejection noise is eliminated. -->
+
 - [ ] **Step 2: Run tests to verify they fail**
 
 ```bash

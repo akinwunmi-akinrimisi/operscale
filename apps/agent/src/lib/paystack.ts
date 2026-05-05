@@ -11,6 +11,15 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 
 const PAYSTACK_API_BASE = 'https://api.paystack.co';
 
+const RETRY_DELAYS_MS = [500, 1000, 2000];
+
+export class PaystackInitError extends Error {
+  constructor(public detail: { status: number; message: string }) {
+    super(`paystack_init_failed: ${detail.status} ${detail.message}`);
+    this.name = 'PaystackInitError';
+  }
+}
+
 export interface InitializeTransactionInput {
   email: string;
   amountNgn: number; // whole NGN, NOT kobo. We multiply ×100 here.
@@ -26,14 +35,99 @@ export interface InitializeTransactionResult {
   reference: string;
 }
 
+interface PaystackEnvelope<T> {
+  status: boolean;
+  message?: string;
+  data?: T;
+}
+
+interface InitData {
+  authorization_url: string;
+  access_code: string;
+  reference: string;
+}
+
+async function paystackPost<T>(path: string, body: unknown, secret: string): Promise<{ status: number; envelope: PaystackEnvelope<T> | null }> {
+  const res = await fetch(`${PAYSTACK_API_BASE}${path}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  let envelope: PaystackEnvelope<T> | null = null;
+  try { envelope = (await res.json()) as PaystackEnvelope<T>; } catch { /* non-json upstream errors */ }
+  return { status: res.status, envelope };
+}
+
+async function paystackGet<T>(path: string, secret: string): Promise<{ status: number; envelope: PaystackEnvelope<T> | null }> {
+  const res = await fetch(`${PAYSTACK_API_BASE}${path}`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${secret}` },
+  });
+  let envelope: PaystackEnvelope<T> | null = null;
+  try { envelope = (await res.json()) as PaystackEnvelope<T>; } catch { /* non-json upstream errors */ }
+  return { status: res.status, envelope };
+}
+
+const DEFAULT_CHANNELS: NonNullable<InitializeTransactionInput['channels']> = ['card', 'bank_transfer', 'ussd', 'qr', 'mobile_money', 'bank'];
+
 export async function initializeTransaction(
-  _input: InitializeTransactionInput,
+  input: InitializeTransactionInput,
 ): Promise<InitializeTransactionResult> {
-  // TODO(Operscale): implement per docs/specs/paystack-integration.md
-  //   POST https://api.paystack.co/transaction/initialize
-  //   Authorization: Bearer ${PAYSTACK_SECRET_KEY}
-  //   Body: { email, amount: amountNgn * 100, currency: 'NGN', reference, callback_url, metadata, channels }
-  throw new Error('initializeTransaction not implemented');
+  const secret = process.env.PAYSTACK_SECRET_KEY;
+  if (!secret) {
+    throw new PaystackInitError({ status: 0, message: 'missing PAYSTACK_SECRET_KEY' });
+  }
+
+  const body = {
+    email: input.email,
+    amount: ngnToKobo(input.amountNgn),
+    currency: 'NGN' as const,
+    reference: input.reference,
+    callback_url: input.callbackUrl,
+    metadata: input.metadata ?? {},
+    channels: input.channels ?? DEFAULT_CHANNELS,
+  };
+
+  // Retry loop: 4 attempts (initial + 3 retries) on 5xx or network error.
+  let lastErr: { status: number; message: string } | null = null;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt > 0) {
+      await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt - 1]));
+    }
+    let result;
+    try {
+      result = await paystackPost<InitData>('/transaction/initialize', body, secret);
+    } catch (e) {
+      lastErr = { status: 0, message: e instanceof Error ? e.message : 'network_error' };
+      continue;
+    }
+    const { status, envelope } = result;
+    if (status >= 200 && status < 300 && envelope?.status === true && envelope.data) {
+      return {
+        authorizationUrl: envelope.data.authorization_url,
+        accessCode: envelope.data.access_code,
+        reference: envelope.data.reference,
+      };
+    }
+    if (status >= 400 && status < 500) {
+      const msg = envelope?.message ?? 'unknown_4xx';
+      // Duplicate-reference fallback: re-fetch the existing transaction.
+      if (msg.toLowerCase().includes('duplicate transaction reference')) {
+        const verify = await paystackGet<InitData>(`/transaction/verify/${input.reference}`, secret);
+        if (verify.status >= 200 && verify.status < 300 && verify.envelope?.status === true && verify.envelope.data) {
+          return {
+            authorizationUrl: verify.envelope.data.authorization_url,
+            accessCode: verify.envelope.data.access_code ?? '',
+            reference: verify.envelope.data.reference,
+          };
+        }
+      }
+      throw new PaystackInitError({ status, message: msg });
+    }
+    // 5xx → retry
+    lastErr = { status, message: envelope?.message ?? 'upstream_5xx' };
+  }
+  throw new PaystackInitError(lastErr ?? { status: 0, message: 'init_failed_no_response' });
 }
 
 /**
