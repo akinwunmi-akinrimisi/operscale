@@ -31,6 +31,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             <a href="/admin/pending-review" className="hover:underline">
               Pending review
             </a>
+            <a href="/admin/paid-orders" className="hover:underline">
+              Paid orders
+            </a>
           </nav>
         </div>
       </header>
