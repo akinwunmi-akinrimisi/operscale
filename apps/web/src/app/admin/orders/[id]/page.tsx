@@ -36,5 +36,5 @@ export default async function OrderDetailPage({ params }: PageProps) {
   if (order.status === 'pending_founder_review') {
     return <ReviewMode orderId={order.id} order={order} />;
   }
-  return <TimelineMode orderId={order.id} />;
+  return <TimelineMode orderId={order.id} order={order} />;
 }
