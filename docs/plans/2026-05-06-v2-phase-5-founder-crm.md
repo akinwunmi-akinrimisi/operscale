@@ -1,6 +1,6 @@
 # V2 Phase 5 — Founder CRM Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Ship the Founder CRM v0 — magic-link sign-in, pending-review queue, brief detail page (review + timeline modes), three founder actions (approve / re-analyze / discard), paid-orders dashboard — all in `apps/web` with Supabase Realtime live updates. v0 deliberately defers inline edit, alert cron, photo lightbox, and recovery actions per the design at `docs/specs/v2-phase-5-design.md`.
 
@@ -49,7 +49,7 @@ Migration 0001 has `activity_log_anon_deny` RESTRICTIVE but no permissive policy
 - Create: `supabase/migrations/0009_activity_log_founder_insert.sql`
 - Apply: `0009` to staging Supabase via paramiko + SFTP + `docker exec psql`
 
-- [ ] **Step 1.1: Update spec §4.1 routes table**
+- [x] **Step 1.1: Update spec §4.1 routes table**
 
 In `docs/specs/v2-phase-5-design.md` §4.1, replace the routes table with:
 
@@ -63,7 +63,7 @@ In `docs/specs/v2-phase-5-design.md` §4.1, replace the routes table with:
 | `/admin/paid-orders` | Server Component + `<RealtimePaidOrders />` client child | 25 most-recent + Load more |
 ```
 
-- [ ] **Step 1.2: Update spec §4.2 auth gate**
+- [x] **Step 1.2: Update spec §4.2 auth gate**
 
 Replace §4.2 with:
 
@@ -79,7 +79,7 @@ Already wired at `apps/web/src/middleware.ts` (matcher `['/admin/:path*']`). Beh
 Phase 5 does NOT modify the middleware — the existing implementation is correct.
 ```
 
-- [ ] **Step 1.3: Update spec §4.5 lib files**
+- [x] **Step 1.3: Update spec §4.5 lib files**
 
 Replace §4.5 with:
 
@@ -94,7 +94,7 @@ Existing (verified in repo):
 Phase 5 does NOT add `src/lib/supabase/server.ts`, `src/lib/supabase/browser.ts`, `src/lib/supabase/middleware.ts`, or `src/lib/auth/verify-jwt.ts`. The existing factories cover all needs.
 ```
 
-- [ ] **Step 1.4: Update spec §4.6 deps**
+- [x] **Step 1.4: Update spec §4.6 deps**
 
 Replace §4.6 with:
 
@@ -105,7 +105,7 @@ Replace §4.6 with:
 - `apps/agent`: no new deps.
 ```
 
-- [ ] **Step 1.5: Update spec §5.1 sign-in component**
+- [x] **Step 1.5: Update spec §5.1 sign-in component**
 
 In §5.1, change:
 
@@ -119,7 +119,7 @@ to:
 - `SignInForm` (`'use client'`) — lives at `/admin/page.tsx` (replaces the 14-line stub). Controlled email input + submit. Calls `getSupabaseBrowser().auth.signInWithOtp({ email, options: { emailRedirectTo: \`${origin}/auth/callback\` } })`. Renders `idle | sent | error` states. Honours `?reason=not_authenticated|not_authorized|expired|session` from middleware/callback redirects with inline copy.
 ```
 
-- [ ] **Step 1.6: Update spec §6.3 re-analyze trigger_type**
+- [x] **Step 1.6: Update spec §6.3 re-analyze trigger_type**
 
 In the writes table:
 
@@ -129,7 +129,7 @@ In the writes table:
 
 (Drop `re_analyze_with_note` — that name doesn't exist in code. Use the canonical `re_analyze_same_frameworks` from `apps/agent/src/lib/idempotency-key.ts`.)
 
-- [ ] **Step 1.7: Update spec §7 auth flow**
+- [x] **Step 1.7: Update spec §7 auth flow**
 
 Replace step 6 with:
 
@@ -137,7 +137,7 @@ Replace step 6 with:
 6. `/auth/callback` Route Handler exchanges code for session via `getSupabaseServer()` (which sets cookies via the cookieStore.setAll path); INSERTs `founder_signed_in` activity_log row directly (migration 0009 enables this); 307 to `/admin/pending-review`.
 ```
 
-- [ ] **Step 1.8: Update spec §12 files touched**
+- [x] **Step 1.8: Update spec §12 files touched**
 
 Replace the new files / modified files lists with the corrected inventory:
 
@@ -190,7 +190,7 @@ Replace the new files / modified files lists with the corrected inventory:
 - `.github/workflows/nightly-smoke.yml` (add schema-shapes test)
 ```
 
-- [ ] **Step 1.9: Write migration 0009**
+- [x] **Step 1.9: Write migration 0009**
 
 Create `supabase/migrations/0009_activity_log_founder_insert.sql`:
 
@@ -224,7 +224,7 @@ commit;
 
 (Read policy is added in the same migration because the brief detail page's HistoryAccordion + TimelineMode read activity_log via the founder JWT + RLS — Task 6 + Task 8 depend on this.)
 
-- [ ] **Step 1.10: Apply migration 0009 to staging Supabase**
+- [x] **Step 1.10: Apply migration 0009 to staging Supabase**
 
 Use the documented paramiko pattern (see `prompt.md` "Apply a new migration to staging" one-liner). Adapt:
 
@@ -254,7 +254,7 @@ Run: `PYTHONIOENCODING=utf-8 python C:\tmp\apply-migration-0009.py`
 
 Expected stdout includes `BEGIN`, `CREATE POLICY`, `CREATE POLICY`, `COMMIT` and `t` (psql showing the NOTIFY succeeded). No errors in stderr.
 
-- [ ] **Step 1.11: Verify policy applied**
+- [x] **Step 1.11: Verify policy applied**
 
 Run via paramiko:
 
@@ -270,7 +270,7 @@ activity_log_founder_insert
 activity_log_founder_read
 ```
 
-- [ ] **Step 1.12: Commit**
+- [x] **Step 1.12: Commit**
 
 ```bash
 cd "C:\Users\DELL\Documents\Antigravity\operscale-calender\operscale-calendar-platform"
@@ -299,7 +299,7 @@ phase-5(task-1): spec patch + migration 0009 (activity_log founder INSERT)
   reference. Plan-keeps-pace pattern from Phase 4.5 + 4.6 applies.
 ```
 
-- [ ] **Step 1.13: Verify**
+- [x] **Step 1.13: Verify**
 
 Run:
 ```bash
@@ -318,13 +318,13 @@ Expected: latest commit is `phase-5(task-1): spec patch + migration 0009 (activi
 
 Pattern: write 9 failing tests against the future implementation (mirrors `/v1/brief/approve` test layout from Phase 4 + 4.5), confirm they fail, write minimum impl to pass, verify, commit.
 
-- [ ] **Step 2.1: Read the existing `/v1/brief/approve` route as the canonical pattern**
+- [x] **Step 2.1: Read the existing `/v1/brief/approve` route as the canonical pattern**
 
 Run: `cat apps/agent/src/app/v1/brief/approve/route.ts | head -80`
 
 Confirm pattern: `verifyJwt` → role gate → zod → `getSupabaseAdmin()` → SELECT → status guard → UPDATE → `writeActivityLog` → return JSON.
 
-- [ ] **Step 2.2: Write failing tests for `/v1/brief/discard`**
+- [x] **Step 2.2: Write failing tests for `/v1/brief/discard`**
 
 Create `apps/agent/src/app/v1/brief/discard/route.test.ts`:
 
@@ -499,7 +499,7 @@ describe('POST /v1/brief/discard', () => {
 });
 ```
 
-- [ ] **Step 2.3: Run tests — confirm they FAIL**
+- [x] **Step 2.3: Run tests — confirm they FAIL**
 
 ```bash
 cd apps/agent && pnpm vitest run src/app/v1/brief/discard/route.test.ts
@@ -507,7 +507,7 @@ cd apps/agent && pnpm vitest run src/app/v1/brief/discard/route.test.ts
 
 Expected: all 9 tests fail because `route.ts` still returns 501.
 
-- [ ] **Step 2.4: Implement `/v1/brief/discard`**
+- [x] **Step 2.4: Implement `/v1/brief/discard`**
 
 Replace the 20-line stub at `apps/agent/src/app/v1/brief/discard/route.ts`:
 
@@ -608,7 +608,7 @@ export async function POST(req: Request): Promise<Response> {
 }
 ```
 
-- [ ] **Step 2.5: Run tests — confirm all 9 PASS**
+- [x] **Step 2.5: Run tests — confirm all 9 PASS**
 
 ```bash
 cd apps/agent && pnpm vitest run src/app/v1/brief/discard/route.test.ts
@@ -616,7 +616,7 @@ cd apps/agent && pnpm vitest run src/app/v1/brief/discard/route.test.ts
 
 Expected: 9/9 tests pass.
 
-- [ ] **Step 2.6: Run full test suite + typecheck + worker build**
+- [x] **Step 2.6: Run full test suite + typecheck + worker build**
 
 ```bash
 cd apps/agent && pnpm test && pnpm typecheck && pnpm build:worker
@@ -624,7 +624,7 @@ cd apps/agent && pnpm test && pnpm typecheck && pnpm build:worker
 
 Expected: 281+ tests pass, no TS errors, worker builds.
 
-- [ ] **Step 2.7: Commit**
+- [x] **Step 2.7: Commit**
 
 ```bash
 cd "C:\Users\DELL\Documents\Antigravity\operscale-calender\operscale-calendar-platform"
@@ -642,7 +642,7 @@ git commit -m "feat(agent): /v1/brief/discard — founder-only, idempotent, audi
 
 Goal: a magic-link sign-in form at `/admin` that handles `?reason=...` query param messaging from middleware/callback redirects.
 
-- [ ] **Step 3.1: Add component-test deps**
+- [x] **Step 3.1: Add component-test deps**
 
 ```bash
 cd apps/web
@@ -657,7 +657,7 @@ git add apps/web/package.json pnpm-lock.yaml
 git commit -m "chore(web): add @testing-library/react + happy-dom for component tests"
 ```
 
-- [ ] **Step 3.2: Write `SignInForm.tsx`**
+- [x] **Step 3.2: Write `SignInForm.tsx`**
 
 Create `apps/web/src/app/admin/SignInForm.tsx`:
 
@@ -764,7 +764,7 @@ export function SignInForm() {
 }
 ```
 
-- [ ] **Step 3.3: Replace `apps/web/src/app/admin/page.tsx`**
+- [x] **Step 3.3: Replace `apps/web/src/app/admin/page.tsx`**
 
 ```tsx
 // /admin — magic-link sign-in page (always reachable per middleware).
@@ -794,7 +794,7 @@ export default function AdminSignInPage() {
 
 (`useSearchParams` requires Suspense boundary — this is the canonical Next 15 pattern.)
 
-- [ ] **Step 3.4: Write component test**
+- [x] **Step 3.4: Write component test**
 
 Create `apps/web/test/components/SignInForm.test.tsx`:
 
@@ -880,7 +880,7 @@ describe('SignInForm with ?reason=not_authenticated', () => {
 });
 ```
 
-- [ ] **Step 3.5: Update `vitest.config.ts` to include test/ folder**
+- [x] **Step 3.5: Update `vitest.config.ts` to include test/ folder**
 
 Modify `apps/web/vitest.config.ts`:
 
@@ -907,7 +907,7 @@ export default defineConfig({
 
 (Adds `test/**/*` to include glob; the per-file `// @vitest-environment happy-dom` directive overrides the default `'node'` environment for component tests.)
 
-- [ ] **Step 3.6: Run apps/web tests**
+- [x] **Step 3.6: Run apps/web tests**
 
 ```bash
 cd apps/web && pnpm test
@@ -915,7 +915,7 @@ cd apps/web && pnpm test
 
 Expected: existing email-template tests still pass, new SignInForm tests pass (5 tests).
 
-- [ ] **Step 3.7: Commit**
+- [x] **Step 3.7: Commit**
 
 ```bash
 cd "C:\Users\DELL\Documents\Antigravity\operscale-calender\operscale-calendar-platform"
@@ -932,7 +932,7 @@ git commit -m "feat(web): /admin sign-in form with magic-link + reason-banner"
 
 Goal: exchange the magic-link `code` for a session, write `founder_signed_in` activity_log, redirect to `/admin/pending-review`.
 
-- [ ] **Step 4.1: Write the callback route**
+- [x] **Step 4.1: Write the callback route**
 
 Create `apps/web/src/app/auth/callback/route.ts`:
 
@@ -1010,7 +1010,7 @@ export async function GET(req: NextRequest) {
 }
 ```
 
-- [ ] **Step 4.2: Verify callback redirects work via curl** (post-deploy — see Task 12)
+- [x] **Step 4.2: Verify callback redirects work via curl** (post-deploy — see Task 12)
 
 The route can't be unit-tested without a real Supabase code (signature is verified server-side). It will be exercised in the live smoke (Task 12).
 
@@ -1020,7 +1020,7 @@ curl -sI http://localhost:3001/auth/callback
 ```
 Expected: 307 to `/admin?reason=expired` (no code → expired branch).
 
-- [ ] **Step 4.3: Typecheck + build**
+- [x] **Step 4.3: Typecheck + build**
 
 ```bash
 cd apps/web && pnpm typecheck && pnpm build
@@ -1028,7 +1028,7 @@ cd apps/web && pnpm typecheck && pnpm build
 
 Expected: clean.
 
-- [ ] **Step 4.4: Commit**
+- [x] **Step 4.4: Commit**
 
 ```bash
 cd "C:\Users\DELL\Documents\Antigravity\operscale-calender\operscale-calendar-platform"
@@ -1036,7 +1036,7 @@ git add apps/web/src/app/auth/callback/route.ts
 git commit -m "feat(web): /auth/callback — exchange code, log founder_signed_in, redirect to /admin/pending-review"
 ```
 
-- [ ] **Step 4.5: Push origin/main (3 tasks done)**
+- [x] **Step 4.5: Push origin/main (3 tasks done)**
 
 ```bash
 git push origin main
@@ -1054,7 +1054,7 @@ git push origin main
 - Create: `apps/web/src/app/admin/pending-review/RealtimeQueue.tsx`
 - Create: `apps/web/test/components/QueueRow.test.tsx`
 
-- [ ] **Step 5.1: Define `QueueRow` component (presentational, time-since-badge logic)**
+- [x] **Step 5.1: Define `QueueRow` component (presentational, time-since-badge logic)**
 
 Create `apps/web/src/app/admin/pending-review/QueueRow.tsx`:
 
@@ -1119,7 +1119,7 @@ export function QueueRow({ row, now = Date.now() }: { row: QueueRowData; now?: n
 }
 ```
 
-- [ ] **Step 5.2: Write QueueRow test (TDD time-since thresholds)**
+- [x] **Step 5.2: Write QueueRow test (TDD time-since thresholds)**
 
 Create `apps/web/test/components/QueueRow.test.tsx`:
 
@@ -1185,7 +1185,7 @@ describe('QueueRow time-since badge', () => {
 });
 ```
 
-- [ ] **Step 5.3: Run QueueRow tests — confirm pass**
+- [x] **Step 5.3: Run QueueRow tests — confirm pass**
 
 ```bash
 cd apps/web && pnpm vitest run test/components/QueueRow.test.tsx
@@ -1193,7 +1193,7 @@ cd apps/web && pnpm vitest run test/components/QueueRow.test.tsx
 
 Expected: 6/6 pass.
 
-- [ ] **Step 5.4: Define `QueueCapBanner`**
+- [x] **Step 5.4: Define `QueueCapBanner`**
 
 Create `apps/web/src/app/admin/pending-review/QueueCapBanner.tsx`:
 
@@ -1208,7 +1208,7 @@ export function QueueCapBanner() {
 }
 ```
 
-- [ ] **Step 5.5: Define `QueueTable` (renders rows + Realtime mount)**
+- [x] **Step 5.5: Define `QueueTable` (renders rows + Realtime mount)**
 
 Create `apps/web/src/app/admin/pending-review/QueueTable.tsx`:
 
@@ -1247,7 +1247,7 @@ export function QueueTable({ initialRows }: QueueTableProps) {
 }
 ```
 
-- [ ] **Step 5.6: Define `RealtimeQueue` subscription**
+- [x] **Step 5.6: Define `RealtimeQueue` subscription**
 
 Create `apps/web/src/app/admin/pending-review/RealtimeQueue.tsx`:
 
@@ -1368,7 +1368,7 @@ export function RealtimeQueue({ onUpdate }: RealtimeQueueProps) {
 }
 ```
 
-- [ ] **Step 5.7: Implement `pending-review/page.tsx` Server Component**
+- [x] **Step 5.7: Implement `pending-review/page.tsx` Server Component**
 
 Replace `apps/web/src/app/admin/pending-review/page.tsx`:
 
@@ -1444,7 +1444,7 @@ export default async function PendingReviewPage() {
 }
 ```
 
-- [ ] **Step 5.8: Run typecheck + apps/web tests**
+- [x] **Step 5.8: Run typecheck + apps/web tests**
 
 ```bash
 cd apps/web && pnpm typecheck && pnpm test
@@ -1452,7 +1452,7 @@ cd apps/web && pnpm typecheck && pnpm test
 
 Expected: clean. 6 new component tests pass.
 
-- [ ] **Step 5.9: Commit**
+- [x] **Step 5.9: Commit**
 
 ```bash
 cd "C:\Users\DELL\Documents\Antigravity\operscale-calender\operscale-calendar-platform"
@@ -1475,7 +1475,7 @@ git commit -m "feat(web): /admin/pending-review queue with Realtime + cap banner
 
 This task focuses on the reads only — Action Bar + Modals come in Task 7.
 
-- [ ] **Step 6.1: Implement `OrderDetailPage` server fetch + mode-switch**
+- [x] **Step 6.1: Implement `OrderDetailPage` server fetch + mode-switch**
 
 Replace `apps/web/src/app/admin/orders/[id]/page.tsx`:
 
@@ -1515,7 +1515,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
 }
 ```
 
-- [ ] **Step 6.2: Implement `HistoryAccordion`**
+- [x] **Step 6.2: Implement `HistoryAccordion`**
 
 Create `apps/web/src/app/admin/orders/[id]/components/HistoryAccordion.tsx`:
 
@@ -1590,7 +1590,7 @@ export function HistoryAccordion({ events, submittedAt }: HistoryAccordionProps)
 }
 ```
 
-- [ ] **Step 6.3: Write `HistoryAccordion` test**
+- [x] **Step 6.3: Write `HistoryAccordion` test**
 
 Create `apps/web/test/components/HistoryAccordion.test.tsx`:
 
@@ -1640,7 +1640,7 @@ describe('HistoryAccordion', () => {
 });
 ```
 
-- [ ] **Step 6.4: Implement `FormResponsesPanel`**
+- [x] **Step 6.4: Implement `FormResponsesPanel`**
 
 Create `apps/web/src/app/admin/orders/[id]/components/FormResponsesPanel.tsx`:
 
@@ -1851,7 +1851,7 @@ export function FormResponsesPanel({
 }
 ```
 
-- [ ] **Step 6.5: Implement `AiSnapshotPanel`**
+- [x] **Step 6.5: Implement `AiSnapshotPanel`**
 
 Create `apps/web/src/app/admin/orders/[id]/components/AiSnapshotPanel.tsx`:
 
@@ -1966,7 +1966,7 @@ export function AiSnapshotPanel({
 }
 ```
 
-- [ ] **Step 6.6: Replace `ReviewMode.tsx` (read-only — Task 7 adds ActionBar)**
+- [x] **Step 6.6: Replace `ReviewMode.tsx` (read-only — Task 7 adds ActionBar)**
 
 Replace `apps/web/src/app/admin/orders/[id]/components/ReviewMode.tsx`:
 
@@ -2108,7 +2108,7 @@ export async function ReviewMode({ orderId, order }: ReviewModeProps) {
 
 (Note: this file imports `ActionBar` and `RealtimeOrderDetail` which Task 7 creates. After Task 6, this file will not typecheck — that's expected. Phase 4.5 cyclic-dep lesson says "do not check in non-typechecking code", so we move both Tasks 6+7 into a single commit OR temporarily stub the missing imports. Choose temporary stubs in Step 6.7 to keep commits atomic.)
 
-- [ ] **Step 6.7: Add temporary stubs for ActionBar + RealtimeOrderDetail**
+- [x] **Step 6.7: Add temporary stubs for ActionBar + RealtimeOrderDetail**
 
 Create `apps/web/src/app/admin/orders/[id]/components/ActionBar.tsx` (stub):
 
@@ -2143,7 +2143,7 @@ export function RealtimeOrderDetail(_props: { orderId: string; briefId: string }
 }
 ```
 
-- [ ] **Step 6.8: Run typecheck + tests**
+- [x] **Step 6.8: Run typecheck + tests**
 
 ```bash
 cd apps/web && pnpm typecheck && pnpm test
@@ -2151,7 +2151,7 @@ cd apps/web && pnpm typecheck && pnpm test
 
 Expected: clean. New HistoryAccordion tests pass.
 
-- [ ] **Step 6.9: Commit**
+- [x] **Step 6.9: Commit**
 
 ```bash
 cd "C:\Users\DELL\Documents\Antigravity\operscale-calender\operscale-calendar-platform"
@@ -2175,7 +2175,7 @@ git commit -m "feat(web): order-detail review-mode read panels (history accordio
 
 `fetch` to `apps/agent` is the write path. Get the founder's JWT from the browser session and forward it as `Authorization: Bearer ...`.
 
-- [ ] **Step 7.1: Implement `DiscardModal`**
+- [x] **Step 7.1: Implement `DiscardModal`**
 
 Create `apps/web/src/app/admin/orders/[id]/components/DiscardModal.tsx`:
 
@@ -2296,7 +2296,7 @@ export function DiscardModal({ open, onClose, orderId }: DiscardModalProps) {
 }
 ```
 
-- [ ] **Step 7.2: Implement `ReanalyzeModal`**
+- [x] **Step 7.2: Implement `ReanalyzeModal`**
 
 Create `apps/web/src/app/admin/orders/[id]/components/ReanalyzeModal.tsx`:
 
@@ -2419,7 +2419,7 @@ export function ReanalyzeModal({ open, onClose, briefId, priorRunId }: Reanalyze
 }
 ```
 
-- [ ] **Step 7.3: Implement `ApproveModal`**
+- [x] **Step 7.3: Implement `ApproveModal`**
 
 Create `apps/web/src/app/admin/orders/[id]/components/ApproveModal.tsx`:
 
@@ -2524,7 +2524,7 @@ export function ApproveModal({ open, onClose, orderId, customerEmail }: ApproveM
 }
 ```
 
-- [ ] **Step 7.4: Replace `ActionBar.tsx` stub with full implementation**
+- [x] **Step 7.4: Replace `ActionBar.tsx` stub with full implementation**
 
 ```tsx
 'use client';
@@ -2614,7 +2614,7 @@ export function ActionBar({
 }
 ```
 
-- [ ] **Step 7.5: Replace `RealtimeOrderDetail.tsx` stub**
+- [x] **Step 7.5: Replace `RealtimeOrderDetail.tsx` stub**
 
 ```tsx
 'use client';
@@ -2670,7 +2670,7 @@ export function RealtimeOrderDetail({ orderId, briefId }: RealtimeOrderDetailPro
 }
 ```
 
-- [ ] **Step 7.6: Set `NEXT_PUBLIC_AGENT_BASE_URL` env var**
+- [x] **Step 7.6: Set `NEXT_PUBLIC_AGENT_BASE_URL` env var**
 
 Add to `apps/web/.env.example` (after the supabase section):
 
@@ -2683,7 +2683,7 @@ NEXT_PUBLIC_AGENT_BASE_URL=http://127.0.0.1:3002
 
 Production env file `/etc/operscale-calendar/web.env` on the VPS gets `NEXT_PUBLIC_AGENT_BASE_URL=https://api.operscale.cloud` (set during VPS rebuild in Task 12).
 
-- [ ] **Step 7.7: Write modal tests**
+- [x] **Step 7.7: Write modal tests**
 
 Create `apps/web/test/components/DiscardModal.test.tsx`:
 
@@ -2889,7 +2889,7 @@ describe('ApproveModal', () => {
 });
 ```
 
-- [ ] **Step 7.8: Run typecheck + tests + build**
+- [x] **Step 7.8: Run typecheck + tests + build**
 
 ```bash
 cd apps/web && pnpm typecheck && pnpm test && pnpm build
@@ -2897,7 +2897,7 @@ cd apps/web && pnpm typecheck && pnpm test && pnpm build
 
 Expected: clean. ~16 component tests now pass total.
 
-- [ ] **Step 7.9: Commit**
+- [x] **Step 7.9: Commit**
 
 ```bash
 cd "C:\Users\DELL\Documents\Antigravity\operscale-calender\operscale-calendar-platform"
@@ -2937,7 +2937,7 @@ feat(web): order-detail action bar + 3 modals + RealtimeOrderDetail
 - 3 component test files (~10 tests) cover happy + error paths.
 ```
 
-- [ ] **Step 7.10: Push origin/main (3 tasks since last push)**
+- [x] **Step 7.10: Push origin/main (3 tasks since last push)**
 
 ```bash
 git push origin main
@@ -2951,7 +2951,7 @@ git push origin main
 - Modify: `apps/web/src/app/admin/orders/[id]/components/TimelineMode.tsx`
 - Create: `apps/web/src/app/admin/orders/[id]/components/timeline/EventCard.tsx`
 
-- [ ] **Step 8.1: Implement `EventCard`**
+- [x] **Step 8.1: Implement `EventCard`**
 
 Create `apps/web/src/app/admin/orders/[id]/components/timeline/EventCard.tsx`:
 
@@ -3005,7 +3005,7 @@ export function EventCard({ occurred_at, event_type, payload }: EventCardProps) 
 }
 ```
 
-- [ ] **Step 8.2: Replace `TimelineMode.tsx`**
+- [x] **Step 8.2: Replace `TimelineMode.tsx`**
 
 ```tsx
 import { getSupabaseServer } from '@/lib/supabase-server';
@@ -3111,7 +3111,7 @@ export async function TimelineMode({ orderId, order }: TimelineModeProps) {
 }
 ```
 
-- [ ] **Step 8.3: Typecheck + build**
+- [x] **Step 8.3: Typecheck + build**
 
 ```bash
 cd apps/web && pnpm typecheck && pnpm build
@@ -3119,7 +3119,7 @@ cd apps/web && pnpm typecheck && pnpm build
 
 Expected: clean.
 
-- [ ] **Step 8.4: Commit**
+- [x] **Step 8.4: Commit**
 
 ```bash
 cd "C:\Users\DELL\Documents\Antigravity\operscale-calender\operscale-calendar-platform"
@@ -3137,7 +3137,7 @@ git commit -m "feat(web): order-detail timeline mode with activity_log + paystac
 - Create: `apps/web/src/app/admin/paid-orders/LoadMoreButton.tsx`
 - Create: `apps/web/src/app/admin/paid-orders/RealtimePaidOrders.tsx`
 
-- [ ] **Step 9.1: Implement `paid-orders/page.tsx`**
+- [x] **Step 9.1: Implement `paid-orders/page.tsx`**
 
 ```tsx
 import { getSupabaseServer } from '@/lib/supabase-server';
@@ -3208,7 +3208,7 @@ export default async function PaidOrdersPage() {
 }
 ```
 
-- [ ] **Step 9.2: Implement `PaidOrdersTable.tsx`**
+- [x] **Step 9.2: Implement `PaidOrdersTable.tsx`**
 
 ```tsx
 'use client';
@@ -3279,7 +3279,7 @@ export function PaidOrdersTable({
 }
 ```
 
-- [ ] **Step 9.3: Implement `LoadMoreButton.tsx`**
+- [x] **Step 9.3: Implement `LoadMoreButton.tsx`**
 
 ```tsx
 'use client';
@@ -3356,7 +3356,7 @@ export function LoadMoreButton({ currentCount, pageSize, onLoaded }: LoadMoreBut
 }
 ```
 
-- [ ] **Step 9.4: Implement `RealtimePaidOrders.tsx`**
+- [x] **Step 9.4: Implement `RealtimePaidOrders.tsx`**
 
 ```tsx
 'use client';
@@ -3438,7 +3438,7 @@ export function RealtimePaidOrders({
 }
 ```
 
-- [ ] **Step 9.5: Add nav link in admin layout**
+- [x] **Step 9.5: Add nav link in admin layout**
 
 Modify `apps/web/src/app/admin/layout.tsx` — add "Paid orders" link to the nav (after the existing "Pending review" link):
 
@@ -3453,7 +3453,7 @@ Modify `apps/web/src/app/admin/layout.tsx` — add "Paid orders" link to the nav
 </nav>
 ```
 
-- [ ] **Step 9.6: Typecheck + build**
+- [x] **Step 9.6: Typecheck + build**
 
 ```bash
 cd apps/web && pnpm typecheck && pnpm build
@@ -3461,7 +3461,7 @@ cd apps/web && pnpm typecheck && pnpm build
 
 Expected: clean.
 
-- [ ] **Step 9.7: Commit**
+- [x] **Step 9.7: Commit**
 
 ```bash
 cd "C:\Users\DELL\Documents\Antigravity\operscale-calender\operscale-calendar-platform"
@@ -3478,7 +3478,7 @@ git commit -m "feat(web): /admin/paid-orders dashboard with Realtime + Load more
 
 This test runs against real staging Supabase under `SMOKE=1`. It catches schema drift before VPS deploy (Phase 3 + 4.5 + 4.6 all bit us; defence in depth).
 
-- [ ] **Step 10.1: Write the test**
+- [x] **Step 10.1: Write the test**
 
 Create `apps/agent/test/integration/phase5-schema-shapes.test.ts`:
 
@@ -3591,7 +3591,7 @@ describe('Phase 5 schema reality (SMOKE=1)', () => {
 });
 ```
 
-- [ ] **Step 10.2: Add `SMOKE=1` runner script to apps/agent/package.json**
+- [x] **Step 10.2: Add `SMOKE=1` runner script to apps/agent/package.json**
 
 Modify `apps/agent/package.json` — add a script:
 
@@ -3637,7 +3637,7 @@ Then in `apps/agent/package.json`:
 "test:phase5-smoke": "node scripts/run-phase5-smoke.mjs"
 ```
 
-- [ ] **Step 10.3: Run the smoke test against staging**
+- [x] **Step 10.3: Run the smoke test against staging**
 
 ```bash
 cd apps/agent && pnpm test:phase5-smoke
@@ -3645,7 +3645,7 @@ cd apps/agent && pnpm test:phase5-smoke
 
 Expected: 4/4 tests pass (or skip if SMOKE not set, but the runner sets it).
 
-- [ ] **Step 10.4: Commit**
+- [x] **Step 10.4: Commit**
 
 ```bash
 cd "C:\Users\DELL\Documents\Antigravity\operscale-calender\operscale-calendar-platform"
@@ -3661,7 +3661,7 @@ git commit -m "test(agent): phase5 schema-reality integration test (SMOKE=1)"
 - Modify: `.github/workflows/ci.yml` (add apps/web test step + ensure tsc + lint gates)
 - Modify: `.github/workflows/nightly-smoke.yml` (add phase5-smoke run)
 
-- [ ] **Step 11.1: Read existing workflows**
+- [x] **Step 11.1: Read existing workflows**
 
 ```bash
 cat .github/workflows/ci.yml | head -80
@@ -3670,7 +3670,7 @@ cat .github/workflows/nightly-smoke.yml
 
 Confirm the apps/agent test job exists; identify where to add apps/web.
 
-- [ ] **Step 11.2: Add apps/web test step in ci.yml**
+- [x] **Step 11.2: Add apps/web test step in ci.yml**
 
 After the existing `apps/agent` test step, add:
 
@@ -3690,7 +3690,7 @@ After the existing `apps/agent` test step, add:
 
 (Exact YAML indentation depends on existing steps — match them.)
 
-- [ ] **Step 11.3: Add nightly phase5-smoke step**
+- [x] **Step 11.3: Add nightly phase5-smoke step**
 
 In `.github/workflows/nightly-smoke.yml`, after the existing nightly L3 test step, add:
 
@@ -3706,7 +3706,7 @@ In `.github/workflows/nightly-smoke.yml`, after the existing nightly L3 test ste
 
 (`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` GitHub Actions repo secrets must exist. **Manual prereq**: if they don't, add via the GitHub UI before the next cron firing.)
 
-- [ ] **Step 11.4: Commit**
+- [x] **Step 11.4: Commit**
 
 ```bash
 cd "C:\Users\DELL\Documents\Antigravity\operscale-calender\operscale-calendar-platform"
@@ -3714,7 +3714,7 @@ git add .github/workflows/ci.yml .github/workflows/nightly-smoke.yml
 git commit -m "ci(phase-5): add apps/web typecheck+lint+test + nightly phase5 schema smoke"
 ```
 
-- [ ] **Step 11.5: Push origin/main**
+- [x] **Step 11.5: Push origin/main**
 
 ```bash
 git push origin main
@@ -3728,7 +3728,7 @@ git push origin main
 - `C:\tmp\phase5-vps-rebuild.py` — paramiko-driven git pull + docker compose up
 - `C:\tmp\phase5-smoke.py` — paramiko-driven discard + reanalyze paths against staging
 
-- [ ] **Step 12.1: Set NEXT_PUBLIC_AGENT_BASE_URL on VPS web env**
+- [x] **Step 12.1: Set NEXT_PUBLIC_AGENT_BASE_URL on VPS web env**
 
 Via paramiko one-liner (see prompt.md "Tail agent logs on VPS" pattern, adapted to write):
 
@@ -3741,7 +3741,7 @@ ssh root@srv1297445.hstgr.cloud "
 
 Verify with `cat /etc/operscale-calendar/web.env | grep AGENT_BASE_URL`.
 
-- [ ] **Step 12.2: Rebuild VPS**
+- [x] **Step 12.2: Rebuild VPS**
 
 ```bash
 PYTHONIOENCODING=utf-8 python C:\tmp\vps-rebuild.py
@@ -3751,7 +3751,7 @@ PYTHONIOENCODING=utf-8 python C:\tmp\vps-rebuild.py
 
 Expected: web container rebuilt (~50s); agent rebuild not strictly needed but runs anyway. Both containers up.
 
-- [ ] **Step 12.3: Live verify the four routes**
+- [x] **Step 12.3: Live verify the four routes**
 
 ```bash
 curl -sI https://api.operscale.cloud/v1/health                        # 200
@@ -3760,7 +3760,7 @@ curl -sI https://operscale.cloud/admin                                # 200 (sig
 curl -sI https://operscale.cloud/auth/callback                        # 307 to /admin?reason=expired
 ```
 
-- [ ] **Step 12.4: Manual sign-in smoke (founder browser test)**
+- [x] **Step 12.4: Manual sign-in smoke (founder browser test)**
 
 In a private browser window:
 1. Navigate to `https://operscale.cloud/admin`.
@@ -3774,7 +3774,7 @@ In a private browser window:
    WHERE event_type='founder_signed_in' ORDER BY occurred_at DESC LIMIT 1;
    ```
 
-- [ ] **Step 12.5: Discard path smoke (paramiko-driven seed + browser action + paramiko verify)**
+- [x] **Step 12.5: Discard path smoke (paramiko-driven seed + browser action + paramiko verify)**
 
 Create `C:\tmp\phase5-smoke.py`:
 
@@ -3874,7 +3874,7 @@ if __name__ == '__main__':
 
 Run: `PYTHONIOENCODING=utf-8 python C:\tmp\phase5-smoke.py`
 
-- [ ] **Step 12.6: Re-analyze path smoke (manual + paramiko poll)**
+- [x] **Step 12.6: Re-analyze path smoke (manual + paramiko poll)**
 
 Re-use the seed pattern, then in the browser click Re-analyze, type a 20-char note, submit. Poll for the new `analysis_runs` row:
 
@@ -3897,7 +3897,7 @@ else:
 "
 ```
 
-- [ ] **Step 12.7: Approve path smoke (re-run Phase 4.5 smoke)**
+- [x] **Step 12.7: Approve path smoke (re-run Phase 4.5 smoke)**
 
 ```bash
 PYTHONIOENCODING=utf-8 python C:\tmp\phase4-5-smoke.py
@@ -3905,11 +3905,11 @@ PYTHONIOENCODING=utf-8 python C:\tmp\phase4-5-smoke.py
 
 Confirms the forward path (form → analyze → approve → Paystack init + Resend send → brief_sent) still works after the CRM deploy.
 
-- [ ] **Step 12.8: Cross-tab Realtime sanity check**
+- [x] **Step 12.8: Cross-tab Realtime sanity check**
 
 Open two browser tabs at `https://operscale.cloud/admin/pending-review`. Run the seed function from `phase5-smoke.py` (no input prompt — just the seed lines). Within ~3 seconds, both tabs should show the new row prepended. (If tab-2 doesn't update, gotcha #4 may have regressed — check `\d+ orders` for REPLICA IDENTITY FULL.)
 
-- [ ] **Step 12.9: Manual mobile + iPad + laptop test**
+- [x] **Step 12.9: Manual mobile + iPad + laptop test**
 
 Per CLAUDE.md "test on real mobile devices":
 
@@ -3919,7 +3919,7 @@ Per CLAUDE.md "test on real mobile devices":
 
 Take screenshots of each. Save to `docs/screenshots/phase-5-smoke/` (NOT committed — these are operational artefacts).
 
-- [ ] **Step 12.10: Document smoke run**
+- [x] **Step 12.10: Document smoke run**
 
 Append to `docs/runbooks/phase-5-smoke.md` (create the file if it doesn't exist):
 
@@ -3940,7 +3940,7 @@ Each time the CRM is rebuilt, run this checklist:
 Last run: 2026-05-06 — green across all 8 checks.
 ```
 
-- [ ] **Step 12.11: Commit runbook**
+- [x] **Step 12.11: Commit runbook**
 
 ```bash
 cd "C:\Users\DELL\Documents\Antigravity\operscale-calender\operscale-calendar-platform"
@@ -3958,7 +3958,7 @@ git push origin main
 - Modify: `prompt.md` at repo root (rewrite as Phase 6 handoff)
 - Memory updates (write through automatic memory system; not a file modification)
 
-- [ ] **Step 13.1: Verify all upstream tasks pass**
+- [x] **Step 13.1: Verify all upstream tasks pass**
 
 ```bash
 cd apps/agent && pnpm test && pnpm typecheck && pnpm build:worker
@@ -3967,15 +3967,15 @@ cd ../web && pnpm test && pnpm typecheck && pnpm build
 
 Expected: all green, no skipped tests apart from the SMOKE-gated nightly + phase5-schema. Total tests: 281 (agent) + ~25 component (web) + existing email-template + sanity = ≈315.
 
-- [ ] **Step 13.2: Flip plan checkboxes**
+- [x] **Step 13.2: Flip plan checkboxes**
 
 Edit `docs/plans/2026-05-06-v2-phase-5-founder-crm.md` — change every `[ ]` to `[x]` in tasks 1-12 + steps 13.1-13.4.
 
-- [ ] **Step 13.3: Rewrite prompt.md as Phase 6 handoff**
+- [x] **Step 13.3: Rewrite prompt.md as Phase 6 handoff**
 
 Phase 6 (per the prompt's revised roadmap): customer brief form. Update prompt.md at the repo root analogously to the Phase 4.6→5 handoff already in place. Keep the carry-forwards section style; ensure all new schema reality (migration 0009, /v1/brief/discard live, NEXT_PUBLIC_AGENT_BASE_URL) is captured.
 
-- [ ] **Step 13.4: Single close-out commit + push**
+- [x] **Step 13.4: Single close-out commit + push**
 
 ```bash
 cd "C:\Users\DELL\Documents\Antigravity\operscale-calender\operscale-calendar-platform"
