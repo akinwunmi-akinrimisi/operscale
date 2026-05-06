@@ -22,7 +22,26 @@ COPY --from=deps /repo/node_modules ./node_modules
 COPY --from=deps /repo/apps/web/node_modules ./apps/web/node_modules
 COPY . .
 WORKDIR /repo/apps/web
-ENV NEXT_TELEMETRY_DISABLED=1
+# NEXT_PUBLIC_* vars must be set at build time — Next.js inlines them into
+# the client bundle (substituted as literal strings during webpack/turbopack
+# build). At runtime the container env values are NOT visible to client code.
+# Compose passes these via build.args (see /docker/operscale-calendar/docker-
+# compose.yml on the VPS).
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ARG NEXT_PUBLIC_AGENT_BASE_URL
+ARG NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
+ARG NEXT_PUBLIC_BRAND_NAME=Operscale
+ARG NEXT_PUBLIC_BRAND_DOMAIN=operscale.cloud
+ARG NEXT_PUBLIC_FOUNDER_WHATSAPP
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL} \
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY} \
+    NEXT_PUBLIC_AGENT_BASE_URL=${NEXT_PUBLIC_AGENT_BASE_URL} \
+    NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=${NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY} \
+    NEXT_PUBLIC_BRAND_NAME=${NEXT_PUBLIC_BRAND_NAME} \
+    NEXT_PUBLIC_BRAND_DOMAIN=${NEXT_PUBLIC_BRAND_DOMAIN} \
+    NEXT_PUBLIC_FOUNDER_WHATSAPP=${NEXT_PUBLIC_FOUNDER_WHATSAPP}
 RUN pnpm build
 
 # ---- runner stage: minimal standalone image ------------------------------

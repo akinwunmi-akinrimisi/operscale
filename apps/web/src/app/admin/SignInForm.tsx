@@ -28,19 +28,26 @@ export function SignInForm() {
     if (state.kind === 'sending') return;
     setState({ kind: 'sending' });
 
-    const supabase = getSupabaseBrowser();
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim().toLowerCase(),
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-
-    if (error) {
-      setState({ kind: 'error', message: error.message ?? 'Couldn’t send sign-in email.' });
-      return;
+    try {
+      const supabase = getSupabaseBrowser();
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim().toLowerCase(),
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) {
+        setState({ kind: 'error', message: error.message ?? 'Couldn’t send sign-in email.' });
+        return;
+      }
+      setState({ kind: 'sent', email: email.trim().toLowerCase() });
+    } catch (err) {
+      // Surface init failures (e.g. NEXT_PUBLIC_* not inlined into the
+      // browser bundle) instead of letting the form hang at "Sending…".
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[SignInForm] signInWithOtp threw:', err);
+      setState({ kind: 'error', message: `Sign-in failed: ${message}` });
     }
-    setState({ kind: 'sent', email: email.trim().toLowerCase() });
   }
 
   if (state.kind === 'sent') {
