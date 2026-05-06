@@ -61,6 +61,7 @@ export async function POST(req: Request): Promise<Response> {
           eventType: 'discard_failed',
           actor: 'founder',
           briefId: order.brief_id,
+          orderId: order.id,
           payload: {
             order_id: parsed.order_id,
             error: updErr.message,
@@ -79,6 +80,7 @@ export async function POST(req: Request): Promise<Response> {
       eventType: 'founder_discarded',
       actor: 'founder',
       briefId: order.brief_id,
+      orderId: order.id,
       payload: {
         order_id: parsed.order_id,
         reason: parsed.reason ?? null,

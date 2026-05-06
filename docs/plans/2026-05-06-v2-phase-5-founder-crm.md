@@ -437,7 +437,7 @@ describe('POST /v1/brief/discard', () => {
     );
     expect(res.status).toBe(409);
     const body = await res.json();
-    expect(body.error).toMatch(/paid/);
+    expect(body.current_status).toBe('paid');
   });
 
   it('happy path returns 200 + UPDATEs status + writes activity_log with reason', async () => {
@@ -574,6 +574,7 @@ export async function POST(req: Request): Promise<Response> {
           eventType: 'discard_failed',
           actor: 'founder',
           briefId: order.brief_id,
+          orderId: order.id,
           payload: {
             order_id: parsed.order_id,
             error: updErr.message,
@@ -592,6 +593,7 @@ export async function POST(req: Request): Promise<Response> {
       eventType: 'founder_discarded',
       actor: 'founder',
       briefId: order.brief_id,
+      orderId: order.id,
       payload: {
         order_id: parsed.order_id,
         reason: parsed.reason ?? null,

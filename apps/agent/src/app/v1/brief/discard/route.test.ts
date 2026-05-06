@@ -107,7 +107,7 @@ describe('POST /v1/brief/discard', () => {
     );
     expect(res.status).toBe(409);
     const body = await res.json();
-    expect(body.error).toMatch(/paid/);
+    expect(body.current_status).toBe('paid');
   });
 
   it('happy path returns 200 + UPDATEs status + writes activity_log with reason', async () => {
