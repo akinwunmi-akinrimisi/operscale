@@ -32,7 +32,7 @@ Ship the **Founder CRM v0** so the founder can sign in, walk a brief from `pendi
 
 | # | Decision | Locked value |
 | --- | --- | --- |
-| 1 | Auth entry | `/admin/*` gated; unauthenticated → 307 to `/admin/sign-in`; post-auth → `/admin/pending-review` |
+| 1 | Auth entry | `/admin/*` gated; unauthenticated → 307 to `/admin`; post-auth → `/admin/pending-review` |
 | 2 | Pending-review list scope | Oldest-first by `submitted_at`; no filter/search/bulk; render all (LIMIT 100 safety cap; banner if cap hit) |
 | 3 | Edit-field UX | N/A in v0 — `selected_pairs` READ-ONLY |
 | 4 | Live-update strategy | Realtime everywhere (queue + order-detail + paid-orders) |
@@ -44,7 +44,7 @@ Ship the **Founder CRM v0** so the founder can sign in, walk a brief from `pendi
 ### Pre-decided constraints (from prompt — locked)
 
 - Magic-link via Supabase `signInWithOtp`. Allowlist enforced project-wide by `send_email_hook`; `role=founder` stamped by `custom_access_token_hook`.
-- `verifyJwt` helper duplicated to `apps/web/src/lib/auth/verify-jwt.ts` (no cross-package import — Phase 4.5 cyclic-dep lesson).
+- `apps/web` reads role via `data.user.app_metadata.role` from `supabase.auth.getUser()` (the existing middleware pattern — see §4.2). No `verify-jwt.ts` duplicate needed.
 - `SUPABASE_SERVICE_ROLE_KEY` stays API-route-only in `apps/agent`. `apps/web` uses anon key + founder JWT cookie + RLS.
 - One brief per order — list views key off orders.
 
@@ -75,7 +75,7 @@ Phase 5 does NOT modify the middleware — the existing implementation is correc
 | Endpoint | Status | Phase 5 work |
 | --- | --- | --- |
 | `POST /v1/brief/approve` | Live (Phase 4 + 4.5) | Reuse — calls Paystack init + Resend send |
-| `POST /v1/brief/analyze` | Live (Phase 4) | Reuse with `trigger_type='re_analyze_with_note'` |
+| `POST /v1/brief/analyze` | Live (Phase 4) | Reuse with `trigger_type='re_analyze_same_frameworks'` |
 | `POST /v1/brief/discard` | 501 stub | **Build it** — Phase 5's only new backend route |
 
 No new GET endpoints. `apps/web` reads directly via `@supabase/ssr` (anon + RLS).
@@ -108,7 +108,7 @@ Each component is single-purpose; reuse shadcn-ui primitives (Button, Dialog, Ca
 
 - `AdminLayout` — `<header>` with brand + nav + signed-in email + sign-out. Server Component (existing scaffold extended).
 - `SignInForm` (`'use client'`) — lives at `/admin/page.tsx` (replaces the 14-line stub). Controlled email input + submit. Calls `getSupabaseBrowser().auth.signInWithOtp({ email, options: { emailRedirectTo: `${origin}/auth/callback` } })`. Renders `idle | sent | error` states. Honours `?reason=not_authenticated|not_authorized|expired|session` from middleware/callback redirects with inline copy.
-- `SignOutButton` (`'use client'`) — calls `supabase.auth.signOut()`, router-pushes to `/admin/sign-in`.
+- `SignOutButton` (`'use client'`) — calls `supabase.auth.signOut()`, router-pushes to `/admin`.
 
 ### 5.2 Pending-review queue
 
@@ -130,7 +130,7 @@ Each component is single-purpose; reuse shadcn-ui primitives (Button, Dialog, Ca
 ### 5.4 Action modals (each `'use client'`)
 
 - `ApproveModal` — confirms "Send brief to {email}?" → `fetch('POST /v1/brief/approve')` → loading (~2-5s for Paystack + Resend) → success: toast + close modal + `router.refresh()` (page re-renders in Timeline mode automatically because `orders.status` is now past `pending_founder_review`); failure: inline error, modal stays open.
-- `ReanalyzeModal` — textarea (min 10 chars validated client + server) → `fetch('POST /v1/brief/analyze')` with `trigger_type='re_analyze_with_note'` + `prior_run_id` + `founder_note` → modal stays open watching Realtime for new `analysis_runs` (`is_current=true`) → close + refresh.
+- `ReanalyzeModal` — textarea (min 10 chars validated client + server) → `fetch('POST /v1/brief/analyze')` with `trigger_type='re_analyze_same_frameworks'` + `prior_run_id` + `founder_note` → modal stays open watching Realtime for new `analysis_runs` (`is_current=true`) → close + refresh.
 - `DiscardModal` — optional reason textarea (max 500) → `fetch('POST /v1/brief/discard')` → success: toast + push to `/admin/pending-review`.
 
 ### 5.5 Paid-orders dashboard
@@ -194,7 +194,7 @@ POST /v1/brief/discard
 ### 6.5 Idempotency
 
 - Discard: naturally idempotent — the `pending_founder_review`-only guard converts re-discards to 409 (not an error from the founder's perspective; modal handles gracefully).
-- Re-analyze: Phase 4's idempotency key `${brief_id}::re_analyze_with_note::${prior_run_index}` catches double-clicks at queue insert.
+- Re-analyze: Phase 4's idempotency key `${brief_id}::re_analyze_same_frameworks::${prior_run_index}` catches double-clicks at queue insert.
 - Approve: Phase 4's status guard (`pending_founder_review` only) catches double-clicks; second click returns 409.
 
 ### 6.6 `orders.status` transitions touching Phase 5
@@ -210,10 +210,10 @@ Phase 5 only writes the `pending_founder_review` → {founder_approved, discarde
 ## 7. Auth flow
 
 1. Founder visits `/admin` (or any `/admin/*` route).
-2. Middleware sees no session cookie → 307 to `/admin/sign-in`.
-3. Founder enters email → `signInWithOtp({ email, options: { emailRedirectTo: `${origin}/admin/auth/callback` } })`.
+2. Middleware sees no session cookie → 307 to `/admin`.
+3. Founder enters email → `signInWithOtp({ email, options: { emailRedirectTo: `${origin}/auth/callback` } })`.
 4. Supabase Auth invokes project-wide `send_email_hook` — if email isn't in allowlist, hook drops the email silently. UI shows generic "If your email is allowlisted, a sign-in link is on its way."
-5. If allowlisted, Resend sends the magic link. Founder clicks → `/admin/auth/callback?code=...`.
+5. If allowlisted, Resend sends the magic link. Founder clicks → `/auth/callback?code=...`.
 6. `/auth/callback` Route Handler exchanges code for session via `getSupabaseServer()` (which sets cookies via the cookieStore.setAll path); INSERTs `founder_signed_in` activity_log row directly (migration 0009 enables this); 307 to `/admin/pending-review`.
 7. Middleware now sees session + founder role → renders the admin app.
 
@@ -226,9 +226,9 @@ If `activity_log` RLS doesn't permit founder-role INSERTs, plan adds a tiny `POS
 | Failure | UI |
 | --- | --- |
 | Email not allowlisted | Generic "If allowlisted, link is on its way." |
-| Magic link expired/reused | `/admin/sign-in?error=expired` — inline "That link has expired." |
+| Magic link expired/reused | `/admin?error=expired` — inline "That link has expired." |
 | Resend down | Form shows "Couldn't send sign-in email. Try again." |
-| Session cookie corruption | Middleware clears cookie + 307 `/admin/sign-in?error=session` |
+| Session cookie corruption | Middleware clears cookie + 307 `/admin?error=session` |
 
 ### 8.2 Read failures (Server Components)
 
@@ -255,7 +255,7 @@ If `activity_log` RLS doesn't permit founder-role INSERTs, plan adds a tiny `POS
 
 | Event | Where written | When |
 | --- | --- | --- |
-| `founder_signed_in` | `/admin/auth/callback` (or `/v1/auth/log-signin` fallback) | After successful code exchange |
+| `founder_signed_in` | `/auth/callback` (or `/v1/auth/log-signin` fallback) | After successful code exchange |
 | `founder_discarded` | `/v1/brief/discard` | Successful UPDATE |
 | `founder_approved` + `brief_email_sent` | `/v1/brief/approve` (already live) | Phase 4.5 logic |
 | `ai_reanalyze_requested` + `ai_analysis_enqueued` | `/v1/brief/analyze` (already live) | Phase 4 logic |
@@ -417,7 +417,7 @@ Post-deploy on staging:
 
 A rough split, to be expanded by writing-plans:
 
-1. **Foundation**: Supabase SSR client factories + middleware + verifyJwt duplicate + admin layout extension + sign-in form + callback route + activity_log RLS check / fallback endpoint.
+1. **Foundation**: Sign-in form (replace 14-line stub) + auth callback route + activity_log RLS check (migration 0009 verified). The Supabase SSR client factories + middleware are already wired — Phase 5 does NOT touch them.
 2. **Discard backend**: TDD `/v1/brief/discard` route → deploy + smoke.
 3. **Pending-review queue**: server fetch + QueueTable + QueueRow + RealtimeQueue + cap banner.
 4. **Brief detail (review mode)**: page mode-switch + FormResponsesPanel + AiSnapshotPanel + HistoryAccordion + ActionBar + the three modals + RealtimeOrderDetail.
