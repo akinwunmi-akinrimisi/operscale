@@ -16,7 +16,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:claude:live": "node scripts/run-live-tests.mjs",
-    "test:smoke": "node scripts/run-smoke-tests.mjs"
+    "test:smoke": "node scripts/run-smoke-tests.mjs",
+    "test:phase5-smoke": "node scripts/run-phase5-smoke.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
