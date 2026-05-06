@@ -46,6 +46,9 @@ supabase/.temp/
 # Local Docker volumes (if any developer runs compose locally)
 .volumes/
 
+# Superpowers brainstorming visual companion (mockups + server state)
+.superpowers/
+
 # Local secrets that aren't .env (defensive)
 *.pem
 *.key
