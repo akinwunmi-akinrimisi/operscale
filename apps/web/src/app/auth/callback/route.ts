@@ -10,8 +10,22 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabase-server';
 
-export async function GET(req: NextRequest) {
+/**
+ * Build a redirect URL that respects upstream proxy headers (Cloudflare → Traefik
+ * → Next). In Docker standalone mode Next sees host=0.0.0.0:3001; without this
+ * helper, redirects would bounce the browser to a non-routable internal address.
+ */
+function proxyAwareUrl(req: NextRequest): URL {
   const url = req.nextUrl.clone();
+  const fwdHost = req.headers.get('x-forwarded-host');
+  const fwdProto = req.headers.get('x-forwarded-proto');
+  if (fwdHost) url.host = fwdHost;
+  if (fwdProto) url.protocol = `${fwdProto}:`;
+  return url;
+}
+
+export async function GET(req: NextRequest) {
+  const url = proxyAwareUrl(req);
   const code = url.searchParams.get('code');
 
   if (!code) {
