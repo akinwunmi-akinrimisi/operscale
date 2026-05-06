@@ -173,6 +173,7 @@ Replace the new files / modified files lists with the corrected inventory:
 - `apps/agent/src/app/v1/brief/discard/route.test.ts`
 - `apps/agent/test/integration/phase5-schema-shapes.test.ts`
 - `supabase/migrations/0009_activity_log_founder_insert.sql`
+- `supabase/migrations/0010_founder_read_customers_brief_photos.sql`
 
 ### Modified files
 
@@ -1248,6 +1249,9 @@ interface RealtimeQueueProps {
 }
 
 // Hydrates one queue row from the orders.id by re-running the same join query.
+// The .eq('status', 'pending_founder_review') filter is a staleness defense:
+// if Realtime delivers an event for a row whose status has already moved by
+// the time we re-fetch, this query returns null and the caller skips it.
 async function fetchJoinedRow(orderId: string): Promise<QueueRowData | null> {
   const supabase = getSupabaseBrowser();
   const { data, error } = await supabase
@@ -1256,6 +1260,7 @@ async function fetchJoinedRow(orderId: string): Promise<QueueRowData | null> {
       `id, tier, status, briefs!inner(id, submitted_at, form_payload), customers!inner(id, name), brief_photos(brief_id)`,
     )
     .eq('id', orderId)
+    .eq('status', 'pending_founder_review')
     .maybeSingle();
   if (error || !data) return null;
   // The supabase-js join shape: briefs is an array because orders→briefs is FK,
@@ -1294,20 +1299,39 @@ export function RealtimeQueue({ onUpdate }: RealtimeQueueProps) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const newRow = (payload as any).new;
           if (!newRow?.id) return;
+          // fetchJoinedRow filters by status=pending_founder_review, so if an
+          // UPDATE flipped status during the fetch, joined will be null and
+          // we skip the prepend.
           const joined = await fetchJoinedRow(newRow.id);
-          if (joined) {
-            onUpdate((prev) => [joined, ...prev]);
-          }
+          if (!joined) return;
+          onUpdate((prev) =>
+            prev.some((r) => r.order_id === joined.order_id)
+              ? prev
+              : [joined, ...prev],
+          );
         },
       )
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'orders' },
-        (payload) => {
+        async (payload) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const newRow = (payload as any).new;
-          if (newRow?.status !== 'pending_founder_review') {
-            onUpdate((prev) => prev.filter((r) => r.order_id !== newRow?.id));
+          if (!newRow?.id) return;
+          if (newRow.status === 'pending_founder_review') {
+            // Promote into the queue: worker analyzer + re-analysis flows
+            // (Phase 5 Task 7) can flip status TO pending_founder_review
+            // via UPDATE rather than INSERT.
+            const joined = await fetchJoinedRow(newRow.id);
+            if (!joined) return;
+            onUpdate((prev) =>
+              prev.some((r) => r.order_id === joined.order_id)
+                ? prev.map((r) => (r.order_id === joined.order_id ? joined : r))
+                : [joined, ...prev],
+            );
+          } else {
+            // Splice out — order has moved to founder_approved / discarded / etc.
+            onUpdate((prev) => prev.filter((r) => r.order_id !== newRow.id));
           }
         },
       )
@@ -1345,8 +1369,8 @@ export const dynamic = 'force-dynamic';
 
 const QUEUE_LIMIT = 100;
 
-interface BriefPhotoCount {
-  count: number | null;
+interface BriefPhotoRow {
+  brief_id: string;
 }
 
 interface OrderJoined {
@@ -1358,7 +1382,7 @@ interface OrderJoined {
     form_payload: { brand_name?: string; niche?: string } | null;
   } | null;
   customers: { id: string; name: string | null } | null;
-  brief_photos: BriefPhotoCount[] | null;
+  brief_photos: BriefPhotoRow[] | null;
 }
 
 async function fetchPending(): Promise<{ rows: QueueRowData[]; capReached: boolean }> {
@@ -1366,7 +1390,7 @@ async function fetchPending(): Promise<{ rows: QueueRowData[]; capReached: boole
   const { data, error } = await supabase
     .from('orders')
     .select(
-      `id, tier, briefs!inner(id, submitted_at, form_payload), customers!inner(id, name), brief_photos(count)`,
+      `id, tier, briefs!inner(id, submitted_at, form_payload), customers!inner(id, name), brief_photos(brief_id)`,
     )
     .eq('status', 'pending_founder_review')
     .order('briefs(submitted_at)', { ascending: true })
@@ -1382,7 +1406,7 @@ async function fetchPending(): Promise<{ rows: QueueRowData[]; capReached: boole
     niche: o.briefs?.form_payload?.niche ?? null,
     tier: o.tier as QueueRowData['tier'],
     submitted_at: o.briefs?.submitted_at ?? new Date().toISOString(),
-    has_photos: (o.brief_photos?.[0]?.count ?? 0) > 0,
+    has_photos: (o.brief_photos?.length ?? 0) > 0,
   }));
 
   return { rows, capReached: rows.length >= QUEUE_LIMIT };
@@ -3415,7 +3439,7 @@ describe('Phase 5 schema reality (SMOKE=1)', () => {
     const { data, error } = await supabase
       .from('orders')
       .select(
-        `id, tier, briefs!inner(id, submitted_at, form_payload), customers!inner(id, name), brief_photos(count)`,
+        `id, tier, briefs!inner(id, submitted_at, form_payload), customers!inner(id, name), brief_photos(brief_id)`,
       )
       .eq('status', 'pending_founder_review')
       .limit(1);

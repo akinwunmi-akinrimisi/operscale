@@ -9,6 +9,9 @@ interface RealtimeQueueProps {
 }
 
 // Hydrates one queue row from the orders.id by re-running the same join query.
+// The .eq('status', 'pending_founder_review') filter is a staleness defense:
+// if Realtime delivers an event for a row whose status has already moved by
+// the time we re-fetch, this query returns null and the caller skips it.
 async function fetchJoinedRow(orderId: string): Promise<QueueRowData | null> {
   const supabase = getSupabaseBrowser();
   const { data, error } = await supabase
@@ -17,6 +20,7 @@ async function fetchJoinedRow(orderId: string): Promise<QueueRowData | null> {
       `id, tier, status, briefs!inner(id, submitted_at, form_payload), customers!inner(id, name), brief_photos(brief_id)`,
     )
     .eq('id', orderId)
+    .eq('status', 'pending_founder_review')
     .maybeSingle();
   if (error || !data) return null;
   // The supabase-js join shape: briefs is an array because orders→briefs is FK,
@@ -55,20 +59,39 @@ export function RealtimeQueue({ onUpdate }: RealtimeQueueProps) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const newRow = (payload as any).new;
           if (!newRow?.id) return;
+          // fetchJoinedRow filters by status=pending_founder_review, so if an
+          // UPDATE flipped status during the fetch, joined will be null and
+          // we skip the prepend.
           const joined = await fetchJoinedRow(newRow.id);
-          if (joined) {
-            onUpdate((prev) => [joined, ...prev]);
-          }
+          if (!joined) return;
+          onUpdate((prev) =>
+            prev.some((r) => r.order_id === joined.order_id)
+              ? prev
+              : [joined, ...prev],
+          );
         },
       )
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'orders' },
-        (payload) => {
+        async (payload) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const newRow = (payload as any).new;
-          if (newRow?.status !== 'pending_founder_review') {
-            onUpdate((prev) => prev.filter((r) => r.order_id !== newRow?.id));
+          if (!newRow?.id) return;
+          if (newRow.status === 'pending_founder_review') {
+            // Promote into the queue: worker analyzer + re-analysis flows
+            // (Phase 5 Task 7) can flip status TO pending_founder_review
+            // via UPDATE rather than INSERT.
+            const joined = await fetchJoinedRow(newRow.id);
+            if (!joined) return;
+            onUpdate((prev) =>
+              prev.some((r) => r.order_id === joined.order_id)
+                ? prev.map((r) => (r.order_id === joined.order_id ? joined : r))
+                : [joined, ...prev],
+            );
+          } else {
+            // Splice out — order has moved to founder_approved / discarded / etc.
+            onUpdate((prev) => prev.filter((r) => r.order_id !== newRow.id));
           }
         },
       )
