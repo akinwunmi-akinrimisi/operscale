@@ -728,18 +728,20 @@ export function SignInForm() {
       </div>
 
       {reason && REASON_COPY[reason] && (
-        <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+        <p role="status" className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
           {REASON_COPY[reason]}
         </p>
       )}
 
       {state.kind === 'error' && (
-        <p className="rounded-md border border-red-300 bg-red-50 p-2 text-xs text-red-900">
+        <p role="alert" className="rounded-md border border-red-300 bg-red-50 p-2 text-xs text-red-900">
           {state.message}
         </p>
       )}
 
+      <label htmlFor="signin-email" className="sr-only">Email address</label>
       <input
+        id="signin-email"
         type="email"
         required
         value={email}
@@ -831,6 +833,15 @@ describe('SignInForm', () => {
       target: { value: 'akinolaakinrimisi@gmail.com' },
     });
     expect(screen.getByRole('button', { name: /Send sign-in link/ })).not.toBeDisabled();
+  });
+
+  it('disables submit when email is cleared after typing', () => {
+    render(<SignInForm />);
+    const input = screen.getByPlaceholderText(/you@/);
+    fireEvent.change(input, { target: { value: 'akinolaakinrimisi@gmail.com' } });
+    expect(screen.getByRole('button', { name: /Send sign-in link/ })).not.toBeDisabled();
+    fireEvent.change(input, { target: { value: '' } });
+    expect(screen.getByRole('button', { name: /Send sign-in link/ })).toBeDisabled();
   });
 
   it('shows the sent state on success', async () => {

@@ -39,6 +39,15 @@ describe('SignInForm', () => {
     expect(screen.getByRole('button', { name: /Send sign-in link/ })).not.toBeDisabled();
   });
 
+  it('disables submit when email is cleared after typing', () => {
+    render(<SignInForm />);
+    const input = screen.getByPlaceholderText(/you@/);
+    fireEvent.change(input, { target: { value: 'akinolaakinrimisi@gmail.com' } });
+    expect(screen.getByRole('button', { name: /Send sign-in link/ })).not.toBeDisabled();
+    fireEvent.change(input, { target: { value: '' } });
+    expect(screen.getByRole('button', { name: /Send sign-in link/ })).toBeDisabled();
+  });
+
   it('shows the sent state on success', async () => {
     mockSignInWithOtp.mockResolvedValueOnce({ error: null });
     render(<SignInForm />);
