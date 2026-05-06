@@ -19,7 +19,14 @@ function proxyAwareUrl(req: NextRequest): URL {
   const url = req.nextUrl.clone();
   const fwdHost = req.headers.get('x-forwarded-host');
   const fwdProto = req.headers.get('x-forwarded-proto');
-  if (fwdHost) url.host = fwdHost;
+  if (fwdHost) {
+    // Split host[:port] cleanly. Setting url.host to a value without a port
+    // does NOT clear the existing port (URL spec quirk), so we set hostname
+    // and port separately.
+    const colonIdx = fwdHost.indexOf(':');
+    url.hostname = colonIdx === -1 ? fwdHost : fwdHost.slice(0, colonIdx);
+    url.port = colonIdx === -1 ? '' : fwdHost.slice(colonIdx + 1);
+  }
   if (fwdProto) url.protocol = `${fwdProto}:`;
   return url;
 }
