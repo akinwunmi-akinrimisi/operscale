@@ -1257,7 +1257,7 @@ async function fetchJoinedRow(orderId: string): Promise<QueueRowData | null> {
   const { data, error } = await supabase
     .from('orders')
     .select(
-      `id, tier, status, briefs!inner(id, submitted_at, form_payload), customers!inner(id, name), brief_photos(brief_id)`,
+      `id, tier, status, briefs!inner(id, submitted_at, form_payload), customers!inner(id, name:full_name), brief_photos(brief_id)`,
     )
     .eq('id', orderId)
     .eq('status', 'pending_founder_review')
@@ -1390,7 +1390,7 @@ async function fetchPending(): Promise<{ rows: QueueRowData[]; capReached: boole
   const { data, error } = await supabase
     .from('orders')
     .select(
-      `id, tier, briefs!inner(id, submitted_at, form_payload), customers!inner(id, name), brief_photos(brief_id)`,
+      `id, tier, briefs!inner(id, submitted_at, form_payload), customers!inner(id, name:full_name), brief_photos(brief_id)`,
     )
     .eq('status', 'pending_founder_review')
     .order('briefs(submitted_at)', { ascending: true })
@@ -1485,7 +1485,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
   const { data: order, error } = await supabase
     .from('orders')
     .select(
-      `id, brief_id, customer_id, status, tier, amount_ngn, submitted_at, founder_approved_at, paid_at, paystack_authorization, briefs(id, form_payload, submitted_at), customers(id, name, email, whatsapp)`,
+      `id, brief_id, customer_id, status, tier, amount_ngn, submitted_at, founder_approved_at, paid_at, paystack_authorization, briefs!inner(id, form_payload, submitted_at), customers!inner(id, name:full_name, email, whatsapp:whatsapp_number)`,
     )
     .eq('id', id)
     .maybeSingle();
@@ -1631,25 +1631,50 @@ describe('HistoryAccordion', () => {
 Create `apps/web/src/app/admin/orders/[id]/components/FormResponsesPanel.tsx`:
 
 ```tsx
+// Source of truth for form_payload keys: apps/agent/src/worker/process-job.ts
+// (projectBriefRowToAnalyzerInput) + apps/agent/src/lib/types/v2.ts
+// (BriefAnalyzerInput). Keep this interface aligned with that projector — if
+// process-job.ts adds/renames a key, this panel must move with it.
 interface FormPayload {
+  // Identity / niche
   brand_name?: string;
-  niche?: string;
-  website?: string;
-  description?: string;
-  customer_whatsapp?: string;
-  customer_email?: string;
-  angles_selected?: string[];
-  goal?: string;
-  topics?: string[];
-  things_to_avoid?: string[];
-  posting_platforms?: string[];
-  tone?: string;
-  reference_posts?: string[];
-  brand_colors?: string[];
-  on_camera?: string;
-  setting_vibe?: string;
-  niche_followups?: Record<string, string>;
-  source_attribution?: string;
+  niche_slug?: string;
+  niche_label?: string;
+
+  // Step 1 — owner contact
+  owner_name?: string;
+  phone_e164?: string;
+  email?: string;
+
+  // Step 2 — offer
+  one_line_description?: string;
+  offer_description?: string;
+  price_point_band?: string;
+
+  // Step 3 — audience
+  primary_audience_description?: string;
+  audience_age_range?: string;
+  audience_location?: string;
+  audience_belief?: string;
+  audience_belief_target?: string;
+
+  // Step 4 — brand
+  logo_uploaded_yes_no?: 'yes' | 'no';
+  brand_colours?: string;
+  instagram_handle?: string;
+
+  // Step 5 — photos
+  photo_count?: number;
+  photo_consent_yes_no?: 'yes' | 'no';
+
+  // Step 6 — voice
+  stated_voice?: string;
+  reference_posts_block?: string;
+  customer_backstory_verbatim?: string;
+
+  // Step 7 — counts (echoed for prompt fidelity per v2.ts)
+  video_count?: number;
+  carousel_count?: number;
 }
 
 interface FormResponsesPanelProps {
@@ -1671,7 +1696,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[120px_1fr] gap-2 py-0.5">
+    <div className="grid grid-cols-[140px_1fr] gap-2 py-0.5">
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd>{value || <span className="text-muted-foreground">—</span>}</dd>
     </div>
@@ -1686,61 +1711,93 @@ export function FormResponsesPanel({
   photoCount,
 }: FormResponsesPanelProps) {
   const fp = formPayload ?? {};
+  const nicheDisplay = fp.niche_label || fp.niche_slug;
   return (
     <div className="space-y-4 rounded-lg border bg-card p-4">
       <Section title="Business">
         <dl>
           <Field label="Brand" value={brandName} />
-          <Field label="Niche" value={fp.niche} />
-          <Field label="Website" value={fp.website} />
-          <Field
-            label="Description"
-            value={fp.description ? <p className="whitespace-pre-line">{fp.description}</p> : null}
-          />
-          <Field label="Customer" value={customerName} />
-          <Field label="Email" value={customerEmail} />
-          <Field label="WhatsApp" value={fp.customer_whatsapp} />
+          <Field label="Niche" value={nicheDisplay} />
+          <Field label="Owner" value={fp.owner_name || customerName} />
+          <Field label="Email" value={fp.email || customerEmail} />
+          <Field label="Phone" value={fp.phone_e164} />
+          <Field label="Instagram" value={fp.instagram_handle} />
         </dl>
       </Section>
-      <Section title="Direction & goals">
+      <Section title="Offer">
         <dl>
-          <Field label="Angles" value={fp.angles_selected?.join(', ')} />
-          <Field label="Goal" value={fp.goal} />
-          <Field label="Topics" value={fp.topics?.join(', ')} />
-          <Field label="Avoid" value={fp.things_to_avoid?.join(', ')} />
-          <Field label="Platforms" value={fp.posting_platforms?.join(', ')} />
-        </dl>
-      </Section>
-      <Section title="Brand voice">
-        <dl>
-          <Field label="Tone" value={fp.tone} />
           <Field
-            label="References"
+            label="One-liner"
             value={
-              fp.reference_posts?.length ? (
-                <ul className="list-disc pl-4 text-xs">
-                  {fp.reference_posts.map((r, i) => (
-                    <li key={i}>{r}</li>
-                  ))}
-                </ul>
+              fp.one_line_description ? (
+                <p className="whitespace-pre-line">{fp.one_line_description}</p>
               ) : null
             }
           />
           <Field
-            label="Colors"
+            label="Offer detail"
             value={
-              fp.brand_colors?.length ? (
-                <span className="flex flex-wrap gap-1">
-                  {fp.brand_colors.map((c, i) => (
-                    <span
-                      key={i}
-                      className="inline-block rounded border px-1.5 py-0.5 text-xs"
-                      style={{ background: c }}
-                    >
-                      {c}
-                    </span>
-                  ))}
-                </span>
+              fp.offer_description ? (
+                <p className="whitespace-pre-line">{fp.offer_description}</p>
+              ) : null
+            }
+          />
+          <Field label="Price band" value={fp.price_point_band} />
+        </dl>
+      </Section>
+      <Section title="Audience">
+        <dl>
+          <Field
+            label="Primary audience"
+            value={
+              fp.primary_audience_description ? (
+                <p className="whitespace-pre-line">{fp.primary_audience_description}</p>
+              ) : null
+            }
+          />
+          <Field label="Age range" value={fp.audience_age_range} />
+          <Field label="Location" value={fp.audience_location} />
+          <Field
+            label="Current belief"
+            value={
+              fp.audience_belief ? (
+                <p className="whitespace-pre-line">{fp.audience_belief}</p>
+              ) : null
+            }
+          />
+          <Field
+            label="Target belief"
+            value={
+              fp.audience_belief_target ? (
+                <p className="whitespace-pre-line">{fp.audience_belief_target}</p>
+              ) : null
+            }
+          />
+        </dl>
+      </Section>
+      <Section title="Brand voice">
+        <dl>
+          <Field
+            label="Stated voice"
+            value={
+              fp.stated_voice ? (
+                <p className="whitespace-pre-line">{fp.stated_voice}</p>
+              ) : null
+            }
+          />
+          <Field
+            label="References"
+            value={
+              fp.reference_posts_block ? (
+                <p className="whitespace-pre-line text-xs">{fp.reference_posts_block}</p>
+              ) : null
+            }
+          />
+          <Field
+            label="Backstory"
+            value={
+              fp.customer_backstory_verbatim ? (
+                <p className="whitespace-pre-line">{fp.customer_backstory_verbatim}</p>
               ) : null
             }
           />
@@ -1748,13 +1805,14 @@ export function FormResponsesPanel({
       </Section>
       <Section title="Visual character">
         <dl>
-          <Field label="On camera" value={fp.on_camera} />
-          <Field label="Setting" value={fp.setting_vibe} />
+          <Field label="Brand colours" value={fp.brand_colours} />
+          <Field label="Logo uploaded" value={fp.logo_uploaded_yes_no} />
         </dl>
       </Section>
       <Section title="Photos">
         <p className="text-sm">
-          {photoCount} photo{photoCount === 1 ? '' : 's'} uploaded.
+          {photoCount} photo{photoCount === 1 ? '' : 's'} uploaded
+          {fp.photo_consent_yes_no === 'yes' ? ' · consent given' : ''}.
           {photoCount > 0 && (
             <span className="ml-1 text-xs text-muted-foreground">
               (Lightbox preview deferred to Phase 5.x.)
@@ -1762,18 +1820,16 @@ export function FormResponsesPanel({
           )}
         </p>
       </Section>
-      {fp.niche_followups && Object.keys(fp.niche_followups).length > 0 && (
-        <Section title="Niche follow-ups">
-          <dl>
-            {Object.entries(fp.niche_followups).map(([k, v]) => (
-              <Field key={k} label={k} value={v} />
-            ))}
-          </dl>
-        </Section>
-      )}
-      <Section title="Source">
+      <Section title="Order volume">
         <dl>
-          <Field label="Heard via" value={fp.source_attribution} />
+          <Field
+            label="Videos"
+            value={typeof fp.video_count === 'number' ? String(fp.video_count) : null}
+          />
+          <Field
+            label="Carousels"
+            value={typeof fp.carousel_count === 'number' ? String(fp.carousel_count) : null}
+          />
         </dl>
       </Section>
     </div>

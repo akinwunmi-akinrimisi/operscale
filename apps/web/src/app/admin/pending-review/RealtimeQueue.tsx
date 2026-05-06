@@ -17,7 +17,7 @@ async function fetchJoinedRow(orderId: string): Promise<QueueRowData | null> {
   const { data, error } = await supabase
     .from('orders')
     .select(
-      `id, tier, status, briefs!inner(id, submitted_at, form_payload), customers!inner(id, name), brief_photos(brief_id)`,
+      `id, tier, status, briefs!inner(id, submitted_at, form_payload), customers!inner(id, name:full_name), brief_photos(brief_id)`,
     )
     .eq('id', orderId)
     .eq('status', 'pending_founder_review')

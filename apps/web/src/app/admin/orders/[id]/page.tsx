@@ -24,7 +24,7 @@ export default async function OrderDetailPage({ params }: PageProps) {
   const { data: order, error } = await supabase
     .from('orders')
     .select(
-      `id, brief_id, customer_id, status, tier, amount_ngn, submitted_at, founder_approved_at, paid_at, paystack_authorization, briefs!inner(id, form_payload, submitted_at), customers!inner(id, name, email, whatsapp)`,
+      `id, brief_id, customer_id, status, tier, amount_ngn, submitted_at, founder_approved_at, paid_at, paystack_authorization, briefs!inner(id, form_payload, submitted_at), customers!inner(id, name:full_name, email, whatsapp:whatsapp_number)`,
     )
     .eq('id', id)
     .maybeSingle();

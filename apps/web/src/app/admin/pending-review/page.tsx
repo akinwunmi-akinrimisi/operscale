@@ -29,7 +29,7 @@ async function fetchPending(): Promise<{ rows: QueueRowData[]; capReached: boole
   const { data, error } = await supabase
     .from('orders')
     .select(
-      `id, tier, briefs!inner(id, submitted_at, form_payload), customers!inner(id, name), brief_photos(brief_id)`,
+      `id, tier, briefs!inner(id, submitted_at, form_payload), customers!inner(id, name:full_name), brief_photos(brief_id)`,
     )
     .eq('status', 'pending_founder_review')
     .order('briefs(submitted_at)', { ascending: true })
