@@ -1,14 +1,23 @@
-// /admin — sign-in page (magic link) + dashboard for already-signed-in founders.
-// Spec: docs/specs/founder-review-flow.md.
+// /admin — magic-link sign-in page (always reachable per middleware).
+// Already-signed-in founders can also land here; rendering the form is harmless
+// because Supabase signInWithOtp simply re-issues a new link.
+//
+// Spec: docs/specs/v2-phase-5-design.md §4.1 + §5.1.
 
-export default function AdminHomePage() {
+import { Suspense } from 'react';
+import { SignInForm } from './SignInForm';
+
+export const metadata = {
+  title: 'Sign in — Operscale CRM',
+  robots: 'noindex, nofollow',
+};
+
+export default function AdminSignInPage() {
   return (
     <div className="container py-12">
-      <h1 className="text-2xl font-semibold">CRM</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Sign in with your magic link to access pending reviews.
-      </p>
-      {/* TODO(Operscale): magic-link form via supabase.auth.signInWithOtp */}
+      <Suspense fallback={null}>
+        <SignInForm />
+      </Suspense>
     </div>
   );
 }

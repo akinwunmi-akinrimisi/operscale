@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'node',
-    include: ['src/**/*.test.tsx', 'src/**/*.test.ts'],
+    include: ['src/**/*.test.tsx', 'src/**/*.test.ts', 'test/**/*.test.tsx', 'test/**/*.test.ts'],
     globals: false,
   },
   resolve: {
