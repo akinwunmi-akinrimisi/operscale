@@ -22,6 +22,16 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: pnpm --filter @operscale-calendar/agent test:smoke
+      # Requires repo secrets SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to be configured.
+      # The schema-shapes test runs against the live staging Supabase project to catch
+      # schema drift between code expectations and the actual table/column shapes.
+      - name: Phase 5 schema-reality smoke
+        working-directory: apps/agent
+        env:
+          SMOKE: '1'
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: pnpm vitest run test/integration/phase5-schema-shapes.test.ts
       - name: Open issue on failure
         if: failure()
         uses: actions/github-script@v7

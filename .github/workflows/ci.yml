@@ -74,3 +74,33 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm format:check
+
+  test:
+    name: Vitest (apps/agent + apps/web)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: apps/agent — vitest
+        working-directory: apps/agent
+        run: pnpm test
+
+      - name: apps/web — typecheck
+        working-directory: apps/web
+        run: pnpm typecheck
+
+      - name: apps/web — lint
+        working-directory: apps/web
+        run: pnpm lint
+
+      - name: apps/web — vitest
+        working-directory: apps/web
+        run: pnpm test
