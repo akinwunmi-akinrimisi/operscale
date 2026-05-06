@@ -54,22 +54,21 @@ Ship the **Founder CRM v0** so the founder can sign in, walk a brief from `pendi
 
 | Route | Type | Purpose |
 | --- | --- | --- |
-| `/admin` | Server Component | `redirect('/admin/pending-review')` |
-| `/admin/sign-in` | Client Component | Magic-link form + "check your email" state |
-| `/admin/auth/callback` | Route Handler | Exchange magic-link code → session cookie → `founder_signed_in` activity log → redirect to `/admin/pending-review` |
+| `/admin` | Client Component (replaces 14-line stub) | Magic-link sign-in form + post-auth shortcut to `/admin/pending-review` if already signed in |
+| `/auth/callback` | Route Handler (top-level — outside middleware matcher) | Exchange magic-link code → session cookie → `founder_signed_in` activity_log → redirect to `/admin/pending-review` |
 | `/admin/pending-review` | Server Component + `<RealtimeQueue />` client child | Initial queue + Realtime diffs |
 | `/admin/orders/[id]` | Server Component (mode-switching) | Review mode if `status='pending_founder_review'`, else Timeline mode |
 | `/admin/paid-orders` | Server Component + `<RealtimePaidOrders />` client child | 25 most-recent + Load more |
 
 ### 4.2 Auth gate
 
-`apps/web/src/middleware.ts` runs on every `/admin/*` request:
+Already wired at `apps/web/src/middleware.ts` (matcher `['/admin/:path*']`). Behaviour:
 
-1. Reads session cookie via `@supabase/ssr` middleware helper.
-2. Refreshes session if near expiry.
-3. Checks `role === 'founder'` claim in the JWT payload.
-4. Unauthenticated → 307 `/admin/sign-in`.
-5. Authenticated non-founder (defence-in-depth — should not happen due to project-wide `send_email_hook`) → 307 `/admin/sign-in?denied=1`.
+1. `/admin` (sign-in page) — always allowed, no redirect.
+2. `/admin/*` — uses `getSupabaseMiddleware(req, res)` from `lib/supabase-server.ts`. Calls `supabase.auth.getUser()` (forces token refresh + signature verification). On error or null user → 307 to `/admin?reason=not_authenticated`.
+3. Reads role from `data.user.app_metadata.role` (canonical for Supabase) with fallback to `data.user.user_metadata.role`. If `role !== 'founder'` → 307 to `/admin?reason=not_authorized`.
+
+Phase 5 does NOT modify the middleware — the existing implementation is correct.
 
 ### 4.3 Apps/agent endpoints (write boundary)
 
@@ -87,16 +86,18 @@ No new GET endpoints. `apps/web` reads directly via `@supabase/ssr` (anon + RLS)
 - **Realtime**: browser → Supabase Realtime WS (anon + founder JWT) → diffs applied to SSR'd state.
 - **Writes**: browser → `apps/web` client `fetch` → `apps/agent` route (verifies founder JWT) → service-role Supabase REST → DB.
 
-### 4.5 Library files added (`apps/web`)
+### 4.5 Library files
 
-- `src/lib/supabase/server.ts` — `createServerClient` factory (uses `next/headers` cookies).
-- `src/lib/supabase/browser.ts` — `createBrowserClient` factory.
-- `src/lib/supabase/middleware.ts` — middleware helper for session refresh.
-- `src/lib/auth/verify-jwt.ts` — duplicated from `apps/agent/src/lib/auth/verify-jwt.ts`.
+Existing (verified in repo):
+
+- `apps/web/src/lib/supabase-server.ts` — exports `getSupabaseServer()` (Server Components / Route Handlers via `next/headers`) and `getSupabaseMiddleware(req, res)` (middleware).
+- `apps/web/src/lib/supabase-browser.ts` — exports `getSupabaseBrowser()` (browser, cached singleton).
+
+Phase 5 does NOT add `src/lib/supabase/server.ts`, `src/lib/supabase/browser.ts`, `src/lib/supabase/middleware.ts`, or `src/lib/auth/verify-jwt.ts`. The existing factories cover all needs.
 
 ### 4.6 Dependencies added
 
-- `apps/web`: `@supabase/ssr` (new). `@supabase/supabase-js` (already a transitive — promote to direct).
+- `apps/web` devDependencies: `@testing-library/react`, `@testing-library/jest-dom`, `happy-dom` (for component tests). `@supabase/ssr` and `@supabase/supabase-js` are already installed.
 - `apps/agent`: no new deps.
 
 ## 5. Components
@@ -106,7 +107,7 @@ Each component is single-purpose; reuse shadcn-ui primitives (Button, Dialog, Ca
 ### 5.1 Shell & auth
 
 - `AdminLayout` — `<header>` with brand + nav + signed-in email + sign-out. Server Component (existing scaffold extended).
-- `SignInForm` (`'use client'`) — controlled email input + submit. Calls `supabase.auth.signInWithOtp`. Renders `idle | sent | error` states.
+- `SignInForm` (`'use client'`) — lives at `/admin/page.tsx` (replaces the 14-line stub). Controlled email input + submit. Calls `getSupabaseBrowser().auth.signInWithOtp({ email, options: { emailRedirectTo: `${origin}/auth/callback` } })`. Renders `idle | sent | error` states. Honours `?reason=not_authenticated|not_authorized|expired|session` from middleware/callback redirects with inline copy.
 - `SignOutButton` (`'use client'`) — calls `supabase.auth.signOut()`, router-pushes to `/admin/sign-in`.
 
 ### 5.2 Pending-review queue
@@ -172,7 +173,7 @@ REPLICA IDENTITY FULL is set on all three published tables (per migration 0001 +
 | Action | Endpoint | Request | DB writes |
 | --- | --- | --- | --- |
 | Approve | `POST /v1/brief/approve` (live) | `{ order_id }` + JWT | UPDATE orders, INSERT customer_framework_history × 8, INSERT activity_log × 3, side-effects (Paystack init + Resend send) |
-| Re-analyze | `POST /v1/brief/analyze` (live) | `{ brief_id, trigger_type:'re_analyze_with_note', prior_run_id, founder_note }` + JWT | INSERT ai_analysis_jobs, INSERT activity_log `ai_reanalyze_requested` + `ai_analysis_enqueued` |
+| Re-analyze | `POST /v1/brief/analyze` (live) | `{ brief_id, trigger_type:'re_analyze_same_frameworks', prior_run_id, founder_note }` + JWT | INSERT ai_analysis_jobs, INSERT activity_log `ai_analysis_enqueued` |
 | Discard | `POST /v1/brief/discard` (**new**) | `{ order_id, reason? }` + JWT | UPDATE orders SET status='discarded', INSERT activity_log `founder_discarded` |
 
 ### 6.4 `/v1/brief/discard` route detail (new code)
@@ -213,7 +214,7 @@ Phase 5 only writes the `pending_founder_review` → {founder_approved, discarde
 3. Founder enters email → `signInWithOtp({ email, options: { emailRedirectTo: `${origin}/admin/auth/callback` } })`.
 4. Supabase Auth invokes project-wide `send_email_hook` — if email isn't in allowlist, hook drops the email silently. UI shows generic "If your email is allowlisted, a sign-in link is on its way."
 5. If allowlisted, Resend sends the magic link. Founder clicks → `/admin/auth/callback?code=...`.
-6. Callback Route Handler exchanges code for session via `@supabase/ssr` server client; sets cookies; INSERTs `founder_signed_in` activity_log row; 307 to `/admin/pending-review`.
+6. `/auth/callback` Route Handler exchanges code for session via `getSupabaseServer()` (which sets cookies via the cookieStore.setAll path); INSERTs `founder_signed_in` activity_log row directly (migration 0009 enables this); 307 to `/admin/pending-review`.
 7. Middleware now sees session + founder role → renders the admin app.
 
 If `activity_log` RLS doesn't permit founder-role INSERTs, plan adds a tiny `POST /v1/auth/log-signin` endpoint on apps/agent that the callback POSTs to. Resolved during plan-writing by reading 0001 policies.
@@ -368,20 +369,16 @@ Post-deploy on staging:
 
 ### New files
 
-- `apps/web/src/middleware.ts`
-- `apps/web/src/lib/supabase/server.ts`
-- `apps/web/src/lib/supabase/browser.ts`
-- `apps/web/src/lib/supabase/middleware.ts`
-- `apps/web/src/lib/auth/verify-jwt.ts`
-- `apps/web/src/app/admin/sign-in/page.tsx`
-- `apps/web/src/app/admin/sign-in/SignInForm.tsx`
-- `apps/web/src/app/admin/auth/callback/route.ts`
+- `apps/web/src/app/auth/callback/route.ts`
+- `apps/web/src/app/admin/SignInForm.tsx` (`'use client'`)
 - `apps/web/src/app/admin/paid-orders/page.tsx`
-- `apps/web/src/app/admin/paid-orders/PaidOrdersTable.tsx` (`'use client'`)
-- `apps/web/src/app/admin/paid-orders/LoadMoreButton.tsx` (`'use client'`)
-- `apps/web/src/app/admin/pending-review/QueueTable.tsx` (`'use client'`)
+- `apps/web/src/app/admin/paid-orders/PaidOrdersTable.tsx`
+- `apps/web/src/app/admin/paid-orders/LoadMoreButton.tsx`
+- `apps/web/src/app/admin/paid-orders/RealtimePaidOrders.tsx`
+- `apps/web/src/app/admin/pending-review/QueueTable.tsx`
 - `apps/web/src/app/admin/pending-review/QueueRow.tsx`
 - `apps/web/src/app/admin/pending-review/QueueCapBanner.tsx`
+- `apps/web/src/app/admin/pending-review/RealtimeQueue.tsx`
 - `apps/web/src/app/admin/orders/[id]/components/HistoryAccordion.tsx`
 - `apps/web/src/app/admin/orders/[id]/components/FormResponsesPanel.tsx`
 - `apps/web/src/app/admin/orders/[id]/components/AiSnapshotPanel.tsx`
@@ -390,29 +387,31 @@ Post-deploy on staging:
 - `apps/web/src/app/admin/orders/[id]/components/ReanalyzeModal.tsx`
 - `apps/web/src/app/admin/orders/[id]/components/DiscardModal.tsx`
 - `apps/web/src/app/admin/orders/[id]/components/RealtimeOrderDetail.tsx`
-- `apps/web/src/app/admin/pending-review/RealtimeQueue.tsx`
-- `apps/web/src/app/admin/paid-orders/RealtimePaidOrders.tsx`
+- `apps/web/src/app/admin/orders/[id]/components/timeline/EventCard.tsx`
 - `apps/web/src/app/admin/error.tsx`
-- `apps/web/vitest.config.ts`
-- `apps/web/test/components/*` (~6 files)
-- `apps/agent/test/unit/v1-brief-discard.test.ts`
+- `apps/web/test/components/SignInForm.test.tsx`
+- `apps/web/test/components/QueueRow.test.tsx`
+- `apps/web/test/components/HistoryAccordion.test.tsx`
+- `apps/web/test/components/DiscardModal.test.tsx`
+- `apps/web/test/components/ReanalyzeModal.test.tsx`
+- `apps/web/test/components/ApproveModal.test.tsx`
+- `apps/agent/src/app/v1/brief/discard/route.test.ts`
 - `apps/agent/test/integration/phase5-schema-shapes.test.ts`
-- (Conditional) `apps/agent/src/app/v1/auth/log-signin/route.ts` if RLS doesn't permit founder INSERTs.
-- (Conditional) `supabase/migrations/0009_activity_log_founder_insert.sql` same condition.
+- `supabase/migrations/0009_activity_log_founder_insert.sql`
 
 ### Modified files
 
-- `apps/agent/src/app/v1/brief/discard/route.ts` — replace 501 stub with full implementation.
-- `apps/web/src/app/admin/layout.tsx` — extend with signed-in email + sign-out.
-- `apps/web/src/app/admin/page.tsx` — change to redirect.
-- `apps/web/src/app/admin/pending-review/page.tsx` — full implementation.
-- `apps/web/src/app/admin/orders/[id]/page.tsx` — full implementation with mode-switching.
-- `apps/web/src/app/admin/orders/[id]/components/ReviewMode.tsx` — full implementation (currently scaffold).
-- `apps/web/src/app/admin/orders/[id]/components/TimelineMode.tsx` — full implementation (currently scaffold).
-- `apps/web/package.json` — add `@supabase/ssr`, `@supabase/supabase-js` (direct), vitest deps.
-- `apps/web/next.config.mjs` — only if route-level changes need it (probably no change).
-- `.github/workflows/ci.yml` — add `apps/web` test step.
-- `.github/workflows/nightly-smoke.yml` — add schema-shapes test.
+- `apps/agent/src/app/v1/brief/discard/route.ts` (replace 501 stub)
+- `apps/web/src/app/admin/layout.tsx` (extend with signed-in email + sign-out)
+- `apps/web/src/app/admin/page.tsx` (replace 14-line stub with `<SignInForm />`)
+- `apps/web/src/app/admin/pending-review/page.tsx` (full implementation)
+- `apps/web/src/app/admin/orders/[id]/page.tsx` (mode-switching + data fetch)
+- `apps/web/src/app/admin/orders/[id]/components/ReviewMode.tsx` (full implementation)
+- `apps/web/src/app/admin/orders/[id]/components/TimelineMode.tsx` (full implementation)
+- `apps/web/package.json` (add `@testing-library/*` + `happy-dom`)
+- `apps/web/vitest.config.ts` (no change — happy-dom via per-file directive)
+- `.github/workflows/ci.yml` (add apps/web test step)
+- `.github/workflows/nightly-smoke.yml` (add schema-shapes test)
 
 ## 13. Implementation phases (for the plan)
 
