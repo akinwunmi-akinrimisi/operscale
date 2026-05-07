@@ -18,6 +18,8 @@
     "src/lib/webhook-405.ts",
     "src/lib/email.ts",
     "src/lib/snapshot-to-email-props.ts",
-    "src/lib/payment-confirmation-props.ts"
+    "src/lib/payment-confirmation-props.ts",
+    "src/lib/cors.ts",
+    "src/lib/form-payload-schema.ts"
   ]
 }

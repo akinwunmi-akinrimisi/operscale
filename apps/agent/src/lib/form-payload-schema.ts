@@ -15,7 +15,7 @@
 
 import { z } from 'zod';
 import { randomBytes } from 'node:crypto';
-import { NICHE_SLUGS } from './types/v2.js';
+import { NICHE_SLUGS } from './types/v2';
 
 // The customer-facing form's niche dropdown sends one of the canonical worker
 // slugs. Adding `_default` for the master-plan-§7-Q6 "Other (describe)" path
