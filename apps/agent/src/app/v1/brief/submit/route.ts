@@ -44,6 +44,7 @@ import {
   FullFormPayloadSchema,
 } from '@/lib/form-payload-schema';
 import { priceForTier, deliverableForTier, type Tier } from '@/lib/tiers';
+import { computeIdempotencyKey } from '@/lib/idempotency-key';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -258,11 +259,19 @@ async function handler(req: NextRequest): Promise<Response> {
     }
   }
 
-  // 8) Enqueue AI analysis
+  // 8) Enqueue AI analysis. The ai_analysis_jobs table has a UNIQUE
+  // idempotency_key (migration 0006) that the worker uses to drop duplicate
+  // re-enqueues; the canonical key is computeIdempotencyKey({brief_id,
+  // trigger_type:'initial'}) which both /v1/brief/analyze and /submit must
+  // produce identically.
   const { error: jobErr } = await supabase.from('ai_analysis_jobs').insert({
     brief_id: brief.id,
     status: 'queued',
     trigger_type: 'initial',
+    idempotency_key: computeIdempotencyKey({
+      brief_id: brief.id,
+      trigger_type: 'initial',
+    }),
   });
   if (jobErr) {
     // Submission succeeded but the worker won't auto-pick this up. Founder
