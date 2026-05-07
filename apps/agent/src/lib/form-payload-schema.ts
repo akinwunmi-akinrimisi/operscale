@@ -15,6 +15,13 @@
 
 import { z } from 'zod';
 import { randomBytes } from 'node:crypto';
+import { NICHE_SLUGS } from './types/v2.js';
+
+// The customer-facing form's niche dropdown sends one of the canonical worker
+// slugs. Adding `_default` for the master-plan-§7-Q6 "Other (describe)" path
+// — a customer typing their niche freely is mapped to _default.md by the AI
+// brief analyzer with a niche_unmapped flag (catalog never errors).
+const FORM_NICHE_SLUGS = [...NICHE_SLUGS, '_default'] as const;
 
 // ---------------------------------------------------------------------------
 // Per-step schemas
@@ -31,7 +38,10 @@ export const Step2Schema = z.object({
   // Strict E.164: leading + then 7-15 digits, first digit not 0.
   phone_e164: z.string().regex(/^\+[1-9]\d{6,14}$/, 'phone must be E.164 (e.g. +2348012345678)'),
   email: z.string().email().max(254),
-  niche_slug: z.string().min(1).max(60),
+  // Must match the worker's NICHE_SLUGS catalog (apps/agent/src/lib/types/v2.ts)
+  // or the analyzer fails with niche_brief_missing at job-execution time. The
+  // form dropdown should expose the same set; "Other" maps to '_default'.
+  niche_slug: z.enum(FORM_NICHE_SLUGS),
   niche_label: z.string().min(1).max(120),
   one_line_description: z.string().min(10).max(280),
   offer_description: z.string().min(10).max(2000),
