@@ -4,26 +4,32 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 
-const mockSignInWithOtp = vi.fn();
-vi.mock('@/lib/supabase-browser', () => ({
-  getSupabaseBrowser: () => ({
-    auth: { signInWithOtp: mockSignInWithOtp },
-  }),
-}));
-
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
 }));
 
 import { SignInForm } from '../../src/app/admin/SignInForm';
 
+const mockFetch = vi.fn();
+
 beforeEach(() => {
-  mockSignInWithOtp.mockReset();
+  mockFetch.mockReset();
+  // Override global fetch — the form POSTs to /v1/auth/send-magic-link
+  // (rewrite landed in the auth hotfix earlier in this session).
+  vi.stubGlobal('fetch', mockFetch);
 });
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
 });
+
+function fetchResponse(status: number, body: object): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
+}
 
 describe('SignInForm', () => {
   it('renders idle state with disabled button', () => {
@@ -48,8 +54,8 @@ describe('SignInForm', () => {
     expect(screen.getByRole('button', { name: /Send sign-in link/ })).toBeDisabled();
   });
 
-  it('shows the sent state on success', async () => {
-    mockSignInWithOtp.mockResolvedValueOnce({ error: null });
+  it('shows the sent state on a 200 from /v1/auth/send-magic-link', async () => {
+    mockFetch.mockResolvedValueOnce(fetchResponse(200, { ok: true }));
     render(<SignInForm />);
     fireEvent.change(screen.getByPlaceholderText(/you@/), {
       target: { value: 'akinolaakinrimisi@gmail.com' },
@@ -57,16 +63,35 @@ describe('SignInForm', () => {
     fireEvent.click(screen.getByRole('button', { name: /Send sign-in link/ }));
     await waitFor(() => expect(screen.getByText(/Check your email/)).toBeInTheDocument());
     expect(screen.getByText(/akinolaakinrimisi@gmail\.com/)).toBeInTheDocument();
+    // Confirm we hit the right endpoint with normalised email.
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(String(url)).toMatch(/\/v1\/auth\/send-magic-link$/);
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
+      email: 'akinolaakinrimisi@gmail.com',
+    });
   });
 
-  it('shows the error state on failure', async () => {
-    mockSignInWithOtp.mockResolvedValueOnce({ error: { message: 'Resend down' } });
+  it('shows the error state when the endpoint returns 500 with {error}', async () => {
+    mockFetch.mockResolvedValueOnce(fetchResponse(500, { error: 'server_misconfigured' }));
     render(<SignInForm />);
     fireEvent.change(screen.getByPlaceholderText(/you@/), {
       target: { value: 'x@y.com' },
     });
     fireEvent.click(screen.getByRole('button', { name: /Send sign-in link/ }));
-    await waitFor(() => expect(screen.getByText(/Resend down/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/Sign-in send failed: server_misconfigured/)).toBeInTheDocument(),
+    );
+  });
+
+  it('shows a generic error when fetch itself rejects (network)', async () => {
+    mockFetch.mockRejectedValueOnce(new TypeError('NetworkError when attempting to fetch resource.'));
+    render(<SignInForm />);
+    fireEvent.change(screen.getByPlaceholderText(/you@/), {
+      target: { value: 'x@y.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Send sign-in link/ }));
+    await waitFor(() => expect(screen.getByText(/Sign-in failed: NetworkError/)).toBeInTheDocument());
   });
 });
 

@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./emails/*": "./src/emails/*"
+    "./emails/*": "./src/emails/*",
+    "./lib/*": "./src/lib/*"
   },
   "scripts": {
     "dev": "next dev --port 3001",

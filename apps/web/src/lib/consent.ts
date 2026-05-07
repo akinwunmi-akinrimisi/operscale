@@ -19,6 +19,30 @@ export const CONSENT_TEXT_BY_VERSION: Record<string, string> = {
   v1: CONSENT_TEXT_V1,
 };
 
+// ---------------------------------------------------------------------------
+// Terms-and-conditions consent at form step 7.
+//
+// Lives in the same file because the hash-and-version mechanism is identical
+// to the photo consent — both are signed by the customer at form time and
+// recorded in brief_consent (consent_type='terms' vs 'photo_upload'). The
+// terms text references the canonical /terms and /privacy pages on
+// operscale.cloud; the body here is what the checkbox label asserts.
+//
+// If terms wording changes, bump TERMS_CONSENT_VERSION + add a new entry.
+// ---------------------------------------------------------------------------
+
+export const TERMS_CONSENT_VERSION = 'v1' as const;
+
+export const TERMS_CONSENT_TEXT_V1 = `I have read and agree to Operscale's Terms of Service and Privacy Policy at operscale.cloud/terms and operscale.cloud/privacy. I authorise Operscale to use the information I provided in this brief — including reference posts, photos, and any backstory I shared — to produce my content calendar.`;
+
+export const TERMS_CONSENT_TEXT_BY_VERSION: Record<string, string> = {
+  v1: TERMS_CONSENT_TEXT_V1,
+};
+
+export async function currentTermsConsentTextHash(): Promise<string> {
+  return consentTextHash(TERMS_CONSENT_TEXT_V1);
+}
+
 /**
  * Compute SHA-256 hex digest of a consent text.
  * Uses the Web Crypto API so this works in both browser and Node.

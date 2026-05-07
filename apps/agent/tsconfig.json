@@ -10,7 +10,8 @@
     "paths": {
       "@/*": ["./src/*"],
       "@operscale-calendar/agent/lib/*": ["./src/lib/*"],
-      "@operscale-calendar/web/emails/*": ["../web/src/emails/*"]
+      "@operscale-calendar/web/emails/*": ["../web/src/emails/*"],
+      "@operscale-calendar/web/lib/*": ["../web/src/lib/*"]
     }
   },
   "include": ["next-env.d.ts", "vitest.config.ts", "src/**/*.ts", "src/**/*.tsx", ".next/types/**/*.ts"],
