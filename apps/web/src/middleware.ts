@@ -33,21 +33,41 @@ export async function middleware(req: NextRequest) {
 
   // getUser() forces a token refresh + signature verification (vs getSession()
   // which only inspects the cookie). We want the verified version on a gate.
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data?.user) {
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !userData?.user) {
     const signInUrl = req.nextUrl.clone();
     signInUrl.pathname = '/admin';
     signInUrl.searchParams.set('reason', 'not_authenticated');
     return NextResponse.redirect(signInUrl);
   }
 
-  // The custom access token hook in 0004 stamps role='founder' onto the JWT
-  // claims for allowlisted emails. We read it from app_metadata first
-  // (canonical for Supabase) and fall back to the raw user_metadata only if
-  // the hook hasn't been wired yet (fail closed).
+  // The auth.custom_access_token_hook in migration 0004 stamps
+  //   claims := jsonb_set(claims, '{role}', to_jsonb('founder'::text), true)
+  // i.e. role lives as a TOP-LEVEL JWT claim, not on auth.users — so it never
+  // reaches data.user.app_metadata. Read it from the access_token directly
+  // (already signature-verified by getUser above; we just decode the payload).
+  // app_metadata / user_metadata are kept as fallbacks for any future hook
+  // change that mirrors the role into the user row.
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData?.session?.access_token ?? null;
+  let jwtRole: string | undefined;
+  if (accessToken) {
+    try {
+      const payloadB64 = accessToken.split('.')[1] ?? '';
+      // base64url → base64; pad to multiple of 4 for atob.
+      const b64 = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), '=');
+      const claims = JSON.parse(atob(padded)) as { role?: string };
+      jwtRole = claims.role;
+    } catch {
+      // Malformed token — fall through; checks below will redirect to sign-in.
+    }
+  }
+
   const role =
-    (data.user.app_metadata as { role?: string } | null)?.role ??
-    (data.user.user_metadata as { role?: string } | null)?.role;
+    jwtRole ??
+    (userData.user.app_metadata as { role?: string } | null)?.role ??
+    (userData.user.user_metadata as { role?: string } | null)?.role;
 
   if (role !== 'founder') {
     const signInUrl = req.nextUrl.clone();
