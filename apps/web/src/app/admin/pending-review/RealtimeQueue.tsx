@@ -17,7 +17,9 @@ async function fetchJoinedRow(orderId: string): Promise<QueueRowData | null> {
   const { data, error } = await supabase
     .from('orders')
     .select(
-      `id, tier, status, briefs!inner(id, submitted_at, form_payload), customers!inner(id, name:full_name), brief_photos(brief_id)`,
+      // brief_photos nested under briefs — see pending-review/page.tsx for
+      // the same fix; PostgREST has no orders↔brief_photos FK to embed.
+      `id, tier, status, briefs!inner(id, submitted_at, form_payload, brief_photos(brief_id)), customers!inner(id, name:full_name)`,
     )
     .eq('id', orderId)
     .eq('status', 'pending_founder_review')
@@ -42,8 +44,7 @@ async function fetchJoinedRow(orderId: string): Promise<QueueRowData | null> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tier: data.tier as any,
     submitted_at: briefRow?.submitted_at ?? new Date().toISOString(),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    has_photos: Array.isArray((data as any).brief_photos) && (data as any).brief_photos.length > 0,
+    has_photos: Array.isArray(briefRow?.brief_photos) && briefRow.brief_photos.length > 0,
   };
 }
 

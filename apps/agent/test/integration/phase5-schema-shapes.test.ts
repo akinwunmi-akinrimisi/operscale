@@ -26,7 +26,7 @@ describe('Phase 5 schema reality (SMOKE=1)', () => {
     const { data, error } = await supabase
       .from('orders')
       .select(
-        `id, tier, briefs!inner(id, submitted_at, form_payload), customers!inner(id, name:full_name), brief_photos(brief_id)`,
+        `id, tier, briefs!inner(id, submitted_at, form_payload, brief_photos(brief_id)), customers!inner(id, name:full_name)`,
       )
       .eq('status', 'pending_founder_review')
       .limit(1);

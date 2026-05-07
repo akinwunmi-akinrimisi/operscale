@@ -15,13 +15,17 @@ interface BriefPhotoRow {
 interface OrderJoined {
   id: string;
   tier: string;
+  // brief_photos is nested under briefs (not under orders) because PostgREST
+  // resolves the embed via the brief_photos.brief_id → briefs.id FK; there is
+  // no direct orders ↔ brief_photos FK so a top-level embed errors out with
+  // "Could not find a relationship between 'orders' and 'brief_photos'".
   briefs: {
     id: string;
     submitted_at: string;
     form_payload: { brand_name?: string; niche?: string } | null;
+    brief_photos: BriefPhotoRow[] | null;
   } | null;
   customers: { id: string; name: string | null } | null;
-  brief_photos: BriefPhotoRow[] | null;
 }
 
 async function fetchPending(): Promise<{ rows: QueueRowData[]; capReached: boolean }> {
@@ -29,7 +33,7 @@ async function fetchPending(): Promise<{ rows: QueueRowData[]; capReached: boole
   const { data, error } = await supabase
     .from('orders')
     .select(
-      `id, tier, briefs!inner(id, submitted_at, form_payload), customers!inner(id, name:full_name), brief_photos(brief_id)`,
+      `id, tier, briefs!inner(id, submitted_at, form_payload, brief_photos(brief_id)), customers!inner(id, name:full_name)`,
     )
     .eq('status', 'pending_founder_review')
     .order('briefs(submitted_at)', { ascending: true })
@@ -45,7 +49,7 @@ async function fetchPending(): Promise<{ rows: QueueRowData[]; capReached: boole
     niche: o.briefs?.form_payload?.niche ?? null,
     tier: o.tier as QueueRowData['tier'],
     submitted_at: o.briefs?.submitted_at ?? new Date().toISOString(),
-    has_photos: (o.brief_photos?.length ?? 0) > 0,
+    has_photos: (o.briefs?.brief_photos?.length ?? 0) > 0,
   }));
 
   return { rows, capReached: rows.length >= QUEUE_LIMIT };
