@@ -47,10 +47,15 @@ export async function GET(req: NextRequest) {
   if (error || !data?.session) {
     // Surface the failure mode so PKCE-cookie-missing or other issues can
     // be diagnosed. Container logs go to Loki via Docker's stdout driver.
+    // cookieNames included so we can tell whether the verifier cookie ever
+    // reached the server (look for sb-*-auth-token-code-verifier).
+    const { cookies } = await import('next/headers');
+    const cookieNames = (await cookies()).getAll().map((c) => c.name);
     console.error('[auth/callback] exchangeCodeForSession failed:', {
       hasCode: Boolean(code),
       codePrefix: code?.slice(0, 12),
       hasSession: Boolean(data?.session),
+      cookieNames,
       errorName: error?.name ?? null,
       errorMessage: error?.message ?? null,
       errorStatus: (error as { status?: number } | null)?.status ?? null,

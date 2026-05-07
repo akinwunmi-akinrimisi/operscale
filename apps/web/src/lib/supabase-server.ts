@@ -16,6 +16,14 @@ import type { NextRequest, NextResponse } from 'next/server';
 
 type CookieSet = { name: string; value: string; options: CookieOptions };
 
+// Match the cookie domain used by the browser client in supabase-browser.ts so
+// session cookies the SDK writes server-side (post exchangeCodeForSession,
+// post token refresh) and removal cookies the SDK emits during cleanup target
+// the same scope as the PKCE code_verifier cookie set by the browser. If
+// scopes diverge the browser keeps stale chunks on one host and the verifier
+// on another, which surfaces as random sign-in failures.
+const SHARED_COOKIE_OPTIONS: CookieOptions = { domain: '.operscale.cloud' };
+
 function readEnv(): { url: string; anonKey: string } {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -33,6 +41,7 @@ export async function getSupabaseServer() {
   const { cookies } = await import('next/headers');
   const cookieStore = await cookies();
   return createServerClient(url, anonKey, {
+    cookieOptions: SHARED_COOKIE_OPTIONS,
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -57,6 +66,7 @@ export async function getSupabaseServer() {
 export function getSupabaseMiddleware(req: NextRequest, res: NextResponse) {
   const { url, anonKey } = readEnv();
   return createServerClient(url, anonKey, {
+    cookieOptions: SHARED_COOKIE_OPTIONS,
     cookies: {
       getAll() {
         return req.cookies.getAll();

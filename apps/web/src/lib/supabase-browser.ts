@@ -22,7 +22,16 @@ export function getSupabaseBrowser(): SupabaseClient {
   if (!anonKey) throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY not set');
 
   _client = createBrowserClient(url, anonKey, {
-    cookieOptions: { sameSite: 'lax', secure: true } satisfies CookieOptions,
+    // domain '.operscale.cloud' so the PKCE code_verifier cookie set here
+    // survives the cross-host hop (operscale.cloud → supabase.operscale.cloud
+    // → operscale.cloud/auth/callback) and is readable server-side during
+    // exchangeCodeForSession. Hostname is the locked CRM domain, not the
+    // brand domain — independent of brand-lock.
+    cookieOptions: {
+      sameSite: 'lax',
+      secure: true,
+      domain: '.operscale.cloud',
+    } satisfies CookieOptions,
   });
 
   return _client;
