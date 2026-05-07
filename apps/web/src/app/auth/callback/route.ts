@@ -1,14 +1,35 @@
 // /auth/callback — top-level Route Handler (outside the /admin/:path* matcher
-// so the middleware does NOT redirect before the code exchange).
+// so the middleware does NOT redirect before the token exchange).
 //
-// Magic-link flow lands here with ?code=... after the user clicks the email.
-// We exchange code → session, write founder_signed_in activity_log, redirect
-// to /admin/pending-review.
+// As of commit-after-1aa4912 this route is the landing page for OUR own
+// server-generated magic-link emails (apps/agent /v1/auth/send-magic-link).
+// The link the user clicks is:
+//   https://operscale.cloud/auth/callback?token_hash=<hash>&type=magiclink
+// — same origin as the CRM, no Supabase /verify hop, no PKCE state.
 //
-// Spec: docs/specs/v2-phase-5-design.md §7 "Auth flow".
+// Flow here:
+//   1. Read token_hash + type from URL.
+//   2. supabase.auth.verifyOtp({token_hash, type}) → session.
+//   3. SDK writes the founder cookies via @supabase/ssr's setAll callback.
+//   4. activity_log founder_signed_in (best-effort).
+//   5. 302 → /admin/pending-review.
+//
+// On failure or missing token: 302 → /admin?reason=expired&detail=...
+//
+// Spec: docs/specs/v2-phase-5-design.md §7 "Auth flow" (post-PKCE rewrite).
 
 import { NextResponse, type NextRequest } from 'next/server';
+import type { EmailOtpType } from '@supabase/supabase-js';
 import { getSupabaseServer } from '@/lib/supabase-server';
+
+const ALLOWED_OTP_TYPES: ReadonlySet<EmailOtpType> = new Set([
+  'magiclink',
+  'email',
+  'signup',
+  'recovery',
+  'invite',
+  'email_change',
+]);
 
 /**
  * Build a redirect URL that respects upstream proxy headers (Cloudflare → Traefik
@@ -33,29 +54,26 @@ function proxyAwareUrl(req: NextRequest): URL {
 
 export async function GET(req: NextRequest) {
   const url = proxyAwareUrl(req);
-  const code = url.searchParams.get('code');
+  const tokenHash = url.searchParams.get('token_hash');
+  const rawType = url.searchParams.get('type') ?? 'magiclink';
+  const type: EmailOtpType = ALLOWED_OTP_TYPES.has(rawType as EmailOtpType)
+    ? (rawType as EmailOtpType)
+    : 'magiclink';
 
-  if (!code) {
+  if (!tokenHash) {
     url.pathname = '/admin';
-    url.search = '?reason=expired';
+    url.search = '?reason=expired&detail=missing_token_hash';
     return NextResponse.redirect(url);
   }
 
   const supabase = await getSupabaseServer();
-  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+  const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
 
   if (error || !data?.session) {
-    // Surface the failure mode so PKCE-cookie-missing or other issues can
-    // be diagnosed. Container logs go to Loki via Docker's stdout driver.
-    // cookieNames included so we can tell whether the verifier cookie ever
-    // reached the server (look for sb-*-auth-token-code-verifier).
-    const { cookies } = await import('next/headers');
-    const cookieNames = (await cookies()).getAll().map((c) => c.name);
-    console.error('[auth/callback] exchangeCodeForSession failed:', {
-      hasCode: Boolean(code),
-      codePrefix: code?.slice(0, 12),
+    console.error('[auth/callback] verifyOtp failed:', {
+      hashPrefix: tokenHash.slice(0, 8),
+      type,
       hasSession: Boolean(data?.session),
-      cookieNames,
       errorName: error?.name ?? null,
       errorMessage: error?.message ?? null,
       errorStatus: (error as { status?: number } | null)?.status ?? null,

@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { getSupabaseBrowser } from '@/lib/supabase-browser';
 
 type FormState =
   | { kind: 'idle' }
@@ -17,6 +16,9 @@ const REASON_COPY: Record<string, string> = {
   session: 'Your session ended. Sign in again.',
 };
 
+const AGENT_BASE_URL =
+  process.env.NEXT_PUBLIC_AGENT_BASE_URL ?? 'https://api.operscale.cloud';
+
 export function SignInForm() {
   const params = useSearchParams();
   const reason = params.get('reason');
@@ -28,24 +30,32 @@ export function SignInForm() {
     if (state.kind === 'sending') return;
     setState({ kind: 'sending' });
 
+    const normalized = email.trim().toLowerCase();
     try {
-      const supabase = getSupabaseBrowser();
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim().toLowerCase(),
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
+      // Server-generated magic link — bypasses supabase-js PKCE entirely so
+      // the verifier-cookie + cross-host-hop failure mode is impossible. The
+      // link in the email points directly at /auth/callback?token_hash=...
+      // which is verified server-side via verifyOtp.
+      const res = await fetch(`${AGENT_BASE_URL}/v1/auth/send-magic-link`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: normalized }),
       });
-      if (error) {
-        setState({ kind: 'error', message: error.message ?? 'Couldn’t send sign-in email.' });
+      if (!res.ok) {
+        let msg = `Sign-in send failed (HTTP ${res.status})`;
+        try {
+          const j = (await res.json()) as { error?: string };
+          if (j?.error) msg = `Sign-in send failed: ${j.error}`;
+        } catch {
+          /* body wasn't JSON, keep default msg */
+        }
+        setState({ kind: 'error', message: msg });
         return;
       }
-      setState({ kind: 'sent', email: email.trim().toLowerCase() });
+      setState({ kind: 'sent', email: normalized });
     } catch (err) {
-      // Surface init failures (e.g. NEXT_PUBLIC_* not inlined into the
-      // browser bundle) instead of letting the form hang at "Sending…".
       const message = err instanceof Error ? err.message : String(err);
-      console.error('[SignInForm] signInWithOtp threw:', err);
+      console.error('[SignInForm] send-magic-link threw:', err);
       setState({ kind: 'error', message: `Sign-in failed: ${message}` });
     }
   }
