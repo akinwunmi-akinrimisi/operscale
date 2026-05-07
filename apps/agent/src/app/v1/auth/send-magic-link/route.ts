@@ -40,6 +40,35 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CALLBACK_URL = 'https://operscale.cloud/auth/callback';
 const SENDER = process.env.AUTH_EMAIL_FROM ?? 'Operscale CRM <noreply@operscale.cloud>';
 
+// SignInForm at https://operscale.cloud/admin POSTs cross-origin to
+// https://api.operscale.cloud/v1/auth/send-magic-link, which triggers a CORS
+// preflight. Allowed origins are exactly the CRM hostnames — wildcards are
+// avoided so a malicious origin can't proxy sign-in requests for an email it
+// happens to know. Same-origin curl/server calls (no Origin header) are
+// unaffected and continue to work for the verification probes used in deploy.
+const ALLOWED_ORIGINS = new Set<string>([
+  'https://operscale.cloud',
+  'https://www.operscale.cloud',
+]);
+
+function corsHeaders(origin: string | null): Record<string, string> {
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    return {
+      'access-control-allow-origin': origin,
+      'access-control-allow-methods': 'POST, OPTIONS',
+      'access-control-allow-headers': 'content-type',
+      'access-control-max-age': '600',
+      vary: 'origin',
+    };
+  }
+  return {};
+}
+
+export function OPTIONS(req: NextRequest): Response {
+  const origin = req.headers.get('origin');
+  return new Response(null, { status: 204, headers: corsHeaders(origin) });
+}
+
 function htmlBody(url: string): string {
   return [
     '<!doctype html><html><body style="font-family:-apple-system,system-ui,sans-serif;max-width:480px;margin:24px auto;color:#111;line-height:1.5">',
@@ -63,16 +92,26 @@ function textBody(url: string): string {
   ].join('\n');
 }
 
+function jsonWithCors(
+  body: Record<string, unknown>,
+  status: number,
+  origin: string | null,
+): Response {
+  return NextResponse.json(body, { status, headers: corsHeaders(origin) });
+}
+
 export async function POST(req: NextRequest): Promise<Response> {
+  const origin = req.headers.get('origin');
+
   let body: unknown;
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
+    return jsonWithCors({ error: 'invalid_json' }, 400, origin);
   }
   const rawEmail = (body as { email?: unknown })?.email;
   if (typeof rawEmail !== 'string' || !EMAIL_RE.test(rawEmail.trim())) {
-    return NextResponse.json({ error: 'invalid_email' }, { status: 400 });
+    return jsonWithCors({ error: 'invalid_email' }, 400, origin);
   }
   const email = rawEmail.trim().toLowerCase();
 
@@ -81,7 +120,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     console.error('[send-magic-link] RESEND_API_KEY not set');
     // Misconfig: surface to caller so the form shows an error rather than
     // fake-claiming success.
-    return NextResponse.json({ error: 'server_misconfigured' }, { status: 500 });
+    return jsonWithCors({ error: 'server_misconfigured' }, 500, origin);
   }
 
   const supabase = getSupabaseAdmin();
@@ -99,7 +138,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       message: linkErr?.message ?? 'no_hashed_token',
       status: (linkErr as { status?: number } | null)?.status ?? null,
     });
-    return NextResponse.json({ ok: true }, { status: 200 });
+    return jsonWithCors({ ok: true }, 200, origin);
   }
 
   const tokenHash = linkData.properties.hashed_token;
@@ -124,8 +163,8 @@ export async function POST(req: NextRequest): Promise<Response> {
     });
     // Server-side failure — surface so the founder retries instead of
     // staring at "check your email" with nothing arriving.
-    return NextResponse.json({ error: 'send_failed' }, { status: 502 });
+    return jsonWithCors({ error: 'send_failed' }, 502, origin);
   }
 
-  return NextResponse.json({ ok: true }, { status: 200 });
+  return jsonWithCors({ ok: true }, 200, origin);
 }
