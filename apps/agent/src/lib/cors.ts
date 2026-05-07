@@ -25,8 +25,12 @@
 // CLAUDE.md "no shortcuts" rule applies: the same allow-list is used for
 // every route. Drift between routes would create surprising 401-from-CORS
 // behaviour that's hard to diagnose.
-
-import { NextResponse } from 'next/server';
+//
+// Implementation note: this module uses the vanilla web Response/Request
+// runtime APIs rather than next/server. The worker's tsconfig
+// (tsconfig.worker.json) does NOT include Next.js types, and the worker
+// transitively pulls this file in through @/lib/supabase-admin → routes,
+// so importing NextResponse here breaks the worker build.
 
 const ALLOWED_ORIGINS = new Set<string>([
   'https://operscale.cloud',
@@ -56,7 +60,9 @@ export function jsonWithCors(
   status: number,
   origin: string | null,
 ): Response {
-  return NextResponse.json(body, { status, headers: corsHeaders(origin) });
+  const headers = new Headers(corsHeaders(origin));
+  headers.set('content-type', 'application/json');
+  return new Response(JSON.stringify(body), { status, headers });
 }
 
 /**
