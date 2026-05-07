@@ -27,12 +27,15 @@ import { sendEmail, EmailSendError } from '@/lib/email';
 import { snapshotToEmailProps } from '@/lib/snapshot-to-email-props';
 import { BriefEmail } from '@operscale-calendar/web/emails/BriefEmail';
 import { render } from '@react-email/render';
+import { corsPreflight, withCors } from '@/lib/cors';
 
 const BodySchema = z.object({ order_id: z.string().min(1) });
 
 const APPROVABLE_STATUSES = ['pending_founder_review', 'brief_email_failed'] as const;
 
-export async function POST(req: Request): Promise<Response> {
+export const OPTIONS = corsPreflight;
+
+async function handler(req: Request): Promise<Response> {
   const claims = verifyJwt(req.headers);
   if (!claims) return NextResponse.json({ error: 'unauthorised' }, { status: 401 });
   if (claims.role !== 'founder') return NextResponse.json({ error: 'forbidden' }, { status: 403 });
@@ -245,3 +248,5 @@ export async function POST(req: Request): Promise<Response> {
     { status: 200 },
   );
 }
+
+export const POST = withCors(handler);

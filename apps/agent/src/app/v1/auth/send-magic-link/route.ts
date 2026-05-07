@@ -29,9 +29,10 @@
 //
 // CLAUDE.md secrets rule 3: lives under apps/agent/ which has SUPABASE_SERVICE_ROLE_KEY.
 
-import { NextResponse, type NextRequest } from 'next/server';
+import { type NextRequest } from 'next/server';
 import { Resend } from 'resend';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { corsPreflight, jsonWithCors } from '@/lib/cors';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -40,33 +41,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CALLBACK_URL = 'https://operscale.cloud/auth/callback';
 const SENDER = process.env.AUTH_EMAIL_FROM ?? 'Operscale CRM <noreply@operscale.cloud>';
 
-// SignInForm at https://operscale.cloud/admin POSTs cross-origin to
-// https://api.operscale.cloud/v1/auth/send-magic-link, which triggers a CORS
-// preflight. Allowed origins are exactly the CRM hostnames — wildcards are
-// avoided so a malicious origin can't proxy sign-in requests for an email it
-// happens to know. Same-origin curl/server calls (no Origin header) are
-// unaffected and continue to work for the verification probes used in deploy.
-const ALLOWED_ORIGINS = new Set<string>([
-  'https://operscale.cloud',
-  'https://www.operscale.cloud',
-]);
-
-function corsHeaders(origin: string | null): Record<string, string> {
-  if (origin && ALLOWED_ORIGINS.has(origin)) {
-    return {
-      'access-control-allow-origin': origin,
-      'access-control-allow-methods': 'POST, OPTIONS',
-      'access-control-allow-headers': 'content-type',
-      'access-control-max-age': '600',
-      vary: 'origin',
-    };
-  }
-  return {};
-}
-
 export function OPTIONS(req: NextRequest): Response {
-  const origin = req.headers.get('origin');
-  return new Response(null, { status: 204, headers: corsHeaders(origin) });
+  return corsPreflight(req);
 }
 
 function htmlBody(url: string): string {
@@ -90,14 +66,6 @@ function textBody(url: string): string {
     'The link expires in 60 minutes and can only be used once.',
     "If you didn't request this, you can safely ignore this email.",
   ].join('\n');
-}
-
-function jsonWithCors(
-  body: Record<string, unknown>,
-  status: number,
-  origin: string | null,
-): Response {
-  return NextResponse.json(body, { status, headers: corsHeaders(origin) });
 }
 
 export async function POST(req: NextRequest): Promise<Response> {

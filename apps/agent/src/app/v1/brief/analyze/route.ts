@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { getSupabaseAdmin, writeActivityLog } from '@/lib/supabase-admin';
 import { verifyJwt } from '@/lib/auth/verify-jwt';
 import { computeIdempotencyKey } from '@/lib/idempotency-key';
+import { corsPreflight, withCors } from '@/lib/cors';
 
 const BodySchema = z
   .object({
@@ -28,7 +29,9 @@ const BodySchema = z
     },
   );
 
-export async function POST(req: Request): Promise<Response> {
+export const OPTIONS = corsPreflight;
+
+async function handler(req: Request): Promise<Response> {
   const claims = verifyJwt(req.headers);
   if (!claims) return NextResponse.json({ error: 'unauthorised' }, { status: 401 });
 
@@ -135,3 +138,5 @@ export async function POST(req: Request): Promise<Response> {
     { status: 202 },
   );
 }
+
+export const POST = withCors(handler);

@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSupabaseAdmin, writeActivityLog } from '@/lib/supabase-admin';
 import { verifyJwt } from '@/lib/auth/verify-jwt';
+import { corsPreflight, withCors } from '@/lib/cors';
 
 const BodySchema = z.object({
   order_id: z.string().uuid(),
@@ -14,7 +15,9 @@ const BodySchema = z.object({
 
 const DISCARDABLE_STATUSES = ['pending_founder_review'] as const;
 
-export async function POST(req: Request): Promise<Response> {
+export const OPTIONS = corsPreflight;
+
+async function handler(req: Request): Promise<Response> {
   const claims = verifyJwt(req.headers);
   if (!claims) return NextResponse.json({ error: 'unauthorised' }, { status: 401 });
   if (claims.role !== 'founder') return NextResponse.json({ error: 'forbidden' }, { status: 403 });
@@ -92,3 +95,5 @@ export async function POST(req: Request): Promise<Response> {
 
   return NextResponse.json({ status: 'discarded', order_id: parsed.order_id }, { status: 200 });
 }
+
+export const POST = withCors(handler);
