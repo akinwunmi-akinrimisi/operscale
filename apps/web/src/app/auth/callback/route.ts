@@ -45,8 +45,18 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error || !data?.session) {
+    // Surface the failure mode so PKCE-cookie-missing or other issues can
+    // be diagnosed. Container logs go to Loki via Docker's stdout driver.
+    console.error('[auth/callback] exchangeCodeForSession failed:', {
+      hasCode: Boolean(code),
+      codePrefix: code?.slice(0, 12),
+      hasSession: Boolean(data?.session),
+      errorName: error?.name ?? null,
+      errorMessage: error?.message ?? null,
+      errorStatus: (error as { status?: number } | null)?.status ?? null,
+    });
     url.pathname = '/admin';
-    url.search = '?reason=expired';
+    url.search = `?reason=expired&detail=${encodeURIComponent(error?.message ?? 'no_session')}`;
     return NextResponse.redirect(url);
   }
 
