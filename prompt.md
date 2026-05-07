@@ -1,375 +1,207 @@
-# Continuation prompt — Operscale Calendar V2 Phase 6 BRAINSTORM (Customer Brief Form)
+# Continuation prompt — Operscale Calendar AUTH HOTFIX (PKCE blocker)
 
-Phase 5 (Founder CRM v0) is COMPLETE and LIVE on https://operscale.cloud/admin. The forward path now runs end-to-end with a human-in-the-loop CRM: form (still stub) → analyze → founder reviews in CRM → approve → Paystack init + brief email → customer pays → webhook flips order to `paid` → payment-confirmation email lands in customer inbox → paid-orders dashboard shows it. This handoff starts the **Customer Brief Form** brainstorm in a fresh session.
+**Phase 5 CRM is built and accessible at https://operscale.cloud/admin BUT magic-link sign-in fails at the round-trip.** The founder cannot actually log in. This handoff is a focused hotfix session — NOT Phase 6. Phase 6 (customer brief form) is deferred until auth works.
 
-The roadmap (revised at end of Phase 4.5): CRM was Phase 7, became Phase 5 (now done). Customer brief form is **Phase 6**. Submit/auto-ack is Phase 7, marketing/legal Phase 8, launch Phase 9. The reason the founder asked for this re-ordering: he wanted a working CRM **before** real customers arrived, so he could practice operating the pipeline end-to-end on test fixtures — that practice is now possible. Phase 6 builds the customer-facing intake the CRM has been waiting for.
+## What's been ruled in/out (don't re-test these)
 
----
+The previous session went in circles. Here's what's confirmed working:
+
+✅ **Allowlist** — `app.admin_emails` Postgres parameter has all 3 founder emails. Verified via `SHOW app.admin_emails`.
+✅ **SMTP relay** — GoTrue uses Resend SMTP via `smtp.resend.com:587`. Resend logs confirm magic-link emails delivered to `akinolaakinrimisi@gmail.com` from `Operscale CRM <akinwunmi.akinrimisi@operscale.cloud>`. Subject "Your Magic Link".
+✅ **Form `NEXT_PUBLIC_*` inlining** — apps/web Dockerfile takes ARGs; compose passes them via `build.args`. Bundle now contains supabase URL + anon key. SignInForm has try/catch that surfaces errors instead of hanging at "Sending…".
+✅ **Email link `redirect_to`** — points to `https://operscale.cloud/auth/callback` correctly (URI_ALLOW_LIST has 6 literal entries — wildcards `**` did NOT match in GoTrue v2.151.0, literal entries do).
+✅ **/auth/callback route exists** — has `proxyAwareUrl` helper that strips bind port from `x-forwarded-host`. Redirects to `https://operscale.cloud/admin?reason=expired` on failure (correct host, correct port).
+
+## What's broken
+
+❌ **`exchangeCodeForSession(code)` fails server-side.** Token in email starts with `pkce_` confirming PKCE flow. The flow:
+1. Form submits → supabase-js generates `code_verifier` + `code_challenge`. Stores `code_verifier` as a browser cookie. Sends `code_challenge` to Supabase.
+2. Email link → `https://supabase.operscale.cloud/verify?token=pkce_<...>&type=magiclink&redirect_to=https://operscale.cloud/auth/callback`.
+3. Click → Supabase verifies token → 302 to `https://operscale.cloud/auth/callback?code=<auth_code>`.
+4. **Our route handler calls `exchangeCodeForSession(code)` which needs the `code_verifier` cookie. The exchange fails.** Founder bounces back to `/admin?reason=expired&detail=<encoded_error>`.
+
+The root suspect: cross-host cookie handling. Cookie was set on `operscale.cloud` (when supabase-js initialized in the form page). Browser navigates `operscale.cloud → supabase.operscale.cloud → operscale.cloud` — `SameSite=Lax` allows top-level navigation cookies, but the cookie path/domain may be wrong, OR there's a different issue entirely.
+
+**Diagnostic logging is in place** (commit `54f892b`). After the founder retries and lands on `/admin?reason=expired&detail=<...>`:
+- Read the URL `&detail=...` portion → that's the exact error message.
+- OR read web container logs: `docker logs --tail=20 operscale-calendar-web 2>&1 | grep "auth/callback"`.
+
+## Likely fix paths (in order of preference)
+
+### Path A — One-line cookie domain fix (try first)
+
+In `apps/web/src/lib/supabase-browser.ts`, current cookieOptions:
+```typescript
+_client = createBrowserClient(url, anonKey, {
+  cookieOptions: { sameSite: 'lax', secure: true } satisfies CookieOptions,
+});
+```
+
+Add `domain: '.operscale.cloud'` (note the leading dot) so the cookie is shared across `operscale.cloud` AND `supabase.operscale.cloud`:
+```typescript
+_client = createBrowserClient(url, anonKey, {
+  cookieOptions: { sameSite: 'lax', secure: true, domain: '.operscale.cloud' } satisfies CookieOptions,
+});
+```
+
+Also patch `apps/web/src/lib/supabase-server.ts` getSupabaseMiddleware + getSupabaseServer to set the same domain on cookie write paths. The setAll function in both factories takes `cookiesToSet: { name, value, options }[]` — wrap to inject `domain: '.operscale.cloud'` into each `options`.
+
+Rebuild web (the build-args pattern is in place). Test from form. If `exchangeCodeForSession` now succeeds, ship it.
+
+### Path B — Switch to implicit flow (fallback if A fails)
+
+```typescript
+import { createBrowserClient } from '@supabase/ssr';
+
+_client = createBrowserClient(url, anonKey, {
+  auth: { flowType: 'implicit' },
+  cookieOptions: { sameSite: 'lax', secure: true },
+});
+```
+
+Implicit flow returns `access_token` + `refresh_token` directly in the URL fragment after the verify hop. The `/auth/callback` route handler can't read fragments (server-side has no access). Need a CLIENT page at `/auth/callback` that:
+1. Reads `window.location.hash`.
+2. Calls `supabase.auth.setSession({ access_token, refresh_token })` — this sets the session cookie.
+3. Calls `router.replace('/admin/pending-review')`.
+
+That means converting `/auth/callback/route.ts` (Route Handler) into `/auth/callback/page.tsx` (Client Component). Keep the `founder_signed_in` activity_log INSERT but move it into the client page (it'll run after setSession).
+
+Tradeoff: implicit flow is less secure than PKCE (token visible in URL fragment, can leak via referer headers, browser history). For an internal admin tool with HTTPS-only and low traffic, the security delta is acceptable. Document as a deliberate Phase 5 simplification.
+
+### Path C — Custom server-side OTP verification (last resort)
+
+Skip supabase-js's exchange entirely. The /auth/callback route directly calls Supabase's verify endpoint server-side with the token from the URL. More code; needs a careful migration but full control over cookie/session semantics.
+
+## Ground rules for the next session
+
+1. **Diagnose first.** Get the founder to retry → read the `&detail=` query string OR `docker logs operscale-calendar-web | grep auth/callback`. The actual error message will tell you if it's the PKCE cookie issue (look for "code verifier could not be found" or similar) or something else.
+2. **Don't go in circles** like the previous session did. Apply the highest-likelihood fix (Path A), test once end-to-end, and move on. If A fails, jump straight to B (don't iterate variants on A).
+3. **Don't restart auth-1 unnecessarily.** The shared Supabase compose is correctly configured (per memory). Touch only apps/web.
+4. **Verify END-TO-END before declaring done.** Founder enters email → form sent state → email arrives → click link → land on `/admin/pending-review` with founder_signed_in row in activity_log. Anything short of that is not done.
+5. **DON'T** add new abstractions or refactors during this hotfix. Minimum diff to fix.
+
+## Live verification one-liners
+
+```bash
+# Magic link: trigger from CLI to test the wire path
+ANON_KEY="<see /etc/operscale-calendar/web.env on VPS>"
+curl -s -X POST "https://supabase.operscale.cloud/auth/v1/otp?redirect_to=https%3A%2F%2Foperscale.cloud%2Fauth%2Fcallback" \
+  -H "apikey: $ANON_KEY" -H "Content-Type: application/json" \
+  -d '{"email":"akinolaakinrimisi@gmail.com"}'
+# expects: HTTP 200 + {} body. Founder gets email within ~10s. RATE LIMIT: 1 per 60s per email.
+
+# Read the link Resend sent (for inspection without using the live token):
+RESEND_KEY="<see master .env>"
+EMAIL_ID=$(curl -s "https://api.resend.com/emails?limit=1" -H "Authorization: Bearer $RESEND_KEY" | python -c "import json,sys; print(json.load(sys.stdin)['data'][0]['id'])")
+curl -s "https://api.resend.com/emails/$EMAIL_ID" -H "Authorization: Bearer $RESEND_KEY" | python -c "import json,sys,re; html=json.load(sys.stdin).get('html',''); [print(u) for u in re.findall(r'href=[\"\\']([^\"\\'>]+)[\"\\']', html)]"
+
+# Web container logs (to read exchange errors from the diagnostic logging):
+PYTHONIOENCODING=utf-8 python -c "
+import paramiko, pathlib
+pw = next(l.split('=', 1)[1].strip() for l in pathlib.Path(r'c:\Users\DELL\Documents\Antigravity\operscale-calender\.env').read_text(encoding='utf-8').splitlines() if l.startswith('server_password='))
+c = paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+c.connect('srv1297445.hstgr.cloud', 22, 'root', pw, timeout=20, allow_agent=False, look_for_keys=False)
+_, out, _ = c.exec_command('docker logs --tail=50 operscale-calendar-web 2>&1', timeout=15)
+print(out.read().decode())
+c.close()
+"
+
+# After committing a fix to apps/web/src/lib/supabase-browser.ts, rebuild + restart web:
+PYTHONIOENCODING=utf-8 python -c "
+import paramiko, pathlib, time
+pw = next(l.split('=', 1)[1].strip() for l in pathlib.Path(r'c:\Users\DELL\Documents\Antigravity\operscale-calender\.env').read_text(encoding='utf-8').splitlines() if l.startswith('server_password='))
+c = paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+c.connect('srv1297445.hstgr.cloud', 22, 'root', pw, timeout=30, allow_agent=False, look_for_keys=False)
+_, out, _ = c.exec_command('cd /docker/operscale-calendar/repo && git fetch origin main && git reset --hard origin/main && cd /docker/operscale-calendar && docker compose up -d --build web 2>&1', timeout=300)
+print(out.read().decode()[-1500:])
+c.close()
+"
+```
 
 ## System context (paste FIRST in the new session)
 
 ```
 Working directory: C:\Users\DELL\Documents\Antigravity\operscale-calender\operscale-calendar-platform
 
-V2 Phase 6 BRAINSTORM (Customer Brief Form). Phases 1, 2, 3, 4,
-4.5, 4.6, 5 are all live on https://api.operscale.cloud +
-https://operscale.cloud/admin. The /v1/health, /v1/brief/analyze,
-/v1/brief/approve, /v1/brief/discard, /v1/webhook/paystack routes
-all return real responses (no 501s anywhere on the forward path).
-The /admin sign-in + /auth/callback + /admin/pending-review +
-/admin/orders/[id] (review + timeline modes) + /admin/paid-orders
-surfaces all live with Realtime + 3 founder action modals.
+AUTH HOTFIX session. CRM live at https://operscale.cloud/admin but magic-link
+sign-in fails at /auth/callback. The exchangeCodeForSession call rejects
+the PKCE code; founder bounces back to /admin?reason=expired&detail=...
+diagnostic logging is in place (commit 54f892b).
 
 Memory at C:\Users\DELL\.claude\projects\C--Users-DELL-Documents-
 Antigravity-operscale-calender\memory\ auto-loads. Read MEMORY.md +
-project_state.md first — the "V2 Phase 5 — ✅ COMPLETE" section
-ends with "Phase 5.x carry-forwards" + "Phase 6 starting points"
-listing decisions to surface during brainstorming.
+project_state.md FIRST — the "AUTH BLOCKER" section ends with three
+ranked fix paths. Try Path A (one-line cookie domain fix) first.
 
 NON-NEGOTIABLE: NO API KEYS OR SECRETS COMMITTED OR PUSHED, EVER.
-- .env files gitignored; pre-commit hook blocks .env + secret-shaped
-  strings + files >5MB.
-- Master .env at parent dir: C:\Users\DELL\Documents\Antigravity\
-  operscale-calender\.env (server_password, ANTHROPIC_API_KEY,
-  PAYSTACK test keys, RESEND_API_KEY, JWT_SECRET, SUPABASE_*,
-  NEXT_PUBLIC_AGENT_BASE_URL).
-- For SSH/paramiko: PYTHONIOENCODING=utf-8.
+Master .env at parent dir: C:\Users\DELL\Documents\Antigravity\
+operscale-calender\.env. PYTHONIOENCODING=utf-8 for paramiko scripts.
 
-Working pattern (do NOT deviate without asking):
-- Brainstorming first via superpowers:brainstorming. Surface the
-  Phase 6 starting points from project_state.md + ask the founder
-  for direction on UX details that aren't pre-decided.
-- After brainstorming completes: design doc at
-  docs/specs/v2-phase-6-design.md, then implementation plan at
-  docs/plans/<date>-v2-phase-6-customer-form.md.
-- Execution via superpowers:subagent-driven-development.
-- Direct commits to main; no feature branches.
-- "Plan keeps pace with code" — fix plan file in the SAME commit
-  as code when reviews catch plan-level bugs (Phase 5 reinforced
-  this 14 commits in a row).
-- Push to origin every 2-3 tasks.
-- Minute-cadence status updates between every dispatch.
-- Use `git commit -F C:\tmp\commit-msg.txt` for messages with `#`
-  chars (PowerShell heredoc trips on `#`).
+Working pattern (do NOT deviate):
+- Diagnose first. Get the founder to retry the magic-link flow with
+  diagnostic logging in place. Read &detail= from URL OR
+  `docker logs operscale-calendar-web | grep auth/callback`.
+- Apply Path A (cookie domain fix) — single-line change to
+  apps/web/src/lib/supabase-browser.ts (and matching server.ts changes).
+- Rebuild web on VPS via paramiko one-liner.
+- Verify END-TO-END: founder enters email → form sent state → email
+  arrives → click link → lands on /admin/pending-review with
+  founder_signed_in row in activity_log.
+- If Path A fails, jump straight to Path B (implicit flow + client-side
+  callback page). Don't iterate variants on A.
+- Do NOT touch shared Supabase compose. The auth container config is
+  already correct.
+- Do NOT add abstractions or refactors. Minimum diff to fix.
 
-CRITICAL build-discipline carry-forwards (REINFORCED through Phase 5):
-- Route-only lib files (apps/agent/src/lib/email.ts,
-  snapshot-to-email-props.ts, payment-confirmation-props.ts) use
-  plain relative imports (no .js, no @/) AND are excluded from
-  tsconfig.worker.json.
-- All OTHER files in apps/agent/src/lib/ and apps/agent/src/worker/
-  keep .js extensions on relative imports (NodeNext requirement).
-- apps/agent AND apps/web next.config.mjs have typescript.
-  ignoreBuildErrors=true + eslint.ignoreDuringBuilds=true. CI runs
-  tsc --noEmit + next lint as separate gates.
-- Cloudflare DNS-only (NOT proxied) for api.operscale.cloud — load-
-  bearing for the live Paystack webhook. operscale.cloud (apex) IS
-  proxied — Phase 5 added a port-strip in the auth/callback redirect
-  to handle x-forwarded-host coming through Traefik (commit c535a6a).
-- supabase-js join types are T[] | T | null even with !inner — use
-  a firstOrNull helper. Pattern is now repeated in 4 sites in
-  apps/web/src/app/admin/* — Phase 6 is a good time to extract to
-  apps/web/src/lib/supabase-embed.ts.
-- customers table column rename: PostgREST aliasing (id,
-  name:full_name, whatsapp:whatsapp_number) keeps consumer code on
-  canonical names. Reuse the alias selector verbatim.
-- briefs.form_payload canonical keys live in
-  apps/agent/src/lib/types/v2.ts BriefAnalyzerInput +
-  apps/agent/src/worker/process-job.ts projector. Phase 6 form WILL
-  write to form_payload — match these keys exactly or update the
-  projector + analyzer in the same commit.
-- vitest config has globals:false; component test files MUST import
-  { afterEach } + { cleanup } from @testing-library/react and call
-  afterEach(() => cleanup()). Without this, second test in the same
-  file finds 2 instances of every element.
-- Component test files use `// @vitest-environment happy-dom`
-  directive at the top (vitest config env stays 'node' for the
-  agent + email-template tests).
-- Next.js standalone behind Traefik needs proxy-aware URL
-  construction (x-forwarded-host with port-stripping for
-  default-port hosts) for any redirect that bubbles back to the
-  browser. Carry forward verbatim from /auth/callback for any new
-  Phase 6 redirect (e.g. submit-success).
+Recent commits to check:
+  git log --oneline -8
+  # 54f892b fix(web): surface exchangeCodeForSession error in callback
+  # 5b9e46a fix(web): inline NEXT_PUBLIC_* at Docker build + try/catch
+  # c535a6a fix(web): /auth/callback strip bind port when x-forwarded-host
+  # 6c381eb chore(phase-5): close-out
+  # ... (Phase 5 commits)
 
-PHASES 1-5 ARE LIVE. Verify with:
+Phases 1-5 are LIVE end-to-end except for the founder being unable to
+sign in. Verify with:
   curl -sI https://api.operscale.cloud/v1/health           → 200
-  curl -X POST https://api.operscale.cloud/v1/brief/analyze   → 401
-  curl -X POST https://api.operscale.cloud/v1/brief/approve   → 401
-  curl -X POST https://api.operscale.cloud/v1/brief/discard   → 401
-  curl -X POST https://api.operscale.cloud/v1/webhook/paystack → 401
-    (expects valid HMAC signature; 401 on bad/missing sig is correct)
-  curl -sI https://operscale.cloud/admin                    → 200
-  curl -sI https://operscale.cloud/auth/callback            → 307 with
-    Location: https://operscale.cloud/admin?reason=expired
+  curl -sI https://operscale.cloud/admin                   → 200
+  curl -sI https://operscale.cloud/auth/callback           → 307 to /admin?reason=expired
 
-Migration applied through 0010. supabase/migrations/0001 to 0010
-all on disk and applied to staging Supabase:
-- 0009 — activity_log founder INSERT + READ policies
-- 0010 — customers + brief_photos founder READ policies
+Migrations 0001-0010 applied to staging Supabase.
 ```
-
----
 
 ## First message (paste AFTER the system context)
 
 ```
-Begin V2 Phase 6 brainstorming.
+Begin AUTH HOTFIX. Read MEMORY.md, project_state.md (especially
+"AUTH BLOCKER" section), and apps/web/src/app/auth/callback/route.ts +
+apps/web/src/lib/supabase-browser.ts + apps/web/src/lib/supabase-server.ts.
 
-Read MEMORY.md, project_state.md (especially the "V2 Phase 5 —
-✅ COMPLETE" section + the "Phase 6 starting points" block at the
-end), and skim docs/specs/data-model.md for the briefs +
-brief_photos + customers schema affordances. The Phase 5 spec
-(docs/specs/v2-phase-5-design.md) is also useful — it documents
-which form_payload keys the AI analyzer + CRM projection consume.
+Then either:
+(a) Ask me to retry the magic-link sign-in flow so we can capture the
+    actual exchangeCodeForSession error from the redirect URL or web
+    container logs.
+(b) If you're confident the PKCE-cookie-domain hypothesis is correct
+    based on the existing diagnostics, apply Path A (cookie domain
+    fix) directly: add `domain: '.operscale.cloud'` to cookieOptions
+    in supabase-browser.ts AND inject the same domain into the
+    cookiesToSet handler in supabase-server.ts (both getSupabaseServer
+    and getSupabaseMiddleware).
 
-Then run superpowers:brainstorming with this premise:
+Either way: ONE fix attempt, tested end-to-end before iterating.
+If Path A fails, switch to Path B (implicit flow). Don't iterate
+on A.
 
-  Phase 6 builds the CUSTOMER BRIEF FORM at apps/web/src/app/brief/*
-  — the FIRST customer-facing surface in the repo (Phases 1-5 lived
-  in apps/agent's API routes + apps/web's founder-only /admin
-  surface). The customer arrives via marketing site CTA → fills a
-  multi-step form → uploads optional photos → hits submit → form
-  POSTs to /v1/brief/submit (NEW route on apps/agent) which writes
-  briefs + customers + brief_photos rows + creates the order +
-  enqueues the analyze job + (Phase 7 concern) sends the auto-ack
-  email. Customer sees a "thanks, check your inbox" page.
-
-  Per CLAUDE.md file ownership: apps/web/src/app/brief/* is "Test on
-  real mobile devices" — Nigerian SMB founders fill this on a phone,
-  often on a flaky 3G connection. Mobile-first is non-negotiable, and
-  partial-completion persistence (save token round-trips to Supabase
-  after each step per VG fork pattern) is mandatory.
-
-  Decisions to surface during brainstorming (anything not pre-
-  decided in the spec):
-
-  1. Form structure: how many steps? Hard cap at 4-5 to keep
-     completion rate ≥ 35% target (CLAUDE.md "What good looks like").
-     Likely shape: (1) brand basics + niche, (2) tone + audience,
-     (3) examples/competitors + style refs, (4) optional photos,
-     (5) review + submit. Founder confirm step boundaries.
-
-  2. Save-token UX: anonymous form fills → server generates a UUID
-     save_token cookie (httpOnly, 30-day TTL) → every step PATCHes
-     a draft row in `briefs` (status='draft'). On final submit,
-     status flips to 'analyzing' and the save_token is rotated.
-     Founder preference on resume-via-link email vs cookie-only?
-
-  3. Photo upload: tfjs blazeface advisory (CLAUDE.md locked stack)
-     runs browser-side BEFORE upload — warns "this photo doesn't
-     show a clear face" but does NOT block. Photos go to private
-     Supabase Storage bucket via signed-upload-URL pattern (DO NOT
-     expose service-role to client). Max N photos? 5? Founder pref.
-
-  4. Validation: zod schemas for each step, server-side re-validate
-     on submit, client-side eager validation on blur. Pattern from
-     Phase 4 + 5: zod schemas live in apps/agent/src/lib/types/v2.ts;
-     apps/web imports from there or duplicates? (Per Phase 4.5
-     cyclic-dep pattern: duplicate is safer than circular. But
-     form_payload keys are load-bearing so they MUST stay in sync
-     with the analyzer projector — see build-discipline notes.)
-
-  5. Niche-specific branching: the 8 niches (defined in
-     niche-briefs/*) have different "what we need to know" lists.
-     Does the form branch on niche-selected, or stay one-size-fits-
-     all with a free-text "anything else" field? Founder preference.
-
-  6. Auto-ack email: probably Phase 7 (separate phase per roadmap),
-     but the submit handler MUST enqueue a job that Phase 7 will
-     consume. Confirm scope boundary: Phase 6 = form + submit
-     handler + draft persistence + photo upload, Phase 7 = auto-ack
-     email + drop-off recovery emails (12h, 48h).
-
-  7. Brand-name placeholder: every customer-facing string uses
-     <brand-name>. Day 15 of build is the brand-locking PR; until
-     then CI grep-checks the placeholder is present in expected
-     places. Form copy MUST honour this.
-
-  8. Marketing CTA inbound: where does the customer land? `/brief/`
-     directly, or `/` (homepage with hero + CTA → `/brief/`)?
-     Marketing site is Phase 8, so Phase 6 probably ships a stub
-     `/` that redirects to `/brief/` for now. Founder confirm.
-
-  Pre-decided constraints (DO NOT brainstorm — these are locked):
-
-  - form_payload canonical keys live in
-    apps/agent/src/lib/types/v2.ts BriefAnalyzerInput +
-    apps/agent/src/worker/process-job.ts projector. Form WRITES to
-    these keys exactly; no renaming without updating both consumers
-    in the same commit.
-  - Photos go to private Supabase Storage bucket via SIGNED upload
-    URLs — apps/web/src/app/brief/* NEVER touches
-    SUPABASE_SERVICE_ROLE_KEY. The upload-URL endpoint lives on
-    apps/agent.
-  - blazeface model is ADVISORY only. Never block submit on photo
-    quality (CLAUDE.md locked stack: "advisory, not blocking").
-  - Form completion target: ≥ 35% within 60 days. Anything that
-    pushes against this needs a writedown.
-  - Photo opt-in target: ≥ 40%. Photo step is OPTIONAL; making it
-    feel mandatory is a CRO regression.
-  - The customers table uses full_name + whatsapp_number columns
-    (NOT name/whatsapp). Use PostgREST aliasing on read (Phase 5
-    pattern) but write the canonical column names on insert.
-  - REPLICA IDENTITY FULL is set on briefs + orders for Realtime —
-    if Phase 6 adds a new table the founder will read in CRM, set
-    it on the new table too (gotcha #4).
-  - No Phase 2 work. Don't think about video/carousel rendering.
-
-After brainstorming completes, write the design doc at
-docs/specs/v2-phase-6-design.md, then the implementation plan at
-docs/plans/<YYYY-MM-DD>-v2-phase-6-customer-form.md. Don't start
-execution until both are committed and the founder has confirmed
-direction.
+End-state acceptance: I (founder, akinolaakinrimisi@gmail.com) can
+sign in via the magic link and land on /admin/pending-review with a
+founder_signed_in row in activity_log. Anything short of that = not
+done.
 
 NEVER:
-- Commit/push secrets. The repo is public; one mistake is permanent.
+- Commit/push secrets. Public repo.
 - Use git --no-verify.
-- Inline keys in code/config/docs/workflow.
-- Add a brief/ page that calls SUPABASE_SERVICE_ROLE_KEY from a
-  client component. Service-role usage is API-route-only.
-- Block submit on blazeface output (advisory only).
-- Skip the "observability before automation" pattern — log every
-  customer step transition to activity_log BEFORE adding any
-  drop-off recovery automation that reads from it.
-- Touch any Phase 5 admin route, modal, or CRM read path without a
-  separate brainstorm. The CRM is now load-bearing for daily founder
-  ops; regressions are visible immediately.
-- Touch any 4.6 webhook code without a separate brainstorm + plan.
-- Hardcode the brand name. Use <brand-name> placeholder until the
-  Day 15 brand-locking PR.
-
-Phase 5.x carry-forwards (deliberately deferred — DO NOT pull into
-Phase 6 unless the founder explicitly re-prioritises):
-- Inline edit of AI fields + /v1/brief/edit-field route
-- 2-hour WhatsApp founder alert cron
-- 12-hour session-inactivity timeout
-- Photo lightbox via /v1/admin/photo-signed-url
-- "Resend brief email" recovery action for brief_email_failed
-- Restricted-niche flag handling
-- Receipt PDF on payment confirmation (was Phase 4.7)
-- Modal a11y polish (backdrop click, Esc key, role="dialog")
-- Workspace typecheck/lint redundancy cleanup (Task 11 noted
-  apps/web pnpm typecheck/lint duplicate the workspace-level
-  pnpm -r jobs)
-
-Open follow-up tracked from Phase 5 close:
-- supabase-js join firstOrNull helper repeats in 4 sites
-  (apps/web/src/app/admin/pending-review + orders/[id] + paid-
-  orders + RealtimeQueue). Overdue for extraction to
-  apps/web/src/lib/supabase-embed.ts. If Phase 6 adds a 5th site
-  (e.g. brief draft resume reads), do the extraction in the same
-  PR.
-```
-
----
-
-## Useful one-liners (carry forward as-is)
-
-```bash
-# Live stack health
-curl -sI https://api.operscale.cloud/v1/health
-curl -sI https://operscale.cloud/
-curl -sI https://operscale.cloud/admin
-
-# Phase 4 + 4.5 + 4.6 + 5 routes (should all be 401 / 200, real)
-curl -X POST https://api.operscale.cloud/v1/brief/analyze \
-  -H 'content-type: application/json' -d '{}'
-curl -X POST https://api.operscale.cloud/v1/brief/approve \
-  -H 'content-type: application/json' -d '{}'
-curl -X POST https://api.operscale.cloud/v1/brief/discard \
-  -H 'content-type: application/json' -d '{}'
-curl -X POST https://api.operscale.cloud/v1/webhook/paystack \
-  -H 'content-type: application/json' -d '{}'
-
-# Phase 5 callback proxy-aware redirect (must NOT show 0.0.0.0 or :3001)
-curl -sI https://operscale.cloud/auth/callback | grep -i location
-# Expect: Location: https://operscale.cloud/admin?reason=expired
-
-# Local agent (run from apps/agent)
-pnpm test
-pnpm typecheck
-pnpm build:worker
-
-# Local web (run from apps/web)
-pnpm test
-pnpm typecheck
-pnpm build
-
-# Workspace-level (run from repo root)
-pnpm -r test
-pnpm -r typecheck
-
-# VPS rebuild (bakes in git pull)
-PYTHONIOENCODING=utf-8 python C:\tmp\vps-rebuild.py
-
-# Phase 4.5 smoke (still works against live VPS — exercises the
-# enqueue/analyze/approve/paystack-init/email-send forward path)
-PYTHONIOENCODING=utf-8 python C:\tmp\phase4-5-smoke.py
-
-# Phase 4.6 smoke (two-phase: setup then verify, with manual
-# browser payment in between using test card 4084 0840 8408 4081)
-PYTHONIOENCODING=utf-8 python C:\tmp\phase4-6-smoke.py setup
-# (open URL, pay)
-PYTHONIOENCODING=utf-8 python C:\tmp\phase4-6-smoke.py verify
-
-# Phase 5 live smoke runbook (founder-driven manual steps):
-#   docs/runbooks/phase-5-smoke.md
-# Phase 5 schema-reality integration test (gated):
-cd apps/agent && SMOKE=1 pnpm test phase5-schema
-
-# Webhook replay pattern (avoids re-paying for debug runs):
-# 1. SELECT raw_payload from existing payments row.
-# 2. DELETE the payments row + webhook_handler_failed log.
-# 3. Build {event:'charge.success', data: raw_payload} envelope.
-# 4. HMAC-SHA512 sign with PAYSTACK_SECRET_KEY.
-# 5. POST to /v1/webhook/paystack with x-paystack-signature header.
-# Used in Phase 4.6 Task 6 to verify schema fix without a fresh
-# Paystack transaction. See git log around commit 030399d.
-
-# Tail agent logs on VPS
-PYTHONIOENCODING=utf-8 python -c "
-import paramiko
-with open(r'c:\Users\DELL\Documents\Antigravity\operscale-calender\.env', encoding='utf-8') as f:
-    pw = next(l.split('=', 1)[1].strip() for l in f if l.startswith('server_password='))
-c = paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-c.connect('srv1297445.hstgr.cloud', 22, 'root', pw, timeout=20, allow_agent=False, look_for_keys=False)
-_, out, _ = c.exec_command('docker logs --tail=50 operscale-calendar-agent 2>&1 | tail -50', timeout=30)
-print(out.read().decode())
-c.close()
-"
-
-# Tail web logs on VPS (Phase 5 added — useful for /auth/callback debug)
-PYTHONIOENCODING=utf-8 python -c "
-import paramiko
-with open(r'c:\Users\DELL\Documents\Antigravity\operscale-calender\.env', encoding='utf-8') as f:
-    pw = next(l.split('=', 1)[1].strip() for l in f if l.startswith('server_password='))
-c = paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-c.connect('srv1297445.hstgr.cloud', 22, 'root', pw, timeout=20, allow_agent=False, look_for_keys=False)
-_, out, _ = c.exec_command('docker logs --tail=50 operscale-calendar-web 2>&1 | tail -50', timeout=30)
-print(out.read().decode())
-c.close()
-"
-
-# Apply a new migration to staging
-PYTHONIOENCODING=utf-8 python -c "
-import paramiko, pathlib
-pw = next(l.split('=', 1)[1].strip() for l in pathlib.Path(r'c:\Users\DELL\Documents\Antigravity\operscale-calender\.env').read_text(encoding='utf-8').splitlines() if l.startswith('server_password='))
-c = paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-c.connect('srv1297445.hstgr.cloud', 22, 'root', pw, timeout=20, allow_agent=False, look_for_keys=False)
-sftp = c.open_sftp()
-local = r'<absolute-path-to-NEW-migration.sql>'
-remote = '/tmp/' + local.split(chr(92))[-1]
-sftp.put(local, remote)
-sftp.close()
-_, out, err = c.exec_command(f'docker cp {remote} supabase-db-1:/tmp/m.sql && docker exec supabase-db-1 psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f /tmp/m.sql && docker exec supabase-db-1 psql -U postgres -d postgres -t -A -c \"NOTIFY pgrst, \\'reload schema\\'\"', timeout=30)
-print(out.read().decode()); print(err.read().decode())
-c.close()
-"
-
-# Brand-name grep check (CI runs this on every PR until brand-lock day)
-grep -r '<brand-name>' apps/web/src apps/agent/src docs/
-
-# Current branch state
-git log --oneline -10
-git status --short
+- Touch shared Supabase compose at /docker/supabase/. Auth-1 config
+  is correct.
+- Add new abstractions or refactors during this hotfix.
+- Disable, mock, or fall back to make a test pass. Real fix only.
 ```
