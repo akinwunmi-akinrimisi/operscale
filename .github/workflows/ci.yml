@@ -12,8 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Brand placeholder check
+      - name: Brand placeholder check (post-lock — Operscale, 2026-05-07)
         run: bash scripts/check-brand-placeholder.sh
+        env:
+          BRAND_LOCKED: 'true'
       - name: Env scoping check (no NEXT_PUBLIC_*_KEY leaks)
         run: bash scripts/check-env-scoping.sh
       - name: No hardcoded API keys
