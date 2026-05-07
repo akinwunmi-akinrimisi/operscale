@@ -48,6 +48,26 @@ export type TemplateKey =
   | 'recovery-brief'
   | 'recovery-payment';
 
+// Dedup windows per template (minutes). recovery-* run on a 30-min cron and
+// must not re-fire for the same brief/order within the recovery cooldown.
+const DEDUP_WINDOW_MINUTES: Record<TemplateKey, number> = {
+  'auto-ack': 60,
+  'save-token': 60,
+  'brief-email': 60,
+  'payment-confirmation': 60,
+  'recovery-form': 24 * 60,
+  'recovery-brief': 24 * 60,
+  'recovery-payment': 4 * 60,
+};
+
+// Templates that key idempotency by brief_id (no order exists yet, or the
+// email is brief-scoped not order-scoped).
+const BRIEF_SCOPED_TEMPLATES = new Set<TemplateKey>([
+  'auto-ack',
+  'save-token',
+  'recovery-form',
+]);
+
 export interface SendEmailInput {
   to: string;
   templateKey: TemplateKey;
@@ -73,22 +93,32 @@ export class EmailSendError extends Error {
 
 const RETRY_DELAYS_MS = [500, 1000, 2000];
 
-const SUPPORTED_TEMPLATES: ReadonlyArray<TemplateKey> = ['brief-email', 'payment-confirmation'];
+const SUPPORTED_TEMPLATES: ReadonlyArray<TemplateKey> = [
+  'brief-email',
+  'payment-confirmation',
+  'auto-ack',
+  'save-token',
+  'recovery-form',
+];
 
 async function checkIdempotencyCache(
   supabase: ReturnType<typeof getSupabaseAdmin>,
   templateKey: TemplateKey,
-  orderId: string | undefined,
+  scope: { briefId?: string; orderId?: string },
 ): Promise<string | null> {
-  if (!orderId) return null;
   const eventType = `${templateKey.replace(/-/g, '_')}_sent`; // 'brief_email_sent'
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const windowMs = (DEDUP_WINDOW_MINUTES[templateKey] ?? 60) * 60 * 1000;
+  const cutoff = new Date(Date.now() - windowMs).toISOString();
+  const briefScoped = BRIEF_SCOPED_TEMPLATES.has(templateKey);
+  const lookupId = briefScoped ? scope.briefId : scope.orderId;
+  if (!lookupId) return null; // can't dedup without a key — caller will send
+  const lookupCol = briefScoped ? 'brief_id' : 'order_id';
   const { data } = await supabase
     .from('activity_log')
     .select('payload')
     .eq('event_type', eventType)
-    .eq('order_id', orderId)
-    .gt('occurred_at', oneHourAgo)
+    .eq(lookupCol, lookupId)
+    .gt('occurred_at', cutoff)
     .order('occurred_at', { ascending: false })
     .limit(1);
   const row = (data ?? [])[0];
@@ -131,8 +161,13 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
 
   const supabase = getSupabaseAdmin();
 
-  // Idempotency cache: skip Resend entirely on hit.
-  const cached = await checkIdempotencyCache(supabase, input.templateKey, input.orderId);
+  // Idempotency cache: skip Resend entirely on hit. Brief-scoped templates
+  // (auto-ack, save-token, recovery-form) dedup by briefId; everything else
+  // dedups by orderId. Window varies per template (see DEDUP_WINDOW_MINUTES).
+  const cached = await checkIdempotencyCache(supabase, input.templateKey, {
+    briefId: input.briefId,
+    orderId: input.orderId,
+  });
   if (cached) return { resendMessageId: cached };
 
   const resend = new Resend(apiKey);

@@ -147,7 +147,12 @@ describe('sendEmail', () => {
   });
 
   it('throws on unsupported templateKey', async () => {
-    await expect(sendEmail({ ...baseInput, templateKey: 'auto-ack' })).rejects.toBeInstanceOf(EmailSendError);
+    // 'recovery-brief' is declared in TemplateKey but not yet wired in
+    // SUPPORTED_TEMPLATES. Phase 6.1 added auto-ack/save-token/recovery-form
+    // to the supported set; recovery-brief/recovery-payment remain stubs.
+    await expect(sendEmail({ ...baseInput, templateKey: 'recovery-brief' })).rejects.toBeInstanceOf(
+      EmailSendError,
+    );
     expect(resendSpy).not.toHaveBeenCalled();
   });
 
